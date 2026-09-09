@@ -149,7 +149,7 @@ export interface Skeleton<E = unknown, C extends ComputeMap = ComputeMap> {
  */
 export type JsonSchema =
   | { readonly type: 'string'; readonly enum?: readonly string[]; readonly minLength?: number; readonly maxLength?: number; readonly description?: string }
-  | { readonly type: 'number'; readonly entier?: boolean; readonly minimum?: number; readonly maximum?: number; readonly description?: string }
+  | { readonly type: 'number' | 'integer'; readonly minimum?: number; readonly maximum?: number; readonly description?: string }
   | { readonly type: 'boolean'; readonly description?: string }
   | { readonly type: 'array'; readonly items: JsonSchema; readonly minItems?: number; readonly maxItems?: number; readonly description?: string }
   | {
