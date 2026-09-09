@@ -15,8 +15,17 @@ import { cachesAPurger, fichiersAPrecacher, nomCache, strategiePour } from './sw
 
 declare const self: ServiceWorkerGlobalScope
 
-const VERSION = '1'
-const CACHE = nomCache(VERSION)
+/**
+ * L'empreinte de la construction, injectée par `vite.sw.config.ts`.
+ *
+ * Elle n'est pas cosmétique : le navigateur ne réinstalle un service worker
+ * que si son fichier a changé d'un octet. Une version écrite en dur rendait
+ * `sw.js` identique d'une construction à l'autre, et l'application ne pouvait
+ * plus jamais se mettre à jour chez quelqu'un qui l'avait ouverte une fois.
+ */
+declare const __EMPREINTE__: string
+
+const CACHE = nomCache(__EMPREINTE__)
 const COQUILLE = '/index.html'
 
 self.addEventListener('install', (evenement) => {
@@ -61,6 +70,21 @@ self.addEventListener('fetch', (evenement) => {
       const cache = await caches.open(CACHE)
 
       if (strategie === 'coquille') {
+        /*
+         * La coquille se sert depuis le cache, telle quelle.
+         *
+         * On a essayé de la rafraîchir derrière, pour rattraper un service
+         * worker qui ne se serait pas réinstallé. C'était pire : la coquille
+         * est le seul fichier dont le nom ne porte pas d'empreinte, et c'est
+         * elle qui nomme tous les autres. En écrire une neuve dans le cache
+         * courant y laisse une coquille qui réclame des fichiers que ce cache
+         * n'a pas — et le mode avion tombe. L'essai de bout en bout l'a
+         * montré.
+         *
+         * La mise à jour se fait donc là où elle est atomique : la
+         * réinstallation du service worker, qui remplit un cache neuf avec la
+         * coquille *et* ses fichiers avant de purger l'ancien.
+         */
         const coquille = await cache.match(COQUILLE)
         if (coquille !== undefined) return coquille
         return fetch(requete)

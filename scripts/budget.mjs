@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
@@ -112,6 +113,34 @@ for (const requis of ['precache.json', 'sw.js']) {
   } catch {
     echecs.push(`${requis} manquant : l'application ne fonctionnerait pas hors ligne`)
   }
+}
+
+/*
+ * Le service worker doit porter l'empreinte de la construction.
+ *
+ * Le navigateur ne le réinstalle que si son fichier a changé d'un octet. Avec
+ * une version écrite en dur, `sw.js` était identique d'une construction à
+ * l'autre : aucune réinstallation, aucune purge du cache, et la coquille
+ * d'une version précédente servie indéfiniment — donc une application qui ne
+ * pouvait plus jamais se mettre à jour chez quelqu'un qui l'avait ouverte une
+ * fois. Ça n'a été vu qu'en production, par un utilisateur.
+ *
+ * Ce contrôle refait le calcul du côté de la construction et exige de le
+ * retrouver dans le fichier livré.
+ */
+try {
+  const liste = readFileSync(join(DIST, 'precache.json'), 'utf8')
+  const empreinte = createHash('sha256').update(liste).digest('hex').slice(0, 12)
+  const sw = readFileSync(join(DIST, 'sw.js'), 'utf8')
+  if (!sw.includes(empreinte)) {
+    echecs.push(
+      `sw.js ne porte pas l'empreinte de la construction (${empreinte}) : ` +
+        'le navigateur ne le réinstallerait pas, et les mises à jour ne ' +
+        'parviendraient jamais à ceux qui ont déjà ouvert l’application',
+    )
+  }
+} catch {
+  echecs.push('impossible de vérifier l’empreinte du service worker')
 }
 
 if (echecs.length > 0) {
