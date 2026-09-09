@@ -1,5 +1,7 @@
 import type { CardSpec, Instantane, RenderContext } from '@a237/engine'
-import { squeletteDeCalcul, squeletteDeRegistre, squeletteParId } from '@a237/engine'
+import {
+  limiterItems, squeletteDeCalcul, squeletteDeRegistre, squeletteParId, texteReste,
+} from '@a237/engine'
 import {
   DocumentAttestation, DocumentCv, DocumentDette, DocumentDevis, DocumentFacture,
   DocumentMotivation, DocumentRecu,
@@ -76,9 +78,19 @@ function squeletteCompose(instantane: Instantane): { card: (e: never, c: RenderC
   return null
 }
 
-/** La carte, dessinée en HTML — pas en image. */
+/**
+ * La carte, dessinée en HTML — pas en image.
+ *
+ * Elle plafonne sa liste comme le fait l'image partagée, avec le même
+ * `limiterItems` du moteur. Sans cela l'image annonçait « + 47 autres » et la
+ * page en listait cinquante-sept : ce n'était plus le même résumé. Et une
+ * liste de prix de quincaillerie en compte deux cents, ce qui portait la page
+ * à 29,6 Ko — au-delà du plafond du § 8, et sans limite au-delà.
+ */
 export function VueCarte(props: { readonly carte: CardSpec }): JSX.Element {
   const c = props.carte
+  const { visibles, reste } = limiterItems(c.items)
+  const autres = texteReste(reste)
   return (
     <article class="lecture-carte">
       <header>
@@ -98,17 +110,18 @@ export function VueCarte(props: { readonly carte: CardSpec }): JSX.Element {
         {c.subline !== '' && <p class="ligne">{c.subline}</p>}
       </section>
 
-      {c.items.length > 0 && (
+      {visibles.length > 0 && (
         <section class="detail">
           {c.listTitle !== '' && <p class="etiquette">{c.listTitle}</p>}
           <ul>
-            {c.items.map((i) => (
+            {visibles.map((i) => (
               <li key={i.n} class={i.warn ? 'alerte' : i.ok ? 'fait' : ''}>
                 <span class="quoi">{i.n}</span>
                 {i.val !== null && <span class="combien">{i.val}</span>}
               </li>
             ))}
           </ul>
+          {autres !== null && <p class="reste">{autres}</p>}
         </section>
       )}
     </article>

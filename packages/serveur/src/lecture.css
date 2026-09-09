@@ -78,6 +78,14 @@ body {
 .lecture-carte li.alerte .combien { color: var(--alerte); font-weight: 700; }
 .lecture-carte li.fait .combien { color: var(--accent); }
 .lecture-carte .combien { white-space: nowrap; }
+/* « + 47 autres » : la carte est un résumé, elle dit ce qu'elle ne montre pas. */
+.lecture-carte .reste {
+  margin: 10px 0 0;
+  padding-top: 7px;
+  border-top: 1px solid var(--trait);
+  color: var(--encre-2);
+  font-size: 13px;
+}
 /*
  * Le pied s'efface derrière le document.
  *
