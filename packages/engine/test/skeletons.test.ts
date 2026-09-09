@@ -42,6 +42,13 @@ describe('le contrat que tout squelette doit tenir', () => {
     expect(s.schema.type).toBe('object')
   })
 
+  it('ne confond pas le devis et la facture', () => {
+    // Le prototype rangeait « facture » dans les mots-clés du devis. Un devis
+    // ne vaut rien fiscalement ; c'est la facture que la DGI contrôle.
+    expect(trouverSquelette('un devis', SQUELETTES)?.id).toBe('devis')
+    expect(trouverSquelette('une facture', SQUELETTES)?.id).toBe('facture')
+  })
+
   it('n’a pas deux squelettes du même identifiant', () => {
     const ids = SQUELETTES.map((s) => s.id)
     expect(new Set(ids).size).toBe(ids.length)
@@ -167,6 +174,9 @@ describe('étage 1 — la correspondance de mots-clés, à zéro jeton', () => {
     ['je veux tenir une tontine', 'njangi'],
     ['faire un chiffrage pour un chantier', 'devis'],
     ['CAGNOTTE du quartier', 'njangi'],
+    ['je dois facturer un client', 'facture'],
+    ['ma facture n’est pas payée', 'facture'],
+    ['suivre les impayés', 'facture'],
   ])('« %s » → %s', (demande, id) => {
     expect(trouverSquelette(demande, SQUELETTES)?.id).toBe(id)
   })
