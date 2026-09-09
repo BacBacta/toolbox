@@ -96,12 +96,10 @@ C'est arrivé : `--production-branch main` à la création n'a pas tenu, la
 répondait « Deployment complete », le domaine servait bien l'application — mais
 c'était un déploiement plus ancien.
 
-La `production_branch` a été remise à `main`, et la mise en ligne se fait donc
-avec `--branch main`. **Attention** : `main` n'existe pas encore dans le dépôt
-— tout le travail vit sur une branche de session. Ça ne gêne pas l'envoi
-direct, où la branche n'est qu'une étiquette que `wrangler` transmet. Ça
-gênerait le jour où le dépôt serait relié à Pages pour un déploiement
-automatique : il faudra alors que `main` existe vraiment.
+La `production_branch` a été remise à `main`, `main` existe dans le dépôt, et
+la mise en ligne se fait avec `--branch main`. Les trois doivent rester
+d'accord : c'est leur désaccord qui envoie un déploiement en préversion sans
+le dire.
 
 À vérifier d'un coup d'œil quand quelque chose ne prend pas :
 
