@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  verif:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Porte l'invariant du moteur pur : packages/engine compile sans "DOM".
+      - run: pnpm typecheck
+
+      # Le seuil de 90 % de couverture est dans vitest.config.ts, et il échoue
+      # la CI par lui-même (section 8 du brief : à faire échouer, pas à
+      # surveiller à l'œil). Le budget de poids du bundle arrivera avec
+      # apps/web — il n'y a rien à peser tant que la PWA n'existe pas.
+      - run: pnpm test:cov
