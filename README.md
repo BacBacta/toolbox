@@ -26,9 +26,14 @@ commencé, conformément au point 4 de la section 11 du brief.
 | `apps/web` | la PWA : accueil, stockage IndexedDB, formulaire dressé à partir du schéma, diffusion, service worker |
 | `e2e` | une vérification dans un vrai navigateur, mode avion compris |
 
-688 tests, couverture à 95 %. Coquille initiale : **18,6 Ko gzip** pour un
+695 tests, couverture à 95 %. Coquille initiale : **18,6 Ko gzip** pour un
 plafond de 120. Deux dépendances tierces de production : `preact` et
 `idb-keyval`.
+
+En ligne sur **https://atelier237.vercel.app**, et **vérifié sur un vrai
+téléphone** — la cible, pas un émulateur. Restent à confirmer sur ce même
+téléphone : le mode avion, et l'ouverture de WhatsApp depuis « Partager la
+carte » (§ 6 du brief).
 
 ```bash
 pnpm install

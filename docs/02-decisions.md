@@ -121,6 +121,18 @@ production** à ce stade, `preact` — cinq étaient autorisées. La question de
 
 ---
 
+## Vérifié sur le terrain
+
+| Quoi | Où | Quand |
+|---|---|---|
+| Les trois outils écrits fonctionnent sur un vrai téléphone | https://atelier237.vercel.app | 9 septembre 2026 |
+
+C'est la première fois que le produit tourne sur sa cible et non sur une machine
+de développement. Deux choses restent à confirmer **sur ce même téléphone**, et
+elles ne se déduisent pas de la première : que l'application s'ouvre données
+coupées, et que « Partager la carte » ouvre bien WhatsApp — la section 6 du
+brief insiste, « pas seulement sur le tien ».
+
 ## Reportées, et à quel moment il faudra trancher
 
 | Sujet | Quand | Ce qui est déjà prêt |
