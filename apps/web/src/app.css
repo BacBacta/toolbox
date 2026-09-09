@@ -1,81 +1,132 @@
 /*
- * La coquille : accueil, formulaires, feuille de diffusion.
+ * La coquille : accueil, formulaire dressé à partir du schéma, feuille de
+ * diffusion.
  *
- * Elle reprend les variables de `outil.css`, qui les déclare sur `.outil`.
- * Ici on les redéclare sur `.app` pour que l'accueil et les feuilles en
- * profitent aussi.
- *
- * Cibles : Android d'entrée de gamme, doigt, écran de 360 px de large.
+ * Les jetons — palette, rythme, formes, mouvement — viennent de
+ * `@a237/render/styles/outil.css`, qui les déclare sur `:root`. Rien n'est
+ * redéclaré ici : deux palettes finiraient par diverger.
  */
 
-.app {
-  --accent: #1b5e43;
-  --encre: #131a14;
-  --encre-2: #4a554a;
-  --encre-3: #7d887c;
-  --trait: #e1e7dc;
-  --fond: #fbfcf8;
-  --alerte: #a32a1d;
-  --bandeau: #eef2ea;
-
+* {
   box-sizing: border-box;
-  max-width: 720px;
-  min-height: 100dvh;
-  margin: 0 auto;
-  padding: 16px 16px 40px;
-  background: var(--fond);
-  color: var(--encre);
-  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-.app *,
-.app *::before,
-.app *::after {
-  box-sizing: border-box;
+html {
+  background: var(--fond);
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  max-width: 760px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: var(--pas-5) var(--pas-4) var(--pas-6);
+  background: var(--fond);
+  color: var(--encre);
+  font: 15px/1.5 var(--police);
+  font-variant-numeric: tabular-nums;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ───────────────────────────── l'accueil ───────────────────────────── */
+
+.app-entete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--pas-3);
+  margin-bottom: var(--pas-5);
 }
 
 .titre-app {
-  margin: 4px 0 16px;
-  font-size: 22px;
-  letter-spacing: 0.02em;
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.app-baseline {
+  font-size: 13px;
+  color: var(--encre-3);
 }
 
 .retour {
-  min-height: 44px;
-  margin-bottom: 8px;
-  padding: 0 12px 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pas-2);
+  min-height: var(--cible);
+  margin-bottom: var(--pas-3);
+  padding: 0 var(--pas-3) 0 0;
   border: 0;
   background: none;
   color: var(--accent);
   font: inherit;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .grille {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 8px;
-  margin: 12px 0 8px;
+  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+  /* Toutes les tuiles d'une rangée à la même hauteur, quel que soit le nombre
+     de lignes que prend le titre. */
+  grid-auto-rows: 1fr;
+  gap: var(--pas-2);
+  margin: var(--pas-3) 0 var(--pas-5);
 }
 
 .carte-squelette {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-height: 64px;
-  padding: 12px;
+  align-items: center;
+  gap: var(--pas-3);
+  min-height: 72px;
+  padding: var(--pas-3);
   border: 1px solid var(--trait);
-  border-radius: 12px;
-  background: #fff;
+  border-radius: var(--rond-l);
+  background: var(--surface);
+  box-shadow: var(--ombre-1);
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: transform var(--vitesse) var(--courbe), box-shadow var(--vitesse) var(--courbe);
+}
+
+.carte-squelette:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.carte-squelette .marque {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: var(--rond-m);
+  background: var(--accent-doux);
+  color: var(--accent);
+  font-size: 19px;
+  line-height: 1;
+}
+
+.carte-squelette .texte {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
 
 .carte-squelette b {
   font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .carte-squelette span {
@@ -92,48 +143,64 @@
   cursor: pointer;
 }
 
-/* ─────────────────────────────── formulaire ─────────────────────────────── */
+/* ───────────────────── formulaire dressé par le schéma ───────────────────── */
 /*
  * Les règles de base des champs vivent dans `@a237/render` : ce sont ses
  * composants qui les emploient. Ici, seulement ce qui est propre au formulaire
  * dressé à partir du schéma, qui n'existe que dans l'application.
  */
 
+.champ + .champ,
+.champ + .champ-groupe,
+.champ-groupe + .champ {
+  margin-top: var(--pas-3);
+}
+
 .champ-groupe {
-  margin: 12px 0;
-  padding: 12px;
+  margin: var(--pas-4) 0;
+  padding: var(--pas-4);
   border: 1px solid var(--trait);
-  border-radius: 12px;
+  border-radius: var(--rond-l);
+  background: var(--surface);
 }
 
 .champ-groupe legend {
-  padding: 0 6px;
-  font-size: 13px;
+  padding: 0 var(--pas-2);
+  font-size: 12px;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--accent);
 }
 
 .champ-element {
-  margin-bottom: 12px;
-  padding-bottom: 12px;
+  margin-bottom: var(--pas-4);
+  padding-bottom: var(--pas-4);
   border-bottom: 1px solid var(--trait);
 }
 
+.champ-element:last-of-type {
+  margin-bottom: var(--pas-3);
+}
+
 .champ-vide {
+  margin: var(--pas-2) 0;
   color: var(--encre-3);
   font-style: italic;
 }
 
 .champ-ajouter,
 .champ-retirer {
-  min-height: 44px;
-  padding: 0 14px;
-  border: 1px solid var(--trait);
-  border-radius: 10px;
-  background: #fff;
+  min-height: var(--cible);
+  margin-top: var(--pas-2);
+  padding: 0 var(--pas-4);
+  border: 1px solid var(--trait-champ);
+  border-radius: var(--rond-m);
+  background: var(--surface);
   color: inherit;
   font: inherit;
   font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -142,15 +209,45 @@
   cursor: not-allowed;
 }
 
-/* ─────────────────────────── messages et feuille ─────────────────────────── */
+/* ───────────────────────────── messages ───────────────────────────── */
 
 .alerte {
-  margin: 12px 0;
-  padding: 10px 12px;
-  border-left: 4px solid var(--alerte);
-  border-radius: 4px;
-  background: #f6e5e3;
+  margin: var(--pas-3) 0;
+  padding: var(--pas-3);
+  border-left: 3px solid var(--alerte);
+  border-radius: 0 var(--rond-s) var(--rond-s) 0;
+  background: var(--alerte-douce);
   font-size: 14px;
+  color: var(--encre);
+}
+
+.alerte ul {
+  margin: var(--pas-2) 0 0;
+  padding-left: var(--pas-5);
+}
+
+.alerte li {
+  margin-top: 2px;
+}
+
+/* Le geste qui fait disparaître l'encart, dans l'encart. */
+.alerte-action {
+  min-height: var(--cible);
+  margin-top: var(--pas-3);
+  padding: 0 var(--pas-4);
+  border: 1px solid var(--alerte);
+  border-radius: var(--rond-plein);
+  background: none;
+  color: var(--alerte);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.alerte-action:active {
+  background: var(--alerte);
+  color: var(--surface);
 }
 
 .etat-invalide code {
@@ -158,17 +255,81 @@
   word-break: break-all;
 }
 
-.alerte ul {
-  margin: 6px 0 0;
-  padding-left: 18px;
+/* ───────────────────────────── la diffusion ───────────────────────────── */
+
+/*
+ * La diffusion est une feuille posée par-dessus, ancrée en bas.
+ *
+ * Elle était rendue à la suite de l'outil : il fallait faire défiler pour la
+ * trouver, alors que c'est le moment où l'utilisateur montre son travail à
+ * quelqu'un. Sur un téléphone, ce moment doit venir à lui.
+ */
+.feuille-fond {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  border: 0;
+  padding: 0;
+  background: rgb(10 14 9 / 55%);
+  cursor: pointer;
+  animation: apparaitre var(--vitesse) var(--courbe);
 }
 
 .feuille {
-  margin-top: 20px;
-  padding: 16px;
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 11;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pas-3);
+  max-height: 90dvh;
+  padding: var(--pas-4) var(--pas-4) var(--pas-6);
   border: 1px solid var(--trait);
-  border-radius: 16px;
-  background: #fff;
+  border-bottom: 0;
+  border-radius: var(--rond-l) var(--rond-l) 0 0;
+  background: var(--surface-haute);
+  box-shadow: var(--ombre-2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  animation: monter calc(var(--vitesse) * 1.6) var(--courbe);
+}
+
+@media (min-width: 560px) {
+  .feuille {
+    inset: auto auto 0 50%;
+    width: min(520px, 100%);
+    transform: translateX(-50%);
+    border-radius: var(--rond-l) var(--rond-l) 0 0;
+  }
+}
+
+@keyframes apparaitre {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes monter {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+}
+
+@media (min-width: 560px) {
+  @keyframes monter {
+    from {
+      transform: translate(-50%, 14px);
+      opacity: 0;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feuille,
+  .feuille-fond {
+    animation: none;
+  }
 }
 
 .feuille-tete {
@@ -177,14 +338,22 @@
   justify-content: space-between;
 }
 
+.feuille-tete b {
+  font-size: 17px;
+}
+
 .feuille-fermer {
-  min-width: 44px;
-  min-height: 44px;
+  display: grid;
+  place-items: center;
+  width: var(--cible);
+  height: var(--cible);
   border: 0;
+  border-radius: var(--rond-plein);
   background: none;
   color: var(--encre-3);
   font: inherit;
   font-size: 22px;
+  line-height: 1;
   cursor: pointer;
 }
 
@@ -192,30 +361,55 @@
   display: block;
   width: 100%;
   height: auto;
-  margin: 10px 0;
+  margin: 0;
   border: 1px solid var(--trait);
-  border-radius: 12px;
+  border-radius: var(--rond-m);
+  /* La carte est un document clair : elle garde son fond même en thème sombre. */
+  background: #fbfcf8;
 }
 
 .resume {
-  margin: 8px 0;
-  padding: 10px 12px;
-  border-radius: 10px;
+  margin: 0;
+  padding: var(--pas-3);
+  border-radius: var(--rond-m);
   background: var(--bandeau);
+  color: var(--encre-2);
   font: inherit;
   font-size: 13px;
+  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-/* La feuille A4 est plus large qu'un téléphone : on la met à l'échelle. */
+.feuille .champ-aide {
+  margin-top: calc(var(--pas-2) * -1);
+}
+
+.feuille a.outil-bascule {
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+}
+
+/* ───────────────────────── l'aperçu d'un document ───────────────────────── */
+/*
+ * La feuille A4 est plus large qu'un téléphone : on la met à l'échelle, sans
+ * jamais changer sa taille réelle — c'est elle qui part à l'impression.
+ */
+
 .a4-cadre {
   --echelle: 0.42;
-  margin: 12px 0;
+  margin: var(--pas-3) 0;
 }
 
 @media (min-width: 560px) {
   .a4-cadre {
     --echelle: 0.62;
+  }
+}
+
+@media (min-width: 800px) {
+  .a4-cadre {
+    --echelle: 0.78;
   }
 }

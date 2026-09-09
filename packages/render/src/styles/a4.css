@@ -6,6 +6,10 @@
  * comment. Ici la page fait ses 210 × 297 mm et le texte ses points : on rend à
  * la taille vraie, et c'est l'aperçu qui est mis à l'échelle par --echelle.
  *
+ * **Cette feuille ignore le thème sombre, et c'est voulu** : un devis part à
+ * l'impression et chez un client. Il est blanc chez tout le monde. Elle ne lit
+ * donc aucun jeton de l'interface et se suffit à elle-même.
+ *
  * Aucune police web : on prend ce que le téléphone a déjà (invariant § 2.6).
  */
 
@@ -19,23 +23,32 @@
   transform: scale(var(--echelle));
   transform-origin: top left;
   margin-bottom: calc((297mm * var(--echelle)) - 297mm);
+  box-shadow: 0 2px 18px rgb(18 23 16 / 12%);
 }
 
 .a4 {
   --pa: #1f2a44;
-  --trait: #d8dde2;
-  --gris: #5a646b;
-  --gris-clair: #8c959b;
+  --trait: #d7dce1;
+  --trait-fort: #aeb6bd;
+  --gris: #4e575e;
+  --gris-clair: #7b848b;
 
   box-sizing: border-box;
   position: relative;
   width: 210mm;
   min-height: 297mm;
-  padding: 15mm 16mm 18mm;
+  padding: 15mm 16mm 20mm;
   background: #fff;
-  color: #1a1f24;
-  font: 9.5pt/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-variant-numeric: tabular-nums;
+  color: #16191c;
+  font: 9.5pt/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-variant-numeric: tabular-nums lining-nums;
+  /* Les aplats d'accent doivent sortir de l'imprimante, pas être « économisés ». */
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.a4 * {
+  box-sizing: border-box;
 }
 
 /* ─────────────────────────────── entête ─────────────────────────────── */
@@ -43,22 +56,25 @@
 .a4-entete {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 10mm;
-  padding-bottom: 3mm;
-  border-bottom: 0.6mm solid var(--pa);
+  padding-bottom: 3.5mm;
+  border-bottom: 0.7mm solid var(--pa);
 }
 
 .a4-entete .raison {
-  font-size: 13pt;
+  font-size: 14pt;
   font-weight: 700;
-  letter-spacing: 0.01em;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
   color: var(--pa);
 }
 
 .a4-entete .coordonnees,
 .a4-entete .immat {
+  margin-top: 1.5mm;
   font-size: 8pt;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--gris);
 }
 
@@ -70,30 +86,37 @@
 /* ─────────────────────────────── titre ─────────────────────────────── */
 
 .a4-titre {
-  margin-top: 8mm;
-  font-size: 20pt;
+  margin: 9mm 0 0;
+  font-size: 22pt;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  line-height: 1;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--pa);
 }
 
 .a4-sous-titre {
-  margin-top: 1mm;
+  margin-top: 2mm;
   font-size: 9pt;
   color: var(--gris);
 }
 
 .a4-bloc-client {
-  margin-top: 6mm;
-  padding: 3mm 4mm;
-  border: 0.3mm solid var(--trait);
+  margin-top: 7mm;
+  padding: 3.5mm 4mm;
+  border: 0.25mm solid var(--trait);
+  border-left: 1.2mm solid var(--pa);
+  border-radius: 0 1mm 1mm 0;
+  background: #fbfcfd;
   font-size: 9pt;
+  line-height: 1.55;
 }
 
 .a4-bloc-client .etiquette {
+  margin-bottom: 0.8mm;
   font-size: 7.5pt;
-  letter-spacing: 0.1em;
+  font-weight: 700;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--gris-clair);
 }
@@ -102,26 +125,32 @@
 
 .a4-tableau {
   width: 100%;
-  margin-top: 6mm;
+  margin-top: 7mm;
   border-collapse: collapse;
   font-size: 8.5pt;
 }
 
 .a4-tableau th {
-  padding: 2mm 2mm;
-  border-bottom: 0.5mm solid var(--pa);
+  padding: 2.4mm 2mm;
+  border-bottom: 0.6mm solid var(--pa);
   font-size: 7.5pt;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   text-align: left;
   color: var(--pa);
+  white-space: nowrap;
 }
 
 .a4-tableau td {
-  padding: 2mm 2mm;
+  padding: 2.4mm 2mm;
   border-bottom: 0.2mm solid var(--trait);
   vertical-align: top;
+}
+
+/* Une ligne de facture ne se coupe pas au milieu par un saut de page. */
+.a4-tableau tr {
+  break-inside: avoid;
 }
 
 .a4-tableau .nombre {
@@ -130,11 +159,11 @@
 }
 
 .a4-tableau tbody tr:last-child td {
-  border-bottom: 0.3mm solid var(--trait);
+  border-bottom: 0.4mm solid var(--trait-fort);
 }
 
 .a4-vide {
-  padding: 6mm 0;
+  padding: 8mm 0;
   color: var(--gris-clair);
   font-style: italic;
   text-align: center;
@@ -143,17 +172,18 @@
 /* ─────────────────────────────── totaux ─────────────────────────────── */
 
 .a4-totaux {
-  margin-top: 4mm;
+  margin-top: 5mm;
   margin-left: auto;
-  width: 85mm;
+  width: 88mm;
   font-size: 9pt;
+  break-inside: avoid;
 }
 
 .a4-totaux .ligne {
   display: flex;
   justify-content: space-between;
   gap: 6mm;
-  padding: 1.4mm 0;
+  padding: 1.6mm 1mm;
 }
 
 .a4-totaux .ligne + .ligne {
@@ -161,38 +191,46 @@
 }
 
 .a4-totaux .fort {
-  margin-top: 1mm;
-  padding: 2mm 3mm;
+  margin-top: 1.5mm;
+  padding: 2.6mm 3mm;
+  border: 0;
+  border-radius: 1mm;
   background: var(--pa);
   color: #fff;
-  font-size: 11pt;
+  font-size: 11.5pt;
   font-weight: 700;
-  border: 0;
+  letter-spacing: 0.01em;
 }
 
 .a4-en-lettres {
-  margin-top: 3mm;
+  margin-top: 4mm;
   font-size: 8.5pt;
   font-style: italic;
+  line-height: 1.55;
   color: var(--gris);
+  break-inside: avoid;
 }
 
-/* ─────────────────────────── mentions et pied ─────────────────────────── */
+/* ─────────────────────── mentions, signatures, pied ─────────────────────── */
 
 .a4-mentions {
-  margin-top: 6mm;
+  margin-top: 7mm;
   font-size: 8pt;
+  line-height: 1.6;
   color: var(--gris);
+  orphans: 2;
+  widows: 2;
 }
 
 .a4-mentions p {
-  margin: 0 0 1.5mm;
+  margin: 0 0 2mm;
 }
 
 .a4-signatures {
   display: flex;
   gap: 10mm;
-  margin-top: 10mm;
+  margin-top: 12mm;
+  break-inside: avoid;
 }
 
 .a4-signatures .zone {
@@ -202,32 +240,33 @@
 .a4-signatures .libelle {
   font-size: 7.5pt;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--pa);
 }
 
 .a4-signatures .mention {
-  margin-top: 0.5mm;
+  margin-top: 0.8mm;
   font-size: 7.5pt;
   color: var(--gris-clair);
 }
 
 .a4-signatures .cadre {
-  margin-top: 2mm;
-  height: 22mm;
-  border: 0.3mm dashed var(--trait);
+  margin-top: 2.5mm;
+  height: 24mm;
+  border: 0.25mm dashed var(--trait-fort);
+  border-radius: 1mm;
 }
 
 .a4-pied {
   position: absolute;
   left: 16mm;
   right: 16mm;
-  bottom: 10mm;
-  padding-top: 2mm;
+  bottom: 11mm;
+  padding-top: 2.5mm;
   border-top: 0.2mm solid var(--trait);
   font-size: 7pt;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--gris-clair);
 }
 
@@ -256,9 +295,6 @@
   .a4-cadre > .a4 {
     transform: none;
     margin-bottom: 0;
-  }
-
-  .a4 {
     box-shadow: none;
   }
 }

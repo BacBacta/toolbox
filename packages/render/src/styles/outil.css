@@ -1,64 +1,162 @@
 /*
- * L'écran d'un outil : entête, indicateurs, onglets, rangées.
+ * L'interface des outils.
  *
- * Les couleurs sont les mêmes que celles de la carte partagée, déclarées ici en
- * variables et dans `src/jetons.ts` pour le canvas. Un test vérifie que les
- * deux listes ne divergent pas.
+ * Trois principes, et ils ne sont pas décoratifs :
  *
- * Cibles : Android d'entrée de gamme, Chrome, doigt. Les zones tactiles font
- * 44 px de côté minimum, et rien ne dépend du survol.
+ * 1. La cible est un Android d'entrée de gamme, tenu à une main, souvent en
+ *    plein soleil, par quelqu'un qui compte de l'argent. Chaque couple
+ *    texte/fond tient le niveau AA — c'est vérifié par un test, pas jugé à
+ *    l'œil.
+ * 2. Ce qui se touche fait 48 px de haut, et rien ne dépend du survol : sur un
+ *    téléphone, il n'existe pas.
+ * 3. Le mouvement ne déplace jamais que l'opacité et la transformation, et il
+ *    s'efface si le système demande moins d'animation.
+ *
+ * La palette est le miroir de `src/jetons.ts` : le canvas de la carte partagée
+ * la lit là-bas, l'écran ici, et un test vérifie qu'elles ne divergent pas.
+ * Les blocs marqués `@palette` sont ceux que ce test lit.
  */
 
-.outil {
-  --accent: #1b5e43;
-  --accent-sombre: #164e38;
-  --encre: #131a14;
-  --encre-2: #4a554a;
-  --encre-3: #7d887c;
-  --trait: #e1e7dc;
-  --fond: #fbfcf8;
-  --alerte: #a32a1d;
-  --bandeau: #eef2ea;
-  --bandeau-trait: #dce3d6;
+:root {
+  /* @palette clair */
+  --fond: #FAFBF7;
+  --surface: #FFFFFF;
+  --surface-haute: #FFFFFF;
+  --bandeau: #EDF1E9;
+  --trait: #DFE5D9;
+  --trait-champ: #8C9689;
+  --encre: #121710;
+  --encre-2: #414B3F;
+  --encre-3: #5E6A5C;
+  --accent: #1B5E43;
+  --accent-sombre: #144A34;
+  --accent-doux: #E2EEE7;
+  --sur-accent: #FFFFFF;
+  --alerte: #9C2717;
+  --alerte-douce: #F7E7E4;
+  /* @fin-palette */
 
-  background: var(--fond);
+  /* Rythme : un pas de 4 px, et rien entre les pas. */
+  --pas-1: 4px;
+  --pas-2: 8px;
+  --pas-3: 12px;
+  --pas-4: 16px;
+  --pas-5: 24px;
+  --pas-6: 32px;
+
+  --rond-s: 8px;
+  --rond-m: 12px;
+  --rond-l: 18px;
+  --rond-plein: 999px;
+
+  /* Profondeur discrète : elle sépare des plans, elle ne décore pas. */
+  --ombre-1: 0 1px 2px rgb(18 23 16 / 6%), 0 1px 1px rgb(18 23 16 / 4%);
+  --ombre-2: 0 4px 14px rgb(18 23 16 / 8%), 0 1px 3px rgb(18 23 16 / 5%);
+
+  --vitesse: 140ms;
+  --courbe: cubic-bezier(0.2, 0.7, 0.3, 1);
+
+  /* Ce qui se touche. 48 px : une pulpe de doigt, pas un curseur. */
+  --cible: 48px;
+
+  --police: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* @palette sombre */
+    --fond: #0E120D;
+    --surface: #161B15;
+    --surface-haute: #1D231B;
+    --bandeau: #1A201A;
+    --trait: #2A322A;
+    --trait-champ: #6B766A;
+    --encre: #EDF2EA;
+    --encre-2: #BAC4B7;
+    --encre-3: #96A194;
+    --accent: #57B183;
+    --accent-sombre: #46986E;
+    --accent-doux: #1B2E24;
+    --sur-accent: #0E120D;
+    --alerte: #F08878;
+    --alerte-douce: #2E1A17;
+    /* @fin-palette */
+
+    /* Sur fond sombre, l'ombre ne se voit plus : c'est la bordure qui sépare. */
+    --ombre-1: none;
+    --ombre-2: 0 4px 14px rgb(0 0 0 / 40%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --vitesse: 0ms;
+  }
+}
+
+/* ───────────────────────────── l'outil ───────────────────────────── */
+
+.outil {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pas-4);
   color: var(--encre);
-  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 15px/1.5 var(--police);
+  font-variant-numeric: tabular-nums;
 }
 
 .outil-entete {
-  padding: 14px 16px 0;
-  background: var(--bandeau);
-  border-bottom: 1px solid var(--bandeau-trait);
+  position: relative;
+  padding: var(--pas-4);
+  border: 1px solid var(--trait);
+  border-radius: var(--rond-l);
+  background: var(--surface-haute);
+  box-shadow: var(--ombre-1);
+  overflow: hidden;
+}
+
+/* Un filet d'accent en haut de l'entête : l'outil se reconnaît d'un coup d'œil. */
+.outil-entete::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--accent);
 }
 
 .outil-identite {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--pas-3);
 }
 
 .outil-pastille {
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: var(--rond-m);
   background: var(--accent);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 700;
+  color: var(--sur-accent);
+  /* Un signe géométrique, pas des initiales : il lui faut la taille d'un
+     symbole, et une hauteur de ligne de 1 pour rester centré. */
+  font-size: 22px;
+  line-height: 1;
 }
 
 .outil-titre {
   display: flex;
   flex-direction: column;
+  gap: 1px;
   min-width: 0;
 }
 
 .outil-titre b {
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -69,80 +167,115 @@
   color: var(--encre-3);
 }
 
+/* Les indicateurs : des tuiles, pas des colonnes de texte. */
 .outil-kpis {
-  display: flex;
-  gap: 18px;
-  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: var(--pas-2);
+  margin-top: var(--pas-4);
 }
 
 .outil-kpi {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  padding: var(--pas-2) var(--pas-3);
+  border: 1px solid var(--trait);
+  border-radius: var(--rond-m);
+  background: var(--fond);
 }
 
 .outil-kpi .k {
   font-size: 11px;
-  letter-spacing: 0.08em;
+  font-weight: 700;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--encre-3);
 }
 
 .outil-kpi .v {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  white-space: nowrap;
 }
 
 .outil-onglets {
   display: flex;
-  gap: 4px;
-  margin-top: 12px;
+  gap: var(--pas-1);
+  margin: var(--pas-4) calc(var(--pas-4) * -1) calc(var(--pas-4) * -1);
+  padding: 0 var(--pas-2);
+  border-top: 1px solid var(--trait);
+  background: var(--fond);
 }
 
 .outil-onglets button {
-  min-height: 44px;
-  padding: 0 14px;
+  position: relative;
+  min-height: var(--cible);
+  padding: 0 var(--pas-3);
   border: 0;
-  border-bottom: 3px solid transparent;
   background: none;
   color: var(--encre-3);
   font: inherit;
   font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
+  transition: color var(--vitesse) var(--courbe);
+}
+
+.outil-onglets button::after {
+  content: "";
+  position: absolute;
+  inset: auto var(--pas-2) 0;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--accent);
+  opacity: 0;
+  transform: scaleX(0.4);
+  transition: opacity var(--vitesse) var(--courbe), transform var(--vitesse) var(--courbe);
 }
 
 .outil-onglets button[aria-selected="true"] {
-  border-bottom-color: var(--accent);
   color: var(--accent);
-  font-weight: 700;
+}
+
+.outil-onglets button[aria-selected="true"]::after {
+  opacity: 1;
+  transform: scaleX(1);
 }
 
 .outil-corps {
-  padding: 14px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--pas-4);
 }
 
+/* ───────────────────────────── avancement ───────────────────────────── */
+
 .outil-barre {
-  height: 12px;
-  border-radius: 6px;
-  background: var(--trait);
+  height: 10px;
+  border-radius: var(--rond-plein);
+  background: var(--bandeau);
+  box-shadow: inset 0 0 0 1px var(--trait);
   overflow: hidden;
 }
 
 .outil-barre i {
   display: block;
   height: 100%;
-  border-radius: 6px;
+  border-radius: var(--rond-plein);
   background: var(--accent);
+  transition: width var(--vitesse) var(--courbe);
 }
 
 .outil-legende {
-  margin-top: 6px;
+  margin-top: var(--pas-2);
   font-size: 13px;
   color: var(--encre-2);
 }
 
 .outil-surtitre {
-  margin: 16px 0 8px;
+  margin: 0;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -150,24 +283,34 @@
   color: var(--encre-3);
 }
 
+/* ───────────────────────────── les rangées ───────────────────────────── */
+
 .outil-rangees {
   display: flex;
   flex-direction: column;
+  border: 1px solid var(--trait);
+  border-radius: var(--rond-l);
+  background: var(--surface);
+  box-shadow: var(--ombre-1);
+  overflow: hidden;
 }
 
 .outil-rangee {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 56px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--trait);
+  gap: var(--pas-3);
+  min-height: 64px;
+  padding: var(--pas-2) var(--pas-3);
+}
+
+.outil-rangee + .outil-rangee {
+  border-top: 1px solid var(--trait);
 }
 
 .outil-rangee .identite {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--pas-3);
   flex: 1;
   min-width: 0;
 }
@@ -175,12 +318,12 @@
 .outil-rangee .ini {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   flex: none;
-  border-radius: 50%;
-  background: var(--bandeau);
-  color: var(--encre-2);
+  border-radius: var(--rond-plein);
+  background: var(--accent-doux);
+  color: var(--accent);
   font-size: 12px;
   font-weight: 700;
 }
@@ -188,55 +331,66 @@
 .outil-rangee .nom {
   display: flex;
   flex-direction: column;
+  gap: 1px;
   min-width: 0;
 }
 
 .outil-rangee .n1 {
+  font-size: 15px;
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .outil-rangee .n2 {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--encre-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .outil-montant {
-  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  font-weight: 600;
   white-space: nowrap;
 }
 
 .outil-montant.regle {
   color: var(--accent);
-  font-weight: 600;
 }
 
 .outil-montant.retard {
   color: var(--alerte);
 }
 
+.outil-montant.neutre {
+  color: var(--encre-2);
+}
+
 .outil-badge {
-  padding: 5px 10px;
-  border-radius: 999px;
+  padding: 5px var(--pas-3);
+  border-radius: var(--rond-plein);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   white-space: nowrap;
 }
 
 .outil-badge.oui {
-  background: #e3efe8;
+  background: var(--accent-doux);
   color: var(--accent);
 }
 
 .outil-badge.non {
-  background: #f6e5e3;
+  background: var(--alerte-douce);
   color: var(--alerte);
 }
 
 .outil-badge.tour {
   background: var(--accent);
-  color: #fff;
+  color: var(--sur-accent);
 }
 
 .outil-badge.neutre {
@@ -244,107 +398,157 @@
   color: var(--encre-3);
 }
 
+/* ───────────────────────────── ce qui se touche ───────────────────────────── */
+
 .outil-bascule {
-  min-width: 72px;
-  min-height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--trait);
-  border-radius: 999px;
-  background: #fff;
+  min-width: 64px;
+  flex: none;
+  min-height: var(--cible);
+  padding: 0 var(--pas-3);
+  border: 1px solid var(--trait-champ);
+  border-radius: var(--rond-plein);
+  background: var(--surface);
+  color: var(--encre-2);
   font: inherit;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
+  transition:
+    background var(--vitesse) var(--courbe),
+    border-color var(--vitesse) var(--courbe),
+    color var(--vitesse) var(--courbe),
+    transform var(--vitesse) var(--courbe);
 }
 
 .outil-bascule[aria-pressed="true"] {
   border-color: var(--accent);
   background: var(--accent);
-  color: #fff;
+  color: var(--sur-accent);
+}
+
+.outil-bascule:active {
+  transform: scale(0.96);
 }
 
 .outil-retirer {
-  min-width: 44px;
-  min-height: 44px;
+  display: grid;
+  place-items: center;
+  width: var(--cible);
+  height: var(--cible);
+  flex: none;
   border: 0;
+  border-radius: var(--rond-plein);
   background: none;
   color: var(--encre-3);
   font: inherit;
-  font-size: 18px;
+  font-size: 20px;
+  line-height: 1;
   cursor: pointer;
+  transition: background var(--vitesse) var(--courbe), color var(--vitesse) var(--courbe);
+}
+
+.outil-retirer:active {
+  background: var(--alerte-douce);
+  color: var(--alerte);
 }
 
 .outil-actions {
   display: flex;
-  gap: 8px;
-  margin-top: 18px;
+  gap: var(--pas-2);
 }
 
 .outil-action {
   flex: 1;
-  min-height: 48px;
-  padding: 0 14px;
-  border: 1px solid var(--trait);
-  border-radius: 10px;
-  background: #fff;
+  min-height: var(--cible);
+  padding: 0 var(--pas-4);
+  border: 1px solid var(--trait-champ);
+  border-radius: var(--rond-m);
+  background: var(--surface);
   color: var(--encre);
   font: inherit;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
+  transition: transform var(--vitesse) var(--courbe), box-shadow var(--vitesse) var(--courbe);
+}
+
+.outil-action:active {
+  transform: translateY(1px);
 }
 
 .outil-action.principale {
   border-color: var(--accent);
   background: var(--accent);
-  color: #fff;
+  color: var(--sur-accent);
+  box-shadow: var(--ombre-1);
 }
 
 .outil-formulaire {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 14px;
+  gap: var(--pas-2);
 }
 
 .outil-formulaire input {
-  flex: 1 1 120px;
-  min-height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--trait);
-  border-radius: 10px;
-  background: #fff;
+  flex: 1 1 140px;
+  min-height: var(--cible);
+  padding: 0 var(--pas-3);
+  border: 1px solid var(--trait-champ);
+  border-radius: var(--rond-m);
+  background: var(--surface);
+  color: var(--encre);
   font: inherit;
-  font-size: 15px;
+  /* 16 px au minimum : en dessous, Safari zoome à la mise au point. */
+  font-size: 16px;
 }
 
+/* ───────────────────────────── le vide ───────────────────────────── */
+
 .outil-vide {
-  padding: 28px 0;
-  color: var(--encre-3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--pas-2);
+  padding: var(--pas-6) var(--pas-4);
+  border: 1px dashed var(--trait-champ);
+  border-radius: var(--rond-l);
+  background: var(--surface);
+  color: var(--encre-2);
   text-align: center;
 }
+
+.outil-vide::before {
+  content: "▢";
+  font-size: 26px;
+  line-height: 1;
+  color: var(--encre-3);
+}
+
+/* ───────────────────────────── le calcul ───────────────────────────── */
 
 .calc-resultat {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 16px;
-  border-radius: 14px;
-  background: var(--bandeau);
+  gap: var(--pas-1);
+  padding: var(--pas-5) var(--pas-4);
+  border: 1px solid var(--trait);
+  border-radius: var(--rond-l);
+  background: var(--accent-doux);
 }
 
 .calc-libelle {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--encre-3);
+  color: var(--accent);
 }
 
 .calc-valeur {
-  font-size: 32px;
+  font-size: 38px;
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
   color: var(--accent);
 }
 
@@ -364,8 +568,7 @@
 .champ {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
+  gap: var(--pas-1);
 }
 
 .champ-libelle {
@@ -383,39 +586,55 @@
 .champ select,
 .champ textarea {
   width: 100%;
-  min-height: 44px;
-  padding: 10px 12px;
-  border: 1px solid var(--trait);
-  border-radius: 10px;
-  background: #fff;
-  color: inherit;
+  min-height: var(--cible);
+  padding: var(--pas-3);
+  border: 1px solid var(--trait-champ);
+  border-radius: var(--rond-m);
+  background: var(--surface);
+  color: var(--encre);
   font: inherit;
   /* 16 px au minimum : en dessous, Safari zoome à la mise au point. */
   font-size: 16px;
+  transition: border-color var(--vitesse) var(--courbe), box-shadow var(--vitesse) var(--courbe);
 }
 
 .champ textarea {
-  min-height: 96px;
+  min-height: 104px;
+  line-height: 1.5;
   resize: vertical;
 }
 
 .champ-case {
   flex-direction: row;
   align-items: center;
-  gap: 10px;
-  min-height: 44px;
+  gap: var(--pas-3);
+  min-height: var(--cible);
 }
 
 .champ-case input {
-  width: 22px;
-  min-height: 22px;
+  width: 24px;
+  min-height: 24px;
+  accent-color: var(--accent);
 }
 
 .note {
-  margin: 12px 0;
-  padding: 10px 12px;
-  border-left: 4px solid var(--encre-3);
-  border-radius: 4px;
+  padding: var(--pas-3);
+  border-left: 3px solid var(--encre-3);
+  border-radius: 0 var(--rond-s) var(--rond-s) 0;
   background: var(--bandeau);
   font-size: 14px;
+  color: var(--encre-2);
+}
+
+/* ─────────────────────── la mise au point se voit ─────────────────────── */
+/*
+ * `:focus-visible` et non `:focus` : au doigt, un anneau après chaque tape est
+ * du bruit ; au clavier, sans anneau on ne sait plus où on est.
+ */
+
+.outil :focus-visible,
+.app :focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--rond-s);
 }

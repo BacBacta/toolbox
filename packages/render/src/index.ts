@@ -1,5 +1,5 @@
-export { COULEURS, COULEURS_CARTE } from './jetons.js'
-export type { NomCouleur } from './jetons.js'
+export { CLAIR, COULEURS_CARTE, SOMBRE } from './jetons.js'
+export type { Palette } from './jetons.js'
 export * from './carte/index.js'
 export * from './doc/index.js'
 export * from './registre/index.js'

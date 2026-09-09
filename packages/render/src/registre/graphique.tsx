@@ -1,6 +1,5 @@
 import { nf } from '@a237/engine'
 import type { JSX } from 'preact'
-import { COULEURS } from '../jetons.js'
 
 /**
  * Histogramme en SVG inline.
@@ -9,7 +8,12 @@ import { COULEURS } from '../jetons.js'
  * rien ici qui ne tienne en quarante lignes. Porté depuis
  * `reference/atelier-prototype.html:563`, avec une correction : le prototype
  * allait chercher ses couleurs avec `getComputedStyle`, ce qui lit le DOM et
- * rend le composant intestable. Elles viennent maintenant de `jetons.ts`.
+ * rend le composant intestable.
+ *
+ * Les couleurs passent par des variables CSS. Un `fill="var(--accent)"` est
+ * résolu par le navigateur dans le SVG comme ailleurs : le graphique suit donc
+ * le thème clair ou sombre sans une ligne de JavaScript, et le composant reste
+ * testable puisqu'il ne lit rien.
  *
  * Le SVG a un `viewBox` et pas de dimensions fixes : il s'adapte à la largeur
  * du téléphone sans calcul.
@@ -54,7 +58,7 @@ export function Histogramme(props: {
         y1={H - BAS}
         x2={W - R}
         y2={H - BAS}
-        stroke={COULEURS.trait}
+        stroke="var(--trait)"
         stroke-width="1"
       />
       {donnees.map((d, i) => {
@@ -69,7 +73,7 @@ export function Histogramme(props: {
               width={largeur.toFixed(1)}
               height={Math.max(2, h).toFixed(1)}
               rx="3"
-              fill={COULEURS.accent}
+              fill="var(--accent)"
             />
             {d.valeur > 0 && (
               <text
@@ -77,7 +81,7 @@ export function Histogramme(props: {
                 y={(y - 4).toFixed(1)}
                 text-anchor="middle"
                 font-size="8.5"
-                fill={COULEURS.encre}
+                fill="var(--encre)"
               >
                 {nf(d.valeur)}
               </text>
@@ -87,7 +91,7 @@ export function Histogramme(props: {
               y={H - 5}
               text-anchor="middle"
               font-size="8.5"
-              fill={COULEURS.encre3}
+              fill="var(--encre-3)"
             >
               {d.etiquette}
             </text>

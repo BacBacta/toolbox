@@ -67,7 +67,15 @@ export function Diffusion(props: {
   }
 
   return (
-    <div class="feuille" role="dialog" aria-label="Diffuser">
+    <>
+      {/* Le fond ferme la feuille : sur un téléphone, viser la croix est pénible. */}
+      <button
+        type="button"
+        class="feuille-fond"
+        aria-label="Fermer la diffusion"
+        onClick={props.onFermer}
+      />
+      <div class="feuille" role="dialog" aria-modal="true" aria-label="Diffuser">
       <div class="feuille-tete">
         <b>Diffuser</b>
         <button type="button" class="feuille-fermer" onClick={props.onFermer} aria-label="Fermer">
@@ -138,6 +146,7 @@ export function Diffusion(props: {
           })}
         </div>
       )}
-    </div>
+      </div>
+    </>
   )
 }
