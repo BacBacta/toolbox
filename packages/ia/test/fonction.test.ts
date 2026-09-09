@@ -15,7 +15,7 @@ const ENV = { ...process.env }
 async function appeler(
   req: { method?: string; body?: unknown },
 ): Promise<{ statut: number; corps: Record<string, unknown> }> {
-  const { default: handler } = await import('../ai.js')
+  const { default: handler } = await import('../src/fonction.js')
   let statut = 0
   let corps: unknown
   const res = {

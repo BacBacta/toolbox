@@ -10,5 +10,8 @@
   },
   "dependencies": {
     "@a237/engine": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^8.2.2"
   }
 }

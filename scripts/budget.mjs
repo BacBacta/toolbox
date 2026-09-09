@@ -154,6 +154,31 @@ for (const requis of ['precache.json', 'sw.js']) {
 }
 
 /*
+ * La fonction serveur doit être assemblée, complète, et savoir lire sa clef.
+ *
+ * Elle s'est déjà déployée vide : Rollup avait élagué l'export par défaut, et
+ * Vite, en mode navigateur, avait remplacé `process.env` par un objet vide.
+ * Quarante octets sont partis en production sans qu'aucune construction
+ * n'échoue — et la fonction aurait répondu « pas encore ouvert » pour
+ * toujours, ce qui ressemble à un choix plutôt qu'à une panne.
+ */
+try {
+  const fonction = readFileSync('api/ai.js', 'utf8')
+  const exigences = [
+    ['export { handler as default }', 'l’export par défaut, sans quoi Vercel ne voit aucune fonction'],
+    ['process.env.A237_CLEF_IA', 'la lecture de la clef, que le mode navigateur remplacerait par {}'],
+    ['generativelanguage.googleapis.com', 'l’appel au fournisseur, preuve que tout est inclus'],
+  ]
+  for (const [marqueur, quoi] of exigences) {
+    if (!fonction.includes(marqueur)) {
+      echecs.push(`api/ai.js n'a pas ${quoi}`)
+    }
+  }
+} catch {
+  echecs.push('api/ai.js manquant : le proxy IA ne serait pas déployé')
+}
+
+/*
  * Le service worker doit porter l'empreinte de la construction.
  *
  * Le navigateur ne le réinstalle que si son fichier a changé d'un octet. Avec

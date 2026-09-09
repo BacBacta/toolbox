@@ -1,5 +1,6 @@
 import type { RegistreDemande } from '@a237/engine'
-import { gemini, traiter } from '@a237/ia'
+import { gemini } from './fournisseur.js'
+import { traiter } from './traiter.js'
 
 /**
  * Le proxy IA (§ 3, « Appeler l'IA »).
@@ -10,10 +11,16 @@ import { gemini, traiter } from '@a237/ia'
  * déjà validée — jamais de HTML, jamais de code (§ 3, point 5).
  *
  * Le brief place ce proxy dans le Worker Cloudflare, au même endroit que le
- * webhook de paiement et la page de lecture. On le met d'abord ici parce que
- * l'application y est déjà déployée : toute la logique vit dans `@a237/ia`,
- * pur et testé, et ce fichier n'est que la plomberie — le déménager plus tard
- * ne déplacera que ces cinquante lignes.
+ * webhook de paiement et la page de lecture. On le met d'abord sur Vercel
+ * parce que l'application y est déjà déployée ; le déménager ne déplacera que
+ * ce fichier, tout le reste étant pur et testé.
+ *
+ * Il vit ici et non dans `api/`, et il est **assemblé en un seul fichier
+ * JavaScript** avant d'y être déposé. Vercel compile lui-même le TypeScript
+ * qu'il trouve dans `api/`, avec sa propre résolution de modules — qui ne suit
+ * pas les liens d'un espace de travail pnpm et échouait sur `@types/node`. On
+ * ne lui donne donc plus de TypeScript : le service worker est bâti de la même
+ * façon, et pour la même raison.
  *
  * **Ce qui manque encore, et qu'il faut savoir.** Le brief exige un quota par
  * compte (`credits > 0`, sinon 402) et un journal des coûts dans `ai_calls`.
