@@ -72,12 +72,42 @@ describe('ce que le schéma seul laisserait passer', () => {
     expect(e.some((x) => x.chemin === '$.colonnes[0].type')).toBe(true)
   })
 
-  it('refuse une clef qui n’en est pas une', () => {
+  it('refuse une clef qui n’en est pas une, en nommant ce qui cloche', () => {
     const e = verifierRegistre({
       ...SANS_TOTAL,
       colonnes: [{ clef: 'Nom du client', titre: 'Client', type: 'texte' }],
     })
-    expect(e.some((x) => x.message.includes('n’est pas un identifiant'))).toBe(true)
+    // Le reproche repart au modèle : il doit désigner le caractère fautif,
+    // sinon la reprise relit, ne trouve rien à corriger, et renvoie la même
+    // chose — deux tours payés pour rien.
+    expect(e[0]?.message).toContain('« Â »'.replace('Â', ' '))
+  })
+
+  it('accepte le souligné, qui ne casse rien', () => {
+    // Une génération réelle est morte sur `nom_poule`. La clef ne sert que de
+    // propriété d'objet et de nom de champ, jamais d'URL : la règle était
+    // gratuitement stricte, et refuser une bonne réponse coûte un tour.
+    expect(
+      verifierRegistre({
+        ...SANS_TOTAL,
+        colonnes: [
+          { clef: 'nom_poule', titre: 'Poule', type: 'texte' },
+          { clef: 'oeufs_pondus', titre: 'Œufs pondus', type: 'nombre' },
+        ],
+      }),
+    ).toEqual([])
+  })
+
+  it('refuse encore une clef accentuée ou capitalisée', () => {
+    for (const clef of ['prixUnitaire', 'prix_unitaire', 'a1']) {
+      expect(verifierRegistre({ ...SANS_TOTAL, colonnes: [{ clef, titre: 'X', type: 'texte' }] }))
+        .toEqual([])
+    }
+    for (const clef of ['Prix', 'prixé', '1prix', 'prix unitaire']) {
+      expect(
+        verifierRegistre({ ...SANS_TOTAL, colonnes: [{ clef, titre: 'X', type: 'texte' }] }).length,
+      ).toBeGreaterThan(0)
+    }
   })
 
   it('refuse deux colonnes qui portent la même clef', () => {

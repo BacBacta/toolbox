@@ -112,6 +112,9 @@ export default async function handler(req: RequeteEntrante, res: ReponseSortante
       res.status(422).json({
         erreur: 'le modèle n’a pas produit un registre utilisable',
         details: resultat.erreurs.map((e) => `${e.chemin} : ${e.message}`),
+        // Un échec a coûté deux tours. L'omettre ferait sous-estimer la
+        // dépense réelle, et le brief demande le coût de chaque appel (§ 8).
+        fcfa: resultat.cout.fcfa,
       })
       return
     }

@@ -116,6 +116,8 @@ describe('une fois ouvert', () => {
     expect(r.statut).toBe(422)
     // Un essai, une reprise, puis on s'arrête (§ 3).
     expect(appels).toHaveBeenCalledTimes(2)
+    // Un échec a coûté deux tours : l'omettre ferait sous-estimer la dépense.
+    expect(r.corps.fcfa).toBeGreaterThan(0)
   })
 
   it('rend la configuration validée, et ce qu’elle a coûté', async () => {

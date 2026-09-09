@@ -279,7 +279,7 @@ var schemaRegistre = {
 						type: "string",
 						minLength: 1,
 						maxLength: 24,
-						description: "Identifiant sans accent ni espace, en minuscules. Ex. « prixUnitaire »."
+						description: "Identifiant : lettres non accentuées, chiffres, soulignés. Commence par une minuscule. Ex. « prixUnitaire » ou « prix_unitaire »."
 					},
 					titre: {
 						type: "string",
@@ -384,10 +384,13 @@ function verifierRegistre(valeur) {
 		chemin: "$.colonnes[0].type",
 		message: "la première colonne nomme la ligne : elle doit être de type texte"
 	});
-	for (const [i, c] of r.colonnes.entries()) if (!/^[a-z][a-zA-Z0-9]*$/.test(c.clef)) erreurs.push({
-		chemin: `$.colonnes[${i}].clef`,
-		message: `« ${c.clef} » n’est pas un identifiant : minuscule initiale, ni accent ni espace`
-	});
+	for (const [i, c] of r.colonnes.entries()) if (!/^[a-z][a-zA-Z0-9_]*$/.test(c.clef)) {
+		const fautifs = [...new Set([...c.clef].filter((x) => !/[a-zA-Z0-9_]/.test(x)))];
+		erreurs.push({
+			chemin: `$.colonnes[${i}].clef`,
+			message: fautifs.length > 0 ? `« ${c.clef} » contient ${fautifs.map((x) => `« ${x} »`).join(", ")} : la clef ne prend que des lettres non accentuées, des chiffres et des soulignés` : `« ${c.clef} » doit commencer par une lettre minuscule`
+		});
+	}
 	const doublons = clefs.filter((c, i) => clefs.indexOf(c) !== i);
 	for (const d of new Set(doublons)) erreurs.push({
 		chemin: "$.colonnes",
@@ -582,7 +585,8 @@ async function handler(req, res) {
 		if (resultat.sorte !== "reussi") {
 			res.status(422).json({
 				erreur: "le modèle n’a pas produit un registre utilisable",
-				details: resultat.erreurs.map((e) => `${e.chemin} : ${e.message}`)
+				details: resultat.erreurs.map((e) => `${e.chemin} : ${e.message}`),
+				fcfa: resultat.cout.fcfa
 			});
 			return;
 		}

@@ -85,7 +85,7 @@ export const schemaRegistre: JsonSchema = {
         properties: {
           clef: {
             type: 'string', minLength: 1, maxLength: 24,
-            description: 'Identifiant sans accent ni espace, en minuscules. Ex. « prixUnitaire ».',
+            description: 'Identifiant : lettres non accentuées, chiffres, soulignés. Commence par une minuscule. Ex. « prixUnitaire » ou « prix_unitaire ».',
           },
           titre: {
             type: 'string', minLength: 1, maxLength: 32,
@@ -159,11 +159,28 @@ export function verifierRegistre(valeur: unknown): readonly ErreurValidation[] {
     })
   }
 
+  /*
+   * Le souligné est accepté.
+   *
+   * La règle exigeait du camelCase, et une génération réelle est morte
+   * là-dessus : le modèle avait écrit `nom_poule`, qui ne casse rien — la clef
+   * ne sert que de propriété d'objet et de nom de champ, jamais d'URL. Pire,
+   * le reproche disait « minuscule initiale, ni accent ni espace », trois
+   * conditions que `nom_poule` remplit : le modèle a relu, n'a rien trouvé à
+   * corriger, et a renvoyé la même chose. Une reprise coûte un tour entier ;
+   * une reprise qui ne peut pas aboutir les gaspille tous les deux.
+   *
+   * Le message nomme donc ce qui est refusé, pas ce qui est exigé.
+   */
   for (const [i, c] of r.colonnes.entries()) {
-    if (!/^[a-z][a-zA-Z0-9]*$/.test(c.clef)) {
+    if (!/^[a-z][a-zA-Z0-9_]*$/.test(c.clef)) {
+      const fautifs = [...new Set([...c.clef].filter((x) => !/[a-zA-Z0-9_]/.test(x)))]
       erreurs.push({
         chemin: `$.colonnes[${i}].clef`,
-        message: `« ${c.clef} » n’est pas un identifiant : minuscule initiale, ni accent ni espace`,
+        message:
+          fautifs.length > 0
+            ? `« ${c.clef} » contient ${fautifs.map((x) => `« ${x} »`).join(', ')} : la clef ne prend que des lettres non accentuées, des chiffres et des soulignés`
+            : `« ${c.clef} » doit commencer par une lettre minuscule`,
       })
     }
   }
