@@ -21,9 +21,11 @@ commencé, conformément au point 4 de la section 11 du brief.
 |---|---|
 | `packages/engine` | montant en toutes lettres, TVA ligne par ligne, mise en forme, validateur de schéma, numérotation continue, étage 1, trois squelettes (`devis`, `facture`, `njangi`) |
 | `packages/legal-cm` | TVA 19,25 %, mentions obligatoires, formes NIU et RCCM, numérotation |
-| `packages/render`, `apps/web` | pas commencés |
+| `packages/render` | feuille A4 réelle, documents `devis` et `facture`. Le registre njangi et la carte canvas restent à faire |
+| `packages/outils-test` | scanners partagés par les tests de pureté |
+| `apps/web` | pas commencée |
 
-338 tests, couverture du moteur à 97 %. Zéro dépendance de production.
+419 tests, couverture à 97 %. Une seule dépendance de production : `preact`.
 
 ```bash
 pnpm install

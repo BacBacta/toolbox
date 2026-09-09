@@ -69,6 +69,19 @@ Une facture en retard partiellement réglée est affichée « en retard », pas
 dû ressort en trop-perçu plutôt que de creuser un reste négatif — ça se voit au
 lieu de se perdre.
 
+### L'A4 est rendu à la taille vraie, jamais à l'échelle
+Le prototype dessinait un aperçu en pixels minuscules — 7,4 px pour le corps de
+texte. Ça se voit à l'écran et ça s'imprime n'importe comment. La page fait ses
+210 × 297 mm et le texte ses points ; c'est l'aperçu qui est mis à l'échelle par
+une variable CSS. C'est aussi la seule façon d'obtenir un PDF juste en phase 5.
+
+### Le rendu n'injecte jamais de HTML
+Preact échappe tout ce qu'on lui passe en enfant. Un scanner interdit
+`dangerouslySetInnerHTML`, `innerHTML`, `eval` et `new Function` dans tout
+`packages/render`, et des tests vérifient qu'un `<script>` glissé dans le nom du
+client ou la désignation d'une ligne ressort échappé. C'est l'invariant § 2.1
+vérifié là où il se joue plutôt qu'affirmé dans un commentaire.
+
 ### Le validateur de schéma est écrit à la main
 Cent lignes, sans dépendance, en vocabulaire JSON Schema standard pour servir
 tel quel de schéma de réponse contrainte au modèle en phase 4. Une clef
@@ -77,9 +90,9 @@ accès direct, sinon elle remonterait la chaîne de prototypes. Testé.
 
 ### `zod` n'est pas entré
 Il n'a pas été nécessaire : le validateur écrit à la main fait le travail pour
-moins cher qu'un poids dans un budget de 120 Ko. **Zéro dépendance de
-production** à ce stade — cinq étaient autorisées. La question se reposera au
-Worker, où le budget de poids n'existe pas.
+moins cher qu'un poids dans un budget de 120 Ko. **Une seule dépendance de
+production** à ce stade, `preact` — cinq étaient autorisées. La question de
+`zod` se reposera au Worker, où le budget de poids n'existe pas.
 
 ---
 
