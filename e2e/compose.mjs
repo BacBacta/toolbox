@@ -78,6 +78,25 @@ const BASE = 'http://127.0.0.1:5200'
 const navigateur = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] })
 const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 } })
 
+/** Une calculatrice, capturée en production sur « ma marge sur chaque vente ». */
+const CALCUL = {
+  calcul: {
+    titre: 'Marge',
+    kicker: 'MARGE',
+    titreNom: 'Nom du produit',
+    entrees: [
+      { clef: 'prixAchat', titre: 'Prix d’achat', defaut: 0, unite: 'F' },
+      { clef: 'prixVente', titre: 'Prix de vente', defaut: 0, unite: 'F' },
+    ],
+    sortie: {
+      libelle: 'Marge',
+      unite: 'F',
+      formule: { op: 'moins', gauche: { ref: 'prixVente' }, droite: { ref: 'prixAchat' } },
+    },
+  },
+  fcfa: 0.16,
+}
+
 /** Un refus, capturé en production sur « je veux un site internet ». */
 const REFUS = {
   impossible:
@@ -94,7 +113,8 @@ let appels = 0
 await contexte.route('**/api/ai', async (route) => {
   appels++
   const { demande } = JSON.parse(route.request().postData() ?? '{}')
-  const corps = String(demande).includes('site internet') ? REFUS : REPONSE
+  const d = String(demande)
+  const corps = d.includes('site internet') ? REFUS : d.includes('marge') ? CALCUL : REPONSE
   await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(corps) })
 })
 
@@ -166,6 +186,28 @@ dit(
   'il se rouvre après rechargement, sans rappeler le modèle',
 )
 dit(appels === 1, 'et sans repayer une génération', `${appels} appel(s)`)
+
+/*
+ * L'autre forme composable : une calculatrice.
+ *
+ * Sa formule est un arbre déclaré, interprété par du code écrit à la main. Le
+ * modèle décrit le calcul ; il n'obtient jamais le droit d'en exécuter un.
+ */
+await page.goto(BASE, { waitUntil: 'networkidle' })
+await page.fill('#demande', 'ma marge sur chaque vente')
+await page.waitForTimeout(150)
+await page.getByText('Compose-le pour moi').click()
+await page.waitForSelector('text=Prix d’achat', { timeout: 10000 })
+dit(true, 'la calculatrice composée s’ouvre')
+
+await page.fill('#calc-prixAchat', '18000')
+await page.fill('#calc-prixVente', '25000')
+await page.waitForTimeout(250)
+const resultat = await page.textContent('body')
+dit(
+  resultat.replace(/\s/g, ' ').includes('7 000 F'),
+  'la formule déclarée calcule — 25 000 moins 18 000',
+)
 
 /*
  * Le refus, qui est l'autre moitié du contrat.
