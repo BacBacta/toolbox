@@ -1,9 +1,10 @@
 import { Fragment as _Fragment, jsx as _jsx, jsxs as _jsxs } from "preact/jsx-runtime";
-import { CATALOGUE, classer } from '@a237/engine';
+import { CATALOGUE, EXTRAIT_VIDE } from '@a237/engine';
 import { useEffect, useState } from 'preact/hooks';
 import { Diffusion } from './diffusion.js';
 import { CHARGEURS, outilDisponible } from './outils.js';
 import { creerOutil, listerOutils, lireOutil, majEtat, supprimerOutil } from './stockage.js';
+import { Atelier } from './atelier.js';
 /**
  * La coquille.
  *
@@ -22,12 +23,7 @@ function glyphePour(skeleton) {
     return CATALOGUE.find((f) => f.id === skeleton)?.glyphe ?? '◇';
 }
 function Accueil(props) {
-    const [recherche, setRecherche] = useState('');
-    // Étage 1 du moteur : correspondance de mots-clés, zéro jeton (§ 4).
-    const proposes = recherche.trim() === ''
-        ? DISPONIBLES
-        : classer(recherche, DISPONIBLES).map((c) => c.squelette);
-    return (_jsxs(_Fragment, { children: [_jsxs("header", { class: "app-entete", children: [_jsx("h1", { class: "titre-app", children: "Atelier 237" }), _jsx("span", { class: "app-baseline", children: "hors ligne, sur ton t\u00E9l\u00E9phone" })] }), _jsxs("label", { class: "champ", for: "recherche", children: [_jsx("span", { class: "champ-libelle", children: "De quoi as-tu besoin ?" }), _jsx("input", { id: "recherche", type: "search", value: recherche, placeholder: "il me faut un devis, noter le njangi\u2026", onInput: (e) => setRecherche(e.target.value) })] }), proposes.length === 0 ? (_jsx("p", { class: "note", children: "Rien ne correspond encore. Les autres outils du prototype arrivent ; en attendant, essaie \u00AB devis \u00BB, \u00AB facture \u00BB ou \u00AB njangi \u00BB." })) : (_jsx("div", { class: "grille", children: proposes.map((s) => (_jsxs("button", { type: "button", class: "carte-squelette", onClick: () => props.onCreer(s.id), children: [_jsx("span", { class: "marque", "aria-hidden": "true", children: s.glyphe }), _jsxs("span", { class: "texte", children: [_jsx("b", { children: s.title }), _jsx("span", { children: s.group })] })] }, s.id))) })), _jsx("h2", { class: "outil-surtitre", children: "Mes outils" }), props.outils.length === 0 ? (_jsx("p", { class: "note", children: "Rien pour l\u2019instant. Choisis un outil ci-dessus." })) : (_jsx("div", { class: "outil-rangees", children: props.outils.map((o) => (_jsxs("div", { class: "outil-rangee", children: [_jsx("button", { type: "button", class: "identite lien-outil", onClick: () => props.onOuvrir(o.id), children: _jsxs("span", { class: "nom", children: [_jsx("span", { class: "n1", children: o.nom }), _jsx("span", { class: "n2", children: o.skeleton })] }) }), _jsx("button", { type: "button", class: "outil-retirer", "aria-label": `Supprimer ${o.nom}`, onClick: () => props.onSupprimer(o.id), children: "\u00D7" })] }, o.id))) }))] }));
+    return (_jsxs(_Fragment, { children: [_jsxs("header", { class: "app-entete", children: [_jsx("h1", { class: "titre-app", children: "Atelier 237" }), _jsx("span", { class: "app-baseline", children: "hors ligne, sur ton t\u00E9l\u00E9phone" })] }), _jsx(Atelier, { fiches: DISPONIBLES, onCreer: props.onCreer }), _jsx("h2", { class: "outil-surtitre", children: "Tous les outils" }), _jsx("div", { class: "grille", children: DISPONIBLES.map((s) => (_jsxs("button", { type: "button", class: "carte-squelette", onClick: () => props.onCreer(s.id, EXTRAIT_VIDE), children: [_jsx("span", { class: "marque", "aria-hidden": "true", children: s.glyphe }), _jsxs("span", { class: "texte", children: [_jsx("b", { children: s.title }), _jsx("span", { children: s.group })] })] }, s.id))) }), _jsx("h2", { class: "outil-surtitre", children: "Mes outils" }), props.outils.length === 0 ? (_jsx("p", { class: "note", children: "Rien pour l\u2019instant. Choisis un outil ci-dessus." })) : (_jsx("div", { class: "outil-rangees", children: props.outils.map((o) => (_jsxs("div", { class: "outil-rangee", children: [_jsx("button", { type: "button", class: "identite lien-outil", onClick: () => props.onOuvrir(o.id), children: _jsxs("span", { class: "nom", children: [_jsx("span", { class: "n1", children: o.nom }), _jsx("span", { class: "n2", children: o.skeleton })] }) }), _jsx("button", { type: "button", class: "outil-retirer", "aria-label": `Supprimer ${o.nom}`, onClick: () => props.onSupprimer(o.id), children: "\u00D7" })] }, o.id))) }))] }));
 }
 export function App() {
     const [outils, setOutils] = useState([]);
@@ -60,12 +56,12 @@ export function App() {
             setErreur(`${quoi} : ${cause instanceof Error ? cause.message : String(cause)}`);
         });
     }
-    async function creer(skeleton) {
+    async function creer(skeleton, extrait) {
         const chargeur = CHARGEURS[skeleton];
         if (chargeur === undefined)
             throw new Error(`aucun écran pour « ${skeleton} »`);
         const maintenant = new Date();
-        const neuf = (await chargeur()).creer(skeleton, maintenant);
+        const neuf = (await chargeur()).creer(skeleton, maintenant, extrait);
         const outil = await creerOutil(skeleton, neuf.nom, neuf.etat, maintenant);
         setOutils(await listerOutils());
         setOuvert(outil);
@@ -85,7 +81,7 @@ export function App() {
         setOuvert(await lireOutil(id));
     }
     if (ouvert === null) {
-        return (_jsxs("main", { class: "app", children: [erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), _jsx(Accueil, { outils: outils, onCreer: (s) => tenter(() => creer(s), 'Création impossible'), onOuvrir: (id) => tenter(() => ouvrir(id), 'Ouverture impossible'), onSupprimer: (id) => tenter(() => supprimer(id), 'Suppression impossible') })] }));
+        return (_jsxs("main", { class: "app", children: [erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), _jsx(Accueil, { outils: outils, onCreer: (s, extrait) => tenter(() => creer(s, extrait), 'Création impossible'), onOuvrir: (id) => tenter(() => ouvrir(id), 'Ouverture impossible'), onSupprimer: (id) => tenter(() => supprimer(id), 'Suppression impossible') })] }));
     }
     /**
      * Le lien est vide tant que la publication n'existe pas.

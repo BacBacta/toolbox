@@ -20,9 +20,10 @@ export function Outil(props) {
         return _jsx(EtatInvalide, { erreurs: erreurs });
     return (_jsx(RegistreListe, { glyphe: props.glyphe, config: squelette.config, titre: squelette.title, etat: props.outil.etat, ctx: props.ctx, onChange: props.onChange, onDiffuser: props.onDiffuser, partage: squelette.share }));
 }
-export function creer(skeleton, _maintenant) {
+export function creer(skeleton, _maintenant, _extrait) {
     const squelette = PAR_ID.get(skeleton);
     if (squelette === undefined)
         throw new RangeError(`registre inconnu : ${skeleton}`);
+    // Rien dans une phrase ne se transpose en lignes de registre sans inventer.
     return { nom: squelette.title, etat: squelette.defaults };
 }

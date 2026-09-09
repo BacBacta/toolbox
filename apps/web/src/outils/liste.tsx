@@ -4,6 +4,7 @@ import { RegistreListe } from '@a237/render/registre'
 import type { JSX } from 'preact'
 import type { ProprietesOutil } from '../outils.js'
 import { EtatInvalide } from './commun.js'
+import type { Extrait } from '@a237/engine'
 
 /**
  * L'adaptateur des registres décrits par leurs colonnes.
@@ -42,8 +43,13 @@ export function Outil(props: ProprietesOutil): JSX.Element {
   )
 }
 
-export function creer(skeleton: string, _maintenant: Date): { nom: string; etat: unknown } {
+export function creer(
+  skeleton: string,
+  _maintenant: Date,
+  _extrait: Extrait,
+): { nom: string; etat: unknown } {
   const squelette = PAR_ID.get(skeleton)
   if (squelette === undefined) throw new RangeError(`registre inconnu : ${skeleton}`)
+  // Rien dans une phrase ne se transpose en lignes de registre sans inventer.
   return { nom: squelette.title, etat: squelette.defaults }
 }

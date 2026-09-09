@@ -4,6 +4,7 @@ import { Calculatrice } from '@a237/render/registre'
 import type { JSX } from 'preact'
 import type { ProprietesOutil } from '../outils.js'
 import { EtatInvalide } from './commun.js'
+import type { Extrait } from '@a237/engine'
 
 /** L'adaptateur des calculatrices. Un fragment pour les deux. */
 
@@ -36,7 +37,11 @@ export function Outil(props: ProprietesOutil): JSX.Element {
   )
 }
 
-export function creer(skeleton: string, _maintenant: Date): { nom: string; etat: unknown } {
+export function creer(
+  skeleton: string,
+  _maintenant: Date,
+  _extrait: Extrait,
+): { nom: string; etat: unknown } {
   const squelette = PAR_ID.get(skeleton)
   if (squelette === undefined) throw new RangeError(`calcul inconnu : ${skeleton}`)
   return { nom: squelette.title, etat: squelette.defaults }

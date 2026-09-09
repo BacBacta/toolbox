@@ -7,6 +7,7 @@ import { ChampsSchema } from '../formulaire.js'
 import type { ProprietesOutil } from '../outils.js'
 import { CadreDocument, EtatInvalide, Manquements, ongletDOuverture } from './commun.js'
 import type { OngletDocument } from './commun.js'
+import type { Extrait } from '@a237/engine'
 
 /** Champs que l'utilisateur ne saisit pas : ils sont dérivés à la création. */
 const MASQUES = ['$.nom', '$.emisLe']
@@ -46,9 +47,11 @@ export function Outil(props: ProprietesOutil): JSX.Element {
   )
 }
 
-export function creer(_skeleton: string, maintenant: Date): { nom: string; etat: unknown } {
-  return {
-    nom: devis.title,
-    etat: devis.initialiser?.({ lien: '', maintenant }) ?? devis.defaults,
-  }
+export function creer(
+  _skeleton: string,
+  maintenant: Date,
+  extrait: Extrait,
+): { nom: string; etat: unknown } {
+  const neuf = devis.initialiser?.({ lien: '', maintenant }) ?? devis.defaults
+  return { nom: devis.title, etat: devis.garnir?.(neuf, extrait) ?? neuf }
 }

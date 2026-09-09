@@ -1,4 +1,4 @@
-import type { RenderContext, ShareSpec } from '@a237/engine'
+import type { Extrait, RenderContext, ShareSpec } from '@a237/engine'
 import type { JSX } from 'preact'
 import type { OutilEnregistre } from './stockage.js'
 
@@ -32,8 +32,12 @@ export interface ModuleOutil {
    * L'identifiant est passé parce qu'un même fragment sert plusieurs
    * squelettes : les quatre registres de liste partagent un écran, les deux
    * calculatrices aussi.
+   *
+   * `extrait` porte ce que la demande disait déjà — « njangi de 20 000 F par
+   * mois ». Le squelette en prend ce qu'il sait interpréter sans risque, et
+   * ignore le reste.
    */
-  readonly creer: (skeleton: string, maintenant: Date) => EtatNeuf
+  readonly creer: (skeleton: string, maintenant: Date, extrait: Extrait) => EtatNeuf
 }
 
 /**

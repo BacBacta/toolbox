@@ -15,9 +15,7 @@ export function Outil(props) {
     const etat = props.outil.etat;
     return (_jsx(CadreDocument, { titre: props.outil.nom, glyphe: props.glyphe, sousTitre: `Facture N° ${etat.numero}`, onglet: onglet, onOnglet: setOnglet, onDiffuser: () => props.onDiffuser(facture.share(etat, props.ctx)), children: onglet === 'Document' ? (_jsxs(_Fragment, { children: [_jsx(Manquements, { manquements: controleLegal(etat), onCompleter: () => setOnglet('Modifier') }), _jsx(DocumentFacture, { etat: etat, maintenant: props.ctx.maintenant })] })) : (_jsx(ChampsSchema, { schema: facture.schema, valeur: etat, masques: MASQUES, onChange: props.onChange })) }));
 }
-export function creer(_skeleton, maintenant) {
-    return {
-        nom: facture.title,
-        etat: facture.initialiser?.({ lien: '', maintenant }) ?? facture.defaults,
-    };
+export function creer(_skeleton, maintenant, _extrait) {
+    const neuf = facture.initialiser?.({ lien: '', maintenant }) ?? facture.defaults;
+    return { nom: facture.title, etat: neuf };
 }

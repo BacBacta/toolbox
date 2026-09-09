@@ -143,6 +143,120 @@ body {
   cursor: pointer;
 }
 
+/* ───────────────────────────── l'atelier ───────────────────────────── */
+/*
+ * On dit ce dont on a besoin, l'outil s'ouvre. La réponse s'affiche sous la
+ * ligne de saisie, là où le pouce est déjà.
+ */
+
+.atelier {
+  margin-bottom: var(--pas-5);
+}
+
+.atelier-demande {
+  margin: 0;
+}
+
+.atelier-exemples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--pas-2);
+  margin-top: var(--pas-3);
+}
+
+/* Des exemples qui montrent ce qu'une phrase peut porter, pas juste un mot. */
+.atelier-exemple {
+  min-height: 36px;
+  padding: 0 var(--pas-3);
+  border: 1px solid var(--trait);
+  border-radius: var(--rond-plein);
+  background: var(--surface);
+  color: var(--encre-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.atelier-exemple:active {
+  background: var(--accent-doux);
+  color: var(--accent);
+}
+
+.atelier-reponse {
+  margin-top: var(--pas-3);
+}
+
+.atelier-dit {
+  margin: 0 0 var(--pas-2);
+  font-size: 14px;
+  color: var(--encre-2);
+}
+
+.atelier-choix {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--pas-2);
+}
+
+.atelier-option {
+  display: flex;
+  align-items: center;
+  gap: var(--pas-3);
+  min-height: var(--cible);
+  padding: var(--pas-3);
+  border: 1px solid var(--trait);
+  border-radius: var(--rond-l);
+  background: var(--surface);
+  box-shadow: var(--ombre-1);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.atelier-option:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+/* Ce qu'on a compris se lit avant le clic, pas après. */
+.atelier-option.principale {
+  width: 100%;
+  border-color: var(--accent);
+  background: var(--accent-doux);
+}
+
+.atelier-option .marque {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: var(--rond-m);
+  background: var(--accent);
+  color: var(--sur-accent);
+  font-size: 19px;
+  line-height: 1;
+}
+
+.atelier-option .texte {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.atelier-option b {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.atelier-option .texte span {
+  font-size: 12.5px;
+  color: var(--encre-3);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ───────────────────── formulaire dressé par le schéma ───────────────────── */
 /*
  * Les règles de base des champs vivent dans `@a237/render` : ce sont ses

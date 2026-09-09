@@ -6,6 +6,7 @@ import type { EtatNjangi, Periode } from '../compute/njangi.js'
 import { arreteLe, montantF } from '../format.js'
 import { njangiSchema } from '../schema/njangi.js'
 import type { CardSpec, RenderContext, Relance, ShareSpec, Skeleton } from '../types.js'
+import type { Extrait } from '../extraire.js'
 
 const LIBELLE: Readonly<Record<Periode, string>> = {
   semaine: 'semaine', quinzaine: 'quinzaine', mois: 'mois',
@@ -91,11 +92,31 @@ export function njangiShare(etat: EtatNjangi, ctx: RenderContext): ShareSpec {
   }
 }
 
+/**
+ * Ce qu'un njangi retient de la phrase qui l'a ouvert.
+ *
+ * La cotisation d'abord parmi les sommes marquées — « 20 000 F ». À défaut,
+ * un nombre nu, mais seulement au-dessus de cent : dans « njangi à 8 personnes
+ * de 20 000 », 8 est un effectif et 20 000 une cotisation, et c'est l'ordre de
+ * grandeur qui les sépare quand la monnaie n'est pas écrite. Une cotisation de
+ * huit francs n'existe pas ; un njangi de huit membres, si.
+ */
+function garnir(etat: EtatNjangi, extrait: Extrait): EtatNjangi {
+  const cotisation =
+    extrait.montants[0] ?? extrait.nombres.filter((n) => n >= 100)[0] ?? null
+
+  return {
+    ...etat,
+    ...(cotisation !== null ? { cotisation } : {}),
+    ...(extrait.periode !== null ? { periode: extrait.periode } : {}),
+  }
+}
+
 export const njangi: Skeleton<EtatNjangi> = {
   id: 'njangi',
   group: 'registres',
   title: 'Carnet de njangi',
-  keywords: ['njangi', 'tontine', 'cotis', 'tour', 'membre', 'cagnotte'],
+  keywords: ['njangi', 'djangi', 'tontine', 'cotis', 'tour', 'membre', 'cagnotte', 'epargne', 'association', 'reunion'],
   engine: 'registre',
   schema: njangiSchema,
   defaults,
@@ -103,6 +124,7 @@ export const njangi: Skeleton<EtatNjangi> = {
     collecte, fiabilite, estFiable, classementFiabilite, beneficiaireDuTour,
     prochainTour, basculerVersement, ajouterMembre, retirerMembre, changerCotisation,
   },
+  garnir,
   card: njangiCard,
   share: njangiShare,
 }

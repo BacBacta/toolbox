@@ -7,6 +7,8 @@
  * n'afficherait pas la même chose que le téléphone qui a publié.
  */
 
+import type { Extrait } from './extraire.js'
+
 /** Montant en francs CFA. Toujours un entier : le XAF n'a pas de subdivision. */
 export type XAF = number
 
@@ -157,6 +159,21 @@ export interface Skeleton<E = unknown, C extends ComputeMap = ComputeMap> {
    * Absent quand le squelette n'a rien à dériver.
    */
   readonly initialiser?: (ctx: RenderContext) => E
+  /**
+   * Garnit un état neuf de ce que la demande disait déjà.
+   *
+   * « njangi de 20 000 F par mois » a nommé sa cotisation et sa période :
+   * ouvrir un carnet vide obligerait à les retaper, alors qu'on vient de les
+   * écrire. C'est l'étage 1 tenu jusqu'au bout — zéro jeton, hors ligne.
+   *
+   * Écrit à la main, un par squelette, et testé : le squelette seul sait qu'un
+   * nombre nu de la phrase est une cotisation et pas un nombre de membres.
+   * Le modèle, lui, ne produit jamais que de la configuration (§ 2.1).
+   *
+   * Absent quand rien dans une phrase ne se transpose sans risque — un devis
+   * ne devine pas la raison sociale de son émetteur.
+   */
+  readonly garnir?: (etat: E, extrait: Extrait) => E
   readonly compute: C
   readonly card: (etat: E, ctx: RenderContext) => CardSpec
   readonly share: (etat: E, ctx: RenderContext) => ShareSpec
@@ -203,7 +220,7 @@ export interface ErreurValidation {
  * faut d'abord retrouver le type par l'`id` — ce que fait l'app au moment de
  * charger le moteur de rendu de l'outil.
  */
-export type SkeletonAnonyme = Omit<Skeleton<never>, 'defaults' | 'initialiser'> & {
+export type SkeletonAnonyme = Omit<Skeleton<never>, 'defaults' | 'initialiser' | 'garnir'> & {
   readonly defaults: unknown
   readonly initialiser?: (ctx: RenderContext) => unknown
 }

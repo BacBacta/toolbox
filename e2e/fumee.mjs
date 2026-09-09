@@ -83,14 +83,37 @@ await page.goto(BASE, { waitUntil: 'networkidle' })
 dit('la page s’ouvre', (await page.title()) === 'Atelier 237')
 dit("l'accueil s'affiche", await page.getByText('De quoi as-tu besoin ?').isVisible())
 
-// Étage 1 : la recherche par mots-clés.
-await page.fill('#recherche', 'noter le njangi du quartier')
-await page.waitForTimeout(80)
-dit('la recherche filtre', (await page.locator('.carte-squelette').count()) === 1)
+/*
+ * L'étage 1 de bout en bout : la phrase est lue, l'outil s'ouvre, et ce que la
+ * phrase disait y est déjà écrit. Zéro jeton, aucun réseau — c'est le chemin
+ * que sept demandes sur dix doivent prendre (§ 4).
+ */
+await page.fill('#demande', 'njangi du quartier, 20 000 F par mois')
+await page.waitForTimeout(120)
+dit(
+  'la demande est comprise',
+  (await page.locator('.atelier-option.principale').count()) === 1,
+)
+dit(
+  'ce qui a été compris est montré avant d’ouvrir',
+  (await page.locator('.atelier-option.principale').innerText())
+    .replace(/\s/g, ' ')
+    .includes('20 000 F'),
+)
 
-await page.locator('.carte-squelette').first().click()
+await page.locator('.atelier-option.principale').click()
 await page.waitForSelector('text=Aucun membre pour l’instant', { timeout: 5000 })
 dit('l’outil s’ouvre', true)
+
+// La cotisation et la période viennent de la phrase, pas des valeurs par défaut.
+// Les espaces des montants sont insécables (U+00A0) : on compare sur du texte
+// aplati, sinon on teste la mise en forme au lieu du contenu.
+const soustitre = (await page.locator('.outil-titre span').innerText()).replace(/\s/g, ' ')
+dit(
+  'l’outil est garni de ce que la phrase disait',
+  soustitre.includes('20 000 F') && soustitre.includes('mois'),
+  soustitre,
+)
 
 // Ajouter deux membres.
 await page.locator('[role="tab"]', { hasText: 'Membres' }).click()
@@ -158,7 +181,7 @@ await essaie('le cache est rempli', async () => {
 await essaie("l'app s'ouvre en mode avion", async () => {
   await contexte.setOffline(true)
   await page.reload({ waitUntil: 'domcontentloaded' })
-  await page.waitForSelector('#recherche', { timeout: 8000 })
+  await page.waitForSelector('#demande', { timeout: 8000 })
   return true
 })
 
@@ -176,9 +199,10 @@ await essaie("un outil s'ouvre hors ligne", async () => {
 // ── un registre décrit par ses colonnes, pour éprouver l'autre moteur ──
 await contexte.setOffline(false)
 await page.goto(BASE, { waitUntil: 'networkidle' })
-await page.fill('#recherche', 'liste de prix de la boutique')
+await page.fill('#demande', 'liste de prix de la boutique')
 await page.waitForTimeout(120)
-await page.locator('.carte-squelette').first().click()
+// La grille ne filtre plus : c'est la proposition de l'atelier qui ouvre.
+await page.locator('.atelier-option.principale').click()
 await page.waitForSelector('text=Aucun article', { timeout: 20000 })
 dit('un registre de liste s’ouvre', true)
 

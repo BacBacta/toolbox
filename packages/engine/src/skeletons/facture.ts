@@ -134,7 +134,7 @@ export const facture: Skeleton<EtatFacture> = {
   id: 'facture',
   group: 'documents',
   title: 'Facture',
-  keywords: ['facture', 'facturation', 'note a payer', 'impaye', 'creance'],
+  keywords: ['facture', 'facturation', 'note a payer', 'impaye', 'creance', 'facturer', 'reclamer mon argent', 'doit me payer'],
   engine: 'doc',
   schema: factureSchema,
   defaults,

@@ -7,6 +7,7 @@ import { ChampsSchema } from '../formulaire.js'
 import type { ProprietesOutil } from '../outils.js'
 import { CadreDocument, EtatInvalide, Manquements, ongletDOuverture } from './commun.js'
 import type { OngletDocument } from './commun.js'
+import type { Extrait } from '@a237/engine'
 
 const MASQUES = ['$.nom', '$.emisLe']
 
@@ -45,9 +46,11 @@ export function Outil(props: ProprietesOutil): JSX.Element {
   )
 }
 
-export function creer(_skeleton: string, maintenant: Date): { nom: string; etat: unknown } {
-  return {
-    nom: facture.title,
-    etat: facture.initialiser?.({ lien: '', maintenant }) ?? facture.defaults,
-  }
+export function creer(
+  _skeleton: string,
+  maintenant: Date,
+  _extrait: Extrait,
+): { nom: string; etat: unknown } {
+  const neuf = facture.initialiser?.({ lien: '', maintenant }) ?? facture.defaults
+  return { nom: facture.title, etat: neuf }
 }

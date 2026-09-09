@@ -16,9 +16,7 @@ export function Outil(props) {
     const etat = props.outil.etat;
     return (_jsx(CadreDocument, { titre: props.outil.nom, glyphe: props.glyphe, sousTitre: `Devis N° ${etat.numero}`, onglet: onglet, onOnglet: setOnglet, onDiffuser: () => props.onDiffuser(devis.share(etat, props.ctx)), children: onglet === 'Document' ? (_jsxs(_Fragment, { children: [_jsx(Manquements, { manquements: controleLegal(etat), onCompleter: () => setOnglet('Modifier') }), _jsx(DocumentDevis, { etat: etat })] })) : (_jsx(ChampsSchema, { schema: devis.schema, valeur: etat, masques: MASQUES, onChange: props.onChange })) }));
 }
-export function creer(_skeleton, maintenant) {
-    return {
-        nom: devis.title,
-        etat: devis.initialiser?.({ lien: '', maintenant }) ?? devis.defaults,
-    };
+export function creer(_skeleton, maintenant, extrait) {
+    const neuf = devis.initialiser?.({ lien: '', maintenant }) ?? devis.defaults;
+    return { nom: devis.title, etat: devis.garnir?.(neuf, extrait) ?? neuf };
 }

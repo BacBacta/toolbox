@@ -35,6 +35,10 @@ export {
 
 export { lettres, montantEnLettres } from './lettres.js'
 
+export type { Comprehension } from './comprendre.js'
+export { comprendre } from './comprendre.js'
+export type { Extrait } from './extraire.js'
+export { EXTRAIT_VIDE, extraire } from './extraire.js'
 export type { AvecMotsClefs, Correspondance } from './match.js'
 export { classer, trouverSquelette } from './match.js'
 

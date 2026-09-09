@@ -66,8 +66,8 @@ function saisir(selecteur, valeur) {
         champ.dispatchEvent(new Event('input', { bubbles: true }));
     });
 }
-function saisirRecherche(valeur) {
-    saisir('#recherche', valeur);
+function demander(valeur) {
+    saisir('#demande', valeur);
 }
 describe('l’accueil', () => {
     it('propose les outils qui ont un écran', () => {
@@ -78,23 +78,34 @@ describe('l’accueil', () => {
     it('dit qu’il n’y a rien plutôt que de montrer une liste vide', () => {
         expect(hote.textContent).toContain('Rien pour l’instant');
     });
-    it('filtre par mots-clés, sans appeler personne', () => {
-        saisirRecherche('il me faut un devis');
-        expect(hote.textContent).toContain('Devis');
-        expect(hote.textContent).not.toContain('Carnet de njangi');
+});
+describe('l’atelier comprend la demande, sans appeler personne', () => {
+    it('propose l’outil quand la demande est claire', () => {
+        demander('il me faut un devis');
+        expect(hote.textContent).toContain('Ouvrir devis');
     });
     it('reconnaît le vocabulaire du terrain', () => {
-        saisirRecherche('noter la tontine du quartier');
-        expect(hote.textContent).toContain('Carnet de njangi');
-        expect(hote.textContent).not.toContain('Facture');
+        demander('noter la tontine du quartier');
+        expect(hote.textContent).toContain('Ouvrir carnet de njangi');
     });
-    it('le dit quand rien ne correspond, sans faire semblant', () => {
-        saisirRecherche('réparer une mobylette');
-        expect(hote.textContent).toContain('Rien ne correspond encore');
+    it('montre ce qu’il a compris avant d’ouvrir', () => {
+        // Le résumé n'est pas décoratif : si « 20 000 F » avait été pris pour
+        // autre chose, ça se verrait ici, avant le clic et non après.
+        demander('njangi de 20 000 F par mois');
+        expect(hote.textContent).toContain('Ouvrir carnet de njangi');
+        expect(hote.textContent).toContain('par mois');
     });
-    it('revient à la liste complète quand on efface la recherche', () => {
-        saisirRecherche('devis');
-        saisirRecherche('');
+    it('demande plutôt que de parier quand deux outils répondent', () => {
+        demander('je veux un devis puis une facture');
+        expect(hote.textContent).toContain('Lequel veux-tu ?');
+    });
+    it('le dit quand c’est hors de sa portée, sans faire semblant', () => {
+        demander('il me faut un contrat de bail');
+        expect(hote.textContent).toContain('Je ne sais pas encore faire ça');
+    });
+    it('garde la grille complète sous la main', () => {
+        // La demande ne cache pas les autres outils : on peut toujours parcourir.
+        demander('devis');
         expect(hote.textContent).toContain('Carnet de njangi');
     });
 });

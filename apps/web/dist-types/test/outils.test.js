@@ -1,6 +1,6 @@
 import { jsx as _jsx } from "preact/jsx-runtime";
 // @vitest-environment happy-dom
-import { caisse, clients, course, devis, facture, njangi, prix, scolarite, stock, valider, } from '@a237/engine';
+import { EXTRAIT_VIDE, caisse, clients, course, devis, facture, njangi, prix, scolarite, stock, valider, } from '@a237/engine';
 import { render as monter } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -57,13 +57,13 @@ describe.each([
 ])('l’outil « %s »', (id) => {
     it('fabrique un état neuf conforme à son propre schéma', async () => {
         const module = await CHARGEURS[id]();
-        const neuf = module.creer(id, LE_9_SEPT);
+        const neuf = module.creer(id, LE_9_SEPT, EXTRAIT_VIDE);
         expect(neuf.nom.length).toBeGreaterThan(0);
         expect(valider(SCHEMAS[id], neuf.etat)).toEqual([]);
     });
     it('se dessine à partir de cet état', async () => {
         const module = await CHARGEURS[id]();
-        poser(module, outil(id, module.creer(id, LE_9_SEPT).etat));
+        poser(module, outil(id, module.creer(id, LE_9_SEPT, EXTRAIT_VIDE).etat));
         expect(hote.textContent?.length).toBeGreaterThan(20);
         // Un document neuf signale ses mentions manquantes, mais son état est bon.
         expect(hote.querySelector('.etat-invalide')).toBeNull();
@@ -76,7 +76,7 @@ describe.each([
     });
     it('remonte une spécification de partage quand on diffuse', async () => {
         const module = await CHARGEURS[id]();
-        const onDiffuser = poser(module, outil(id, module.creer(id, LE_9_SEPT).etat));
+        const onDiffuser = poser(module, outil(id, module.creer(id, LE_9_SEPT, EXTRAIT_VIDE).etat));
         act(() => hote.querySelector('.outil-action.principale')?.click());
         const partage = onDiffuser.mock.calls[0]?.[0];
         expect(partage?.card.link).toBe('atl.cm/a/ZBV3');
@@ -90,7 +90,7 @@ function avecEmetteur(etat) {
 describe('les documents ont un onglet d’édition', () => {
     it.each(['devis', 'facture'])('« %s » s’ouvre sur le formulaire tant qu’il est vierge', async (id) => {
         const module = await CHARGEURS[id]();
-        poser(module, outil(id, module.creer(id, LE_9_SEPT).etat));
+        poser(module, outil(id, module.creer(id, LE_9_SEPT, EXTRAIT_VIDE).etat));
         // Une page blanche surmontée de sept mentions manquantes n'apprend rien :
         // un document neuf s'ouvre là où on le remplit.
         expect(hote.textContent).toContain('Raison sociale');
@@ -98,18 +98,18 @@ describe('les documents ont un onglet d’édition', () => {
     });
     it.each(['devis', 'facture'])('« %s » s’ouvre sur le document dès qu’il porte un nom', async (id) => {
         const module = await CHARGEURS[id]();
-        poser(module, outil(id, avecEmetteur(module.creer(id, LE_9_SEPT).etat)));
+        poser(module, outil(id, avecEmetteur(module.creer(id, LE_9_SEPT, EXTRAIT_VIDE).etat)));
         expect(hote.textContent).toContain('Sous-total HT');
     });
     it.each(['devis', 'facture'])('« %s » bascule vers le document', async (id) => {
         const module = await CHARGEURS[id]();
-        poser(module, outil(id, module.creer(id, LE_9_SEPT).etat));
+        poser(module, outil(id, module.creer(id, LE_9_SEPT, EXTRAIT_VIDE).etat));
         act(() => hote.querySelector('[role="tab"][aria-selected="false"]')?.click());
         expect(hote.textContent).toContain('Sous-total HT');
     });
     it.each(['devis', 'facture'])('« %s » énumère les mentions qui manquent', async (id) => {
         const module = await CHARGEURS[id]();
-        poser(module, outil(id, avecEmetteur(module.creer(id, LE_9_SEPT).etat)));
+        poser(module, outil(id, avecEmetteur(module.creer(id, LE_9_SEPT, EXTRAIT_VIDE).etat)));
         // Un document sans NIU ni RCCM ne passe pas un contrôle : on le liste au
         // lieu de l'écrire en prose, et on offre le geste qui le répare.
         const alerte = hote.querySelector('.alerte');
@@ -120,7 +120,7 @@ describe('les documents ont un onglet d’édition', () => {
     });
     it('ne montre pas les champs dérivés à la création', async () => {
         const module = await CHARGEURS.devis();
-        poser(module, outil('devis', module.creer('devis', LE_9_SEPT).etat));
+        poser(module, outil('devis', module.creer('devis', LE_9_SEPT, EXTRAIT_VIDE).etat));
         expect(hote.textContent).toContain('Numéro');
         expect(hote.textContent).not.toContain('Date d’émission');
     });

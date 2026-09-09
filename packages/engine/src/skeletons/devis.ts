@@ -5,6 +5,7 @@ import type { EtatDevis } from '../compute/devis.js'
 import { arreteLe, dateLongue, montantF, nf } from '../format.js'
 import { devisSchema } from '../schema/devis.js'
 import type { CardSpec, RenderContext, ShareSpec, Skeleton } from '../types.js'
+import type { Extrait } from '../extraire.js'
 
 /** Préfixe de numérotation du devis. La facture prendra `FA`. */
 export const PREFIXE_DEVIS = 'DV'
@@ -95,11 +96,23 @@ export function devisShare(etat: EtatDevis, ctx: RenderContext): ShareSpec {
   }
 }
 
+/**
+ * Un devis ne retient que l'acompte.
+ *
+ * Une somme dans « devis de 250 000 F » ne dit pas ce qu'elle est : un total
+ * annoncé, une ligne, un budget à ne pas dépasser. L'écrire dans le document
+ * serait inventer une ligne que personne n'a chiffrée. « Acompte de 30 % »,
+ * en revanche, ne veut dire qu'une chose.
+ */
+function garnir(etat: EtatDevis, extrait: Extrait): EtatDevis {
+  return extrait.pourcent === null ? etat : { ...etat, acompte: extrait.pourcent }
+}
+
 export const devis: Skeleton<EtatDevis> = {
   id: 'devis',
   group: 'documents',
   title: 'Devis',
-  keywords: ['devis', 'proposition', 'chiffrage', 'estimation', 'cotation'],
+  keywords: ['devis', 'proposition', 'chiffrage', 'estimation', 'cotation', 'pro forma', 'proforma', 'offre de prix', 'ca va couter'],
   engine: 'doc',
   schema: devisSchema,
   defaults,
@@ -109,6 +122,7 @@ export const devis: Skeleton<EtatDevis> = {
     emisLe: ctx.maintenant.toISOString(),
   }),
   compute: { chiffrer, controleLegal, dateEmission, prochainNumero, piedLegal },
+  garnir,
   card: devisCard,
   share: devisShare,
 }
