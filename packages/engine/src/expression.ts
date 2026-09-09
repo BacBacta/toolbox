@@ -1,5 +1,4 @@
-import type { ErreurValidation, JsonSchema } from './types.js'
-import { valider } from './valider.js'
+import type { ErreurValidation } from './types.js'
 
 /**
  * Une formule qui se **déclare** au lieu de s'écrire.
@@ -37,37 +36,30 @@ export type Expression =
 /** Six niveaux suffisent à tout ce qu'un commerçant calcule de tête. */
 export const PROFONDEUR_MAX = 6
 
-function noeud(profondeur: number): JsonSchema {
-  const sous: JsonSchema =
-    profondeur <= 1
-      ? {
-          type: 'object',
-          additionalProperties: false,
-          properties: { nombre: { type: 'number' }, ref: { type: 'string', maxLength: 24 } },
-        }
-      : noeud(profondeur - 1)
-
-  return {
-    type: 'object',
-    additionalProperties: false,
-    description:
-      'Soit { "nombre": 19.25 }, soit { "ref": "total" } qui reprend une entrée, ' +
-      'soit { "op": …, "gauche": …, "droite": … }.',
-    properties: {
-      nombre: { type: 'number', description: 'Une constante.' },
-      ref: { type: 'string', maxLength: 24, description: 'La clef d’une entrée déclarée.' },
-      op: {
-        type: 'string',
-        enum: ['plus', 'moins', 'fois', 'divise', 'pourcent', 'min', 'max'],
-        description: '« pourcent » rend gauche × droite ÷ 100.',
-      },
-      gauche: sous,
-      droite: sous,
-    },
-  }
-}
-
-export const schemaExpression: JsonSchema = noeud(PROFONDEUR_MAX)
+/**
+ * La description que lit le modèle — en prose, pas en schéma.
+ *
+ * Un schéma JSON récursif ne se déclare pas sans `$ref`, que le validateur
+ * écrit à la main ne connaît pas. La première version dépliait donc l'arbre :
+ * chaque niveau embarquait deux fois le sous-schéma, soit soixante-quatre
+ * copies de la feuille et **quarante mille caractères** — dix mille jetons
+ * d'invite à chaque appel, contre deux mille sept cents pour un registre
+ * entier. Le coût d'une génération est passé de 0,13 à 0,76 franc, et le
+ * modèle, noyé sous la répétition, refusait des demandes qu'il savait traiter.
+ *
+ * Trois lignes de français disent la même chose et se lisent mieux. La
+ * vérification, elle, ne coûte rien et reste exhaustive : `verifierExpression`
+ * parcourt l'arbre lui-même.
+ */
+export const DESCRIPTION_FORMULE =
+  'Un arbre. Chaque nœud est exactement l’une de ces trois formes : ' +
+  '{"nombre": 19.25} une constante ; {"ref": "total"} une entrée déclarée ; ' +
+  '{"op": "moins", "gauche": …, "droite": …} une opération, où gauche et droite ' +
+  'sont eux-mêmes des nœuds. Opérations : plus, moins, fois, divise, pourcent ' +
+  '(gauche × droite ÷ 100), min, max. ' +
+  `Six niveaux d'imbrication au plus. ` +
+  'Exemple — le reste à payer : ' +
+  '{"op":"moins","gauche":{"ref":"total"},"droite":{"ref":"verse"}}'
 
 /**
  * Évalue l'arbre. Jamais d'exception, jamais de NaN, jamais d'infini.
@@ -121,20 +113,37 @@ export function verifierExpression(
   clefs: readonly string[],
   chemin = '$.formule',
 ): readonly ErreurValidation[] {
-  const erreurs = [...valider(schemaExpression, valeur)]
-  if (erreurs.length > 0) return erreurs
-  return formes(valeur as Expression, clefs, chemin, 0)
+  return formes(valeur, clefs, chemin, 0)
 }
 
+const OPERATIONS: readonly string[] = ['plus', 'moins', 'fois', 'divise', 'pourcent', 'min', 'max']
+
+/**
+ * Vérifie l'arbre nœud par nœud.
+ *
+ * Elle fait tout : la forme, les types, l'ensemble fermé des opérations, les
+ * références, la profondeur. Un schéma déplié faisait la moitié du travail
+ * pour quarante mille caractères ; cette marche fait tout pour rien.
+ */
 function formes(
-  e: Expression,
+  valeur: unknown,
   clefs: readonly string[],
   chemin: string,
   niveau: number,
 ): ErreurValidation[] {
-  const o = e as Record<string, unknown>
-  const presents = ['nombre', 'ref', 'op'].filter((c) => o[c] !== undefined)
+  if (typeof valeur !== 'object' || valeur === null || Array.isArray(valeur)) {
+    return [{ chemin, message: 'un nœud de formule est un objet' }]
+  }
 
+  const o = valeur as Record<string, unknown>
+  const inconnus = Object.keys(o).filter(
+    (c) => !['nombre', 'ref', 'op', 'gauche', 'droite'].includes(c),
+  )
+  if (inconnus.length > 0) {
+    return [{ chemin, message: `champ inconnu : « ${inconnus.join(' », « ')} »` }]
+  }
+
+  const presents = ['nombre', 'ref', 'op'].filter((c) => o[c] !== undefined)
   if (presents.length !== 1) {
     return [{
       chemin,
@@ -145,15 +154,29 @@ function formes(
     }]
   }
 
-  if (o['nombre'] !== undefined) return []
+  if (o['nombre'] !== undefined) {
+    return typeof o['nombre'] === 'number' && Number.isFinite(o['nombre'])
+      ? []
+      : [{ chemin, message: '« nombre » doit être un nombre fini' }]
+  }
 
   if (o['ref'] !== undefined) {
-    return clefs.includes(String(o['ref']))
+    if (typeof o['ref'] !== 'string') {
+      return [{ chemin, message: '« ref » doit être la clef d’une entrée' }]
+    }
+    return clefs.includes(o['ref'])
       ? []
       : [{
           chemin,
-          message: `« ${String(o['ref'])} » ne désigne aucune entrée (elles s’appellent ${clefs.join(', ')})`,
+          message: `« ${o['ref']} » ne désigne aucune entrée (elles s’appellent ${clefs.join(', ')})`,
         }]
+  }
+
+  if (typeof o['op'] !== 'string' || !OPERATIONS.includes(o['op'])) {
+    return [{
+      chemin,
+      message: `« ${String(o['op'])} » n’est pas une opération connue (${OPERATIONS.join(', ')})`,
+    }]
   }
 
   if (niveau >= PROFONDEUR_MAX) {
@@ -163,9 +186,9 @@ function formes(
   const erreurs: ErreurValidation[] = []
   for (const cote of ['gauche', 'droite'] as const) {
     if (o[cote] === undefined) {
-      erreurs.push({ chemin: `${chemin}.${cote}`, message: `« ${String(o['op'])} » exige ${cote}` })
+      erreurs.push({ chemin: `${chemin}.${cote}`, message: `« ${o['op']} » exige ${cote}` })
     } else {
-      erreurs.push(...formes(o[cote] as Expression, clefs, `${chemin}.${cote}`, niveau + 1))
+      erreurs.push(...formes(o[cote], clefs, `${chemin}.${cote}`, niveau + 1))
     }
   }
   return erreurs
