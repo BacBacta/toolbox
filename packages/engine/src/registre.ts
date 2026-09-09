@@ -51,6 +51,59 @@ export interface RegistreDemande {
 export const MAX_COLONNES = 6
 
 /**
+ * Le refus, qui est une réponse et non une panne.
+ *
+ * Sans cette branche, le modèle n'avait aucune sortie : on lui donnait un
+ * schéma de registre à remplir, il remplissait un registre. « Je veux un site
+ * internet » rendait un registre « Ventes », « fais-moi un logo » un registre
+ * « Caisse » — inventés de bout en bout, et facturés. Il faisait exactement ce
+ * qu'on lui demandait ; c'est la demande qui était mal posée.
+ *
+ * Un outil qui ne sait pas dire non finit par mentir.
+ */
+export interface RefusModele {
+  readonly impossible: string
+}
+
+export const schemaRefus: JsonSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['impossible'],
+  properties: {
+    impossible: {
+      type: 'string', minLength: 4, maxLength: 160,
+      description:
+        'Pourquoi la demande ne se range pas dans un registre. Une phrase, en français, adressée à l’utilisateur.',
+    },
+  },
+}
+
+export type ReponseModele =
+  | { readonly sorte: 'registre'; readonly registre: RegistreDemande }
+  | { readonly sorte: 'refus'; readonly pourquoi: string }
+  | { readonly sorte: 'invalide'; readonly erreurs: readonly ErreurValidation[] }
+
+/**
+ * Lit ce que le modèle a répondu : un registre, un refus, ou rien de valable.
+ *
+ * Le refus se reconnaît d'abord. Un modèle qui dit « je ne peux pas » a bien
+ * travaillé, et le reprendre pour non-conformité brûlerait un tour à lui faire
+ * inventer ce qu'il vient justement de refuser d'inventer.
+ */
+export function lireReponseModele(valeur: unknown): ReponseModele {
+  if (typeof valeur === 'object' && valeur !== null && 'impossible' in valeur) {
+    const erreurs = valider(schemaRefus, valeur)
+    if (erreurs.length > 0) return { sorte: 'invalide', erreurs }
+    return { sorte: 'refus', pourquoi: (valeur as RefusModele).impossible }
+  }
+
+  const erreurs = verifierRegistre(valeur)
+  return erreurs.length > 0
+    ? { sorte: 'invalide', erreurs }
+    : { sorte: 'registre', registre: valeur as RegistreDemande }
+}
+
+/**
  * Le schéma que l'invite impose au modèle.
  *
  * Les `description` ne sont pas de la documentation : elles sont lues par le

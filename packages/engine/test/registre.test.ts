@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { verifierRegistre } from '../src/registre.js'
+import { lireReponseModele, verifierRegistre } from '../src/registre.js'
 
 /**
  * Ce fichier est la frontière du § 2.1 : rien de ce que le modèle a dit
@@ -153,5 +153,27 @@ describe('ce que le schéma refuse déjà', () => {
       clef: `c${i}`, titre: `C${i}`, type: 'texte' as const,
     }))
     expect(verifierRegistre({ ...BON, colonnes: trop, total: undefined }).length).toBeGreaterThan(0)
+  })
+})
+
+describe('le modèle a le droit de dire non', () => {
+  it('reconnaît un refus', () => {
+    const r = lireReponseModele({ impossible: 'Un site internet ne se range pas dans un registre.' })
+    expect(r.sorte).toBe('refus')
+    if (r.sorte === 'refus') expect(r.pourquoi).toContain('site internet')
+  })
+
+  it('reconnaît un registre', () => {
+    const r = lireReponseModele(BON)
+    expect(r.sorte).toBe('registre')
+  })
+
+  it('refuse un refus vide, qui n’apprend rien', () => {
+    expect(lireReponseModele({ impossible: '' }).sorte).toBe('invalide')
+  })
+
+  it('ne prend pas un registre pour un refus, ni l’inverse', () => {
+    expect(lireReponseModele({ ...BON, impossible: 'non' }).sorte).toBe('invalide')
+    expect(lireReponseModele('<div>bonjour</div>').sorte).toBe('invalide')
   })
 })

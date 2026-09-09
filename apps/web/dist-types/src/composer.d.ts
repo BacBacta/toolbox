@@ -18,6 +18,14 @@ export type Composition = {
     readonly registre: RegistreDemande;
     readonly fcfa: number;
 }
+/**
+ * Le modèle a répondu que la demande n'est pas un registre. C'est une
+ * réponse, pas une panne : on la montre telle quelle et on ne réessaie pas.
+ */
+ | {
+    readonly sorte: 'hors-sujet';
+    readonly pourquoi: string;
+}
 /** Le proxy existe mais n'est pas ouvert. On le dit, on ne fait pas semblant. */
  | {
     readonly sorte: 'pas-ouvert';

@@ -1,4 +1,4 @@
-import { MAX_COLONNES, schemaRegistre } from '@a237/engine'
+import { MAX_COLONNES, schemaRefus, schemaRegistre } from '@a237/engine'
 
 /**
  * L'invite qui impose la sortie en JSON conforme au schéma (§ 3).
@@ -15,8 +15,19 @@ import { MAX_COLONNES, schemaRegistre } from '@a237/engine'
 
 const CONSIGNES = `Tu configures un registre pour un petit commerçant camerounais.
 
+Un registre est un tableau de lignes qu'on tient à la main sur un téléphone :
+des ventes, des dettes, un stock, des présences, des cotisations.
+
 Réponds par un objet JSON seul, sans texte autour, sans bloc de code.
-Il doit être conforme au schéma donné plus bas.
+
+**Si la demande ne décrit pas un registre, refuse.** Un site internet, une
+application, un logo, une traduction, un conseil, une question générale : rien
+de tout cela ne se range dans un tableau de lignes. Réponds alors par le schéma
+de refus, en disant en une phrase ce que tu ne peux pas faire. Ne fabrique
+jamais un registre plausible pour une demande qui n'en réclame pas : un outil
+inventé se remplit une fois, puis se referme pour toujours.
+
+Sinon, réponds par un registre conforme au schéma.
 
 Règles :
 - Les montants sont en francs CFA, entiers, sans décimale.
@@ -32,8 +43,11 @@ Règles :
 export function batirInvite(demande: string): string {
   return `${CONSIGNES}
 
-Schéma :
+Schéma d'un registre :
 ${JSON.stringify(schemaRegistre)}
+
+Schéma d'un refus :
+${JSON.stringify(schemaRefus)}
 
 Demande de l'utilisateur :
 ${demande}`

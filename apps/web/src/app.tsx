@@ -22,11 +22,15 @@ import { Atelier } from './atelier.js'
 const DISPONIBLES = CATALOGUE.filter((f) => outilDisponible(f.id))
 
 /**
- * Le signe d'un outil ouvert. Le losange sert de repli : un état enregistré par
- * une version plus ancienne peut porter un identifiant que ce catalogue-ci ne
- * connaît plus, et un écran sans pastille sauterait à l'œil.
+ * Le signe d'un outil ouvert.
+ *
+ * Un registre composé par le modèle n'est dans aucun catalogue : il porte son
+ * propre signe, l'astérisque, et non le losange de repli. Ce losange dit « je
+ * ne connais pas cet outil » — vrai pour un état enregistré par une version
+ * plus ancienne, faux pour un registre composé, qui est un cas normal.
  */
 function glyphePour(skeleton: string): string {
+  if (skeleton === 'compose') return '✳'
   return CATALOGUE.find((f) => f.id === skeleton)?.glyphe ?? '◇'
 }
 

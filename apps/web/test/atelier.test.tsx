@@ -119,3 +119,25 @@ describe('l’étage 2, quand on le demande', () => {
     expect(hote.textContent).toContain('pas de réseau')
   })
 })
+
+describe('quand la demande n’est pas un registre', () => {
+  it('rapporte le refus du modèle, sans créer d’outil', async () => {
+    // Le défaut d'origine : « je veux un site internet » créait un registre
+    // « Ventes » inventé de bout en bout. Un outil qui ne sait pas dire non
+    // finit par mentir.
+    repond(200, { impossible: 'Un site internet ne se range pas dans un registre.', fcfa: 0.13 })
+    demander('je veux un site internet')
+    cliquer('Compose-le pour moi')
+    await attendre()
+    expect(hote.textContent).toContain('ne se range pas dans un registre')
+    expect(creations).toHaveLength(0)
+  })
+
+  it('ne propose pas de réessayer : la réponse ne changera pas', async () => {
+    repond(200, { impossible: 'Un logo se dessine, il ne se tient pas en lignes.', fcfa: 0.13 })
+    demander('fais-moi un logo')
+    cliquer('Compose-le pour moi')
+    await attendre()
+    expect(hote.textContent).not.toContain('Réessaie')
+  })
+})

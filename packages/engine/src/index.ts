@@ -39,8 +39,10 @@ export type { Comprehension } from './comprendre.js'
 export { comprendre } from './comprendre.js'
 export type { Extrait } from './extraire.js'
 export { EXTRAIT_VIDE, extraire } from './extraire.js'
-export type { ColonneDemandee, RegistreDemande } from './registre.js'
-export { MAX_COLONNES, schemaRegistre, verifierRegistre } from './registre.js'
+export type { ColonneDemandee, RefusModele, RegistreDemande, ReponseModele } from './registre.js'
+export {
+  MAX_COLONNES, lireReponseModele, schemaRefus, schemaRegistre, verifierRegistre,
+} from './registre.js'
 export type { AvecMotsClefs, Correspondance } from './match.js'
 export { classer, trouverSquelette } from './match.js'
 

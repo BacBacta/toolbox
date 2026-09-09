@@ -22,6 +22,9 @@ export async function composer(demande, signal) {
         };
     }
     const corps = (await reponse.json().catch(() => null));
+    if (typeof corps?.impossible === 'string' && corps.impossible !== '') {
+        return { sorte: 'hors-sujet', pourquoi: corps.impossible };
+    }
     const erreurs = verifierRegistre(corps?.registre);
     if (erreurs.length > 0) {
         return { sorte: 'echoue', pourquoi: 'la réponse ne décrit pas un registre valide' };

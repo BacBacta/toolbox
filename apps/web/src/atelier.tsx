@@ -33,7 +33,12 @@ export interface ProprietesAtelier {
 /** L'identifiant d'un registre qui n'a pas de squelette. Voir `outils/liste.tsx`. */
 const ID_COMPOSE = 'compose'
 
-type Composition = 'repos' | 'en-cours' | 'pas-ouvert' | { readonly echoue: string }
+type Composition =
+  | 'repos'
+  | 'en-cours'
+  | 'pas-ouvert'
+  | { readonly echoue: string }
+  | { readonly horsSujet: string }
 
 /**
  * Des exemples qui montrent ce qu'une phrase peut porter, pas seulement le nom
@@ -78,6 +83,8 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
         props.onCreer(ID_COMPOSE, EXTRAIT_VIDE, r.registre)
       } else if (r.sorte === 'pas-ouvert') {
         setComposition('pas-ouvert')
+      } else if (r.sorte === 'hors-sujet') {
+        setComposition({ horsSujet: r.pourquoi })
       } else {
         setComposition({ echoue: r.pourquoi })
       }
@@ -175,7 +182,14 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
             </p>
           )}
 
-          {typeof composition === 'object' && (
+          {typeof composition === 'object' && 'horsSujet' in composition && (
+            // Le modèle a dit non. On le rapporte tel quel plutôt que de
+            // proposer de réessayer : la réponse ne changera pas, et chaque
+            // essai coûte.
+            <p class="note">{composition.horsSujet}</p>
+          )}
+
+          {typeof composition === 'object' && 'echoue' in composition && (
             <p class="note">Je n’ai pas pu composer — {composition.echoue}. Réessaie ?</p>
           )}
         </div>

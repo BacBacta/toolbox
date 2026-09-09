@@ -1,10 +1,9 @@
-import type { ErreurValidation } from '@a237/engine'
+import type { ErreurValidation, RegistreDemande } from '@a237/engine'
+import { lireReponseModele } from '@a237/engine'
 import { couter } from './cout.js'
 import type { Cout } from './cout.js'
 import type { Fournisseur } from './fournisseur.js'
 import { batirInvite, batirReproches } from './invite.js'
-import type { RegistreDemande } from '@a237/engine'
-import { verifierRegistre } from '@a237/engine'
 
 /**
  * Une génération, du texte de l'utilisateur à la configuration validée.
@@ -22,6 +21,19 @@ export type Resultat =
   | {
       readonly sorte: 'reussi'
       readonly registre: RegistreDemande
+      readonly cout: Cout
+      readonly essais: number
+    }
+  /**
+   * Le modèle a dit non, et c'est une bonne réponse.
+   *
+   * Sans cette branche il n'avait pas d'issue : on lui donnait un schéma de
+   * registre, il rendait un registre. « Je veux un site internet » produisait
+   * un registre « Ventes » inventé de bout en bout — et facturé.
+   */
+  | {
+      readonly sorte: 'hors-sujet'
+      readonly pourquoi: string
       readonly cout: Cout
       readonly essais: number
     }
@@ -65,15 +77,16 @@ export async function traiter(
       continue
     }
 
-    erreurs = verifierRegistre(valeur)
-    if (erreurs.length === 0) {
-      return {
-        sorte: 'reussi',
-        registre: valeur as RegistreDemande,
-        cout: cout(),
-        essais: essai,
-      }
+    const lu = lireReponseModele(valeur)
+    if (lu.sorte === 'registre') {
+      return { sorte: 'reussi', registre: lu.registre, cout: cout(), essais: essai }
     }
+    if (lu.sorte === 'refus') {
+      // On ne reprend pas un refus : ce serait payer un tour pour lui faire
+      // inventer ce qu'il vient justement de refuser d'inventer.
+      return { sorte: 'hors-sujet', pourquoi: lu.pourquoi, cout: cout(), essais: essai }
+    }
+    erreurs = lu.erreurs
   }
 
   return {

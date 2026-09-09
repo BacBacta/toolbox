@@ -135,15 +135,6 @@ function envoyer(clef, corps) {
 	});
 }
 //#endregion
-//#region src/cout.ts
-function couter(jetons, prix, tauxFcfaParDollar) {
-	const dollars = (jetons.entree * prix.entree + jetons.sortie * prix.sortie) / 1e6;
-	return {
-		dollars,
-		fcfa: Math.round(dollars * tauxFcfaParDollar * 100) / 100
-	};
-}
-//#endregion
 //#region ../engine/src/valider.ts
 /**
 * Validateur du sous-ensemble de JSON Schema retenu par le produit.
@@ -218,6 +209,45 @@ function valider(schema, valeur, chemin = "$") {
 			return e;
 		}
 	}
+}
+var schemaRefus = {
+	type: "object",
+	additionalProperties: false,
+	required: ["impossible"],
+	properties: { impossible: {
+		type: "string",
+		minLength: 4,
+		maxLength: 160,
+		description: "Pourquoi la demande ne se range pas dans un registre. Une phrase, en français, adressée à l’utilisateur."
+	} }
+};
+/**
+* Lit ce que le modèle a répondu : un registre, un refus, ou rien de valable.
+*
+* Le refus se reconnaît d'abord. Un modèle qui dit « je ne peux pas » a bien
+* travaillé, et le reprendre pour non-conformité brûlerait un tour à lui faire
+* inventer ce qu'il vient justement de refuser d'inventer.
+*/
+function lireReponseModele(valeur) {
+	if (typeof valeur === "object" && valeur !== null && "impossible" in valeur) {
+		const erreurs = valider(schemaRefus, valeur);
+		if (erreurs.length > 0) return {
+			sorte: "invalide",
+			erreurs
+		};
+		return {
+			sorte: "refus",
+			pourquoi: valeur.impossible
+		};
+	}
+	const erreurs = verifierRegistre(valeur);
+	return erreurs.length > 0 ? {
+		sorte: "invalide",
+		erreurs
+	} : {
+		sorte: "registre",
+		registre: valeur
+	};
 }
 /**
 * Le schéma que l'invite impose au modèle.
@@ -410,6 +440,15 @@ function verifierRegistre(valeur) {
 	return erreurs;
 }
 //#endregion
+//#region src/cout.ts
+function couter(jetons, prix, tauxFcfaParDollar) {
+	const dollars = (jetons.entree * prix.entree + jetons.sortie * prix.sortie) / 1e6;
+	return {
+		dollars,
+		fcfa: Math.round(dollars * tauxFcfaParDollar * 100) / 100
+	};
+}
+//#endregion
 //#region src/invite.ts
 /**
 * L'invite qui impose la sortie en JSON conforme au schéma (§ 3).
@@ -425,8 +464,19 @@ function verifierRegistre(valeur) {
 */
 var CONSIGNES = `Tu configures un registre pour un petit commerçant camerounais.
 
+Un registre est un tableau de lignes qu'on tient à la main sur un téléphone :
+des ventes, des dettes, un stock, des présences, des cotisations.
+
 Réponds par un objet JSON seul, sans texte autour, sans bloc de code.
-Il doit être conforme au schéma donné plus bas.
+
+**Si la demande ne décrit pas un registre, refuse.** Un site internet, une
+application, un logo, une traduction, un conseil, une question générale : rien
+de tout cela ne se range dans un tableau de lignes. Réponds alors par le schéma
+de refus, en disant en une phrase ce que tu ne peux pas faire. Ne fabrique
+jamais un registre plausible pour une demande qui n'en réclame pas : un outil
+inventé se remplit une fois, puis se referme pour toujours.
+
+Sinon, réponds par un registre conforme au schéma.
 
 Règles :
 - Les montants sont en francs CFA, entiers, sans décimale.
@@ -441,8 +491,11 @@ Règles :
 function batirInvite(demande) {
 	return `${CONSIGNES}
 
-Schéma :
+Schéma d'un registre :
 ${JSON.stringify(schemaRegistre)}
+
+Schéma d'un refus :
+${JSON.stringify(schemaRefus)}
 
 Demande de l'utilisateur :
 ${demande}`;
@@ -489,13 +542,20 @@ async function traiter(demande, fournisseur, tauxFcfaParDollar) {
 			}];
 			continue;
 		}
-		erreurs = verifierRegistre(valeur);
-		if (erreurs.length === 0) return {
+		const lu = lireReponseModele(valeur);
+		if (lu.sorte === "registre") return {
 			sorte: "reussi",
-			registre: valeur,
+			registre: lu.registre,
 			cout: cout(),
 			essais: essai
 		};
+		if (lu.sorte === "refus") return {
+			sorte: "hors-sujet",
+			pourquoi: lu.pourquoi,
+			cout: cout(),
+			essais: essai
+		};
+		erreurs = lu.erreurs;
 	}
 	return {
 		sorte: "invalide",
@@ -575,8 +635,15 @@ async function handler(req, res) {
 			modele: process.env.A237_MODELE ?? "google/gemini-2.5-flash-lite",
 			essais: resultat.essais,
 			fcfa: resultat.cout.fcfa,
-			aboutit: resultat.sorte === "reussi"
+			issue: resultat.sorte
 		}));
+		if (resultat.sorte === "hors-sujet") {
+			res.status(200).json({
+				impossible: resultat.pourquoi,
+				fcfa: resultat.cout.fcfa
+			});
+			return;
+		}
 		if (resultat.sorte !== "reussi") {
 			res.status(422).json({
 				erreur: "le modèle n’a pas produit un registre utilisable",

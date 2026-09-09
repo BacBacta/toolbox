@@ -104,9 +104,19 @@ export default async function handler(req: RequeteEntrante, res: ReponseSortante
         modele: process.env.A237_MODELE ?? 'google/gemini-2.5-flash-lite',
         essais: resultat.essais,
         fcfa: resultat.cout.fcfa,
-        aboutit: resultat.sorte === 'reussi',
+        issue: resultat.sorte,
       }),
     )
+
+    if (resultat.sorte === 'hors-sujet') {
+      /*
+       * Le modèle a dit non, et c'est une réponse, pas une panne. Un 200 : la
+       * requête a abouti, la réponse est négative. Renvoyer une erreur ferait
+       * réessayer le client, et repayer.
+       */
+      res.status(200).json({ impossible: resultat.pourquoi, fcfa: resultat.cout.fcfa })
+      return
+    }
 
     if (resultat.sorte !== 'reussi') {
       res.status(422).json({

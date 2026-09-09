@@ -18,6 +18,11 @@ import { verifierRegistre } from '@a237/engine'
 
 export type Composition =
   | { readonly sorte: 'compose'; readonly registre: RegistreDemande; readonly fcfa: number }
+  /**
+   * Le modèle a répondu que la demande n'est pas un registre. C'est une
+   * réponse, pas une panne : on la montre telle quelle et on ne réessaie pas.
+   */
+  | { readonly sorte: 'hors-sujet'; readonly pourquoi: string }
   /** Le proxy existe mais n'est pas ouvert. On le dit, on ne fait pas semblant. */
   | { readonly sorte: 'pas-ouvert' }
   | { readonly sorte: 'echoue'; readonly pourquoi: string }
@@ -46,8 +51,12 @@ export async function composer(demande: string, signal?: AbortSignal): Promise<C
   }
 
   const corps = (await reponse.json().catch(() => null)) as
-    | { registre?: unknown; fcfa?: unknown }
+    | { registre?: unknown; impossible?: unknown; fcfa?: unknown }
     | null
+
+  if (typeof corps?.impossible === 'string' && corps.impossible !== '') {
+    return { sorte: 'hors-sujet', pourquoi: corps.impossible }
+  }
 
   const erreurs = verifierRegistre(corps?.registre)
   if (erreurs.length > 0) {

@@ -113,3 +113,20 @@ describe('ce qui ne doit jamais atteindre l’écran', () => {
     expect(r.sorte).toBe('invalide')
   })
 })
+
+describe('le modèle a le droit de dire non', () => {
+  it('rend le refus sans le reprendre', async () => {
+    const f = faux([JSON.stringify({ impossible: 'Un site internet ne se range pas dans un registre.' })])
+    const r = await traiter('je veux un site internet', f, 600)
+    expect(r.sorte).toBe('hors-sujet')
+    if (r.sorte === 'hors-sujet') expect(r.pourquoi).toContain('site internet')
+    // Reprendre un refus, ce serait payer un tour pour lui faire inventer ce
+    // qu'il vient justement de refuser d'inventer.
+    expect(f.vus).toHaveLength(1)
+  })
+
+  it('compte quand même ce que le refus a coûté', async () => {
+    const r = await traiter('un logo', faux([JSON.stringify({ impossible: 'Un logo se dessine.' })]), 600)
+    expect(r.cout.fcfa).toBeGreaterThan(0)
+  })
+})
