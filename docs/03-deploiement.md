@@ -16,7 +16,7 @@ inventée serait un lien mort envoyé par le trésorier à ses membres, sous son
 
 | | |
 |---|---|
-| Production | **https://atelier237.pages.dev** |
+| Production | **https://atelier237.pages.dev** — en ligne depuis le 9 septembre 2026 |
 | Projet | `atelier237` |
 
 `wrangler.toml` est à la racine et nomme le projet ; `apps/web/public/_headers`
@@ -78,11 +78,26 @@ Trois fichiers, et pas une décision.
   fichier qui part en ligne**. Deux copies d'une même règle divergent toujours,
   et celle qui compte est celle du serveur.
 
-### Une embûche à connaître
+### Deux embûches, dont une qui a cassé le mode avion
 
-Sans `--archive=tgz`, l'envoi Vercel des fichiers un par un échouait en cours
-de route. `wrangler` envoie une archive par défaut ; le problème ne se repose
-pas.
+**Pages redirige `/index.html` vers `/` en 308.** Le service worker le
+préchargeait : `addAll` suit la redirection, obtient une réponse marquée
+`redirected`, et `Cache.put` la refuse. L'installation échouait en entier, sans
+un mot dans la console — le déploiement, lui, réussissait. La coquille se range
+désormais sous `/`, qui sert les mêmes octets et ne redirige pas, et le serveur
+des vérifications de bout en bout **reproduit la redirection** : il servait le
+fichier directement, et laissait donc passer exactement ce qui casse en
+production.
+
+C'est la deuxième fois que le préchargement se casse de cette façon. La
+première, `index.html` figurait deux fois dans la liste et `addAll` rejetait sur
+le doublon. Même symptôme, même silence : retenir que **toute panne
+d'installation du service worker est muette**, et qu'elle ne se voit qu'en
+ouvrant l'application hors ligne.
+
+**Sans `--archive=tgz`, l'envoi Vercel des fichiers un par un échouait** en
+cours de route. `wrangler` envoie une archive par défaut ; le problème ne se
+repose pas.
 
 ### Les en-têtes, et pourquoi ils comptent
 
