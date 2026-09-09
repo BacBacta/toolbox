@@ -10,6 +10,12 @@
 /** Montant en francs CFA. Toujours un entier : le XAF n'a pas de subdivision. */
 export type XAF = number
 
+/**
+ * Encre du document. Quatre aplats, pas de dégradé : le poids du PNG partagé est
+ * divisé par trois (invariant § 2.6). La palette vit dans `packages/ui`.
+ */
+export type Encre = 'encre' | 'bordeaux' | 'foret' | 'ardoise'
+
 export type SkeletonId = string
 
 export type SkeletonGroup = 'documents' | 'registres' | 'calculs'
@@ -76,8 +82,12 @@ export interface CardSpec {
 /** Une relance individuelle. Elle part du pouce du propriétaire, via `wa.me`. */
 export interface Relance {
   readonly nom: string
-  /** Numéro au format local, tel que saisi. Le lien `wa.me` est bâti au rendu. */
-  readonly tel: string
+  /**
+   * Numéro au format local, tel que saisi ; `null` quand on ne l'a pas. Le lien
+   * `wa.me` est bâti au rendu — sans numéro, l'interface propose de copier le
+   * message. Le serveur n'envoie jamais rien lui-même (invariant § 2.4).
+   */
+  readonly tel: string | null
   readonly message: string
 }
 
@@ -134,6 +144,19 @@ export interface Skeleton<E = unknown, C extends ComputeMap = ComputeMap> {
   readonly schema: JsonSchema
   /** État par défaut, conforme au schéma. Vérifié par un test. */
   readonly defaults: E
+  /**
+   * Dérive l'état initial d'un nouvel outil à partir de `defaults`.
+   *
+   * Ajout au type du brief, et il se justifie : un numéro de document et une
+   * date d'émission ne peuvent pas être figés dans une constante statique — le
+   * numéro dépend de l'année civile et de ce que le compte a déjà émis, la date
+   * dépend du moment de la création. Les mettre en dur dans `defaults` les
+   * ferait vieillir. `defaults` porte donc des valeurs de remplissage qui
+   * valident contre le schéma, et `initialiser` les remplace à la création.
+   *
+   * Absent quand le squelette n'a rien à dériver.
+   */
+  readonly initialiser?: (ctx: RenderContext) => E
   readonly compute: C
   readonly card: (etat: E, ctx: RenderContext) => CardSpec
   readonly share: (etat: E, ctx: RenderContext) => ShareSpec
@@ -164,4 +187,18 @@ export type JsonSchema =
 export interface ErreurValidation {
   readonly chemin: string
   readonly message: string
+}
+
+/**
+ * Un squelette dont on a oublié le type d'état, pour les registres hétérogènes.
+ *
+ * `defaults` s'élargit à `unknown` (covariant) tandis que `card` et `share`
+ * gardent un paramètre `never` (contravariant) : c'est la seule combinaison où
+ * chaque `Skeleton<E>` concret entre sans conversion. Pour appeler `card` il
+ * faut d'abord retrouver le type par l'`id` — ce que fait l'app au moment de
+ * charger le moteur de rendu de l'outil.
+ */
+export type SkeletonAnonyme = Omit<Skeleton<never>, 'defaults' | 'initialiser'> & {
+  readonly defaults: unknown
+  readonly initialiser?: (ctx: RenderContext) => unknown
 }
