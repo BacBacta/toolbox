@@ -1,0 +1,15 @@
+{
+  "name": "Atelier 237",
+  "short_name": "Atelier",
+  "description": "Devis, factures et carnets de njangi, hors ligne, sur ton téléphone.",
+  "lang": "fr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FBFCF8",
+  "theme_color": "#1B5E43",
+  "icons": [
+    { "src": "/icone.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any maskable" }
+  ]
+}

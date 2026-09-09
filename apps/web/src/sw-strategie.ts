@@ -1,0 +1,69 @@
+/**
+ * Les règles de cache du service worker, isolées pour être testables.
+ *
+ * Un service worker s'exécute dans une portée que ni Vitest ni happy-dom ne
+ * fournissent. Plutôt que de laisser sa logique non vérifiée, elle vit ici sous
+ * forme de fonctions pures, et `sw.ts` ne fait plus que les appeler.
+ */
+
+export type Strategie =
+  /** Une navigation : on sert la coquille, même hors ligne. */
+  | 'coquille'
+  /** Un fichier de l'application : le cache d'abord, le réseau pour se tenir à jour. */
+  | 'cache-puis-reseau'
+  /** Tout le reste : le réseau, sans rien mettre en cache. */
+  | 'reseau'
+
+export interface RequeteObservee {
+  readonly methode: string
+  readonly mode: string
+  readonly url: string
+  readonly destination: string
+}
+
+const DESTINATIONS_APP = new Set(['script', 'style', 'font', 'image', 'manifest', ''])
+
+export function strategiePour(requete: RequeteObservee, origine: string): Strategie {
+  // On ne met jamais en cache autre chose qu'une lecture : publier, payer et
+  // appeler le modèle passent par le réseau ou par la file d'attente.
+  if (requete.methode !== 'GET') return 'reseau'
+  if (requete.mode === 'navigate') return 'coquille'
+
+  let url: URL
+  try {
+    url = new URL(requete.url)
+  } catch {
+    return 'reseau'
+  }
+  if (url.origin !== origine) return 'reseau'
+
+  return DESTINATIONS_APP.has(requete.destination) ? 'cache-puis-reseau' : 'reseau'
+}
+
+/** Le nom du cache porte sa version : changer de version purge l'ancien. */
+export function nomCache(version: string): string {
+  return `atelier237-${version}`
+}
+
+/** Les caches à supprimer à l'activation : les nôtres, sauf le courant. */
+export function cachesAPurger(existants: readonly string[], courant: string): string[] {
+  return existants.filter((c) => c.startsWith('atelier237-') && c !== courant)
+}
+
+/**
+ * La liste des fichiers à précharger, dédoublonnée.
+ *
+ * `cache.addAll` **rejette** quand deux entrées désignent la même requête, et
+ * l'installation du service worker échoue alors en silence : rien n'est mis en
+ * cache, aucune erreur ne remonte à la page, et le mode avion ne marche pas.
+ * C'est arrivé — `index.html` figurait à la fois dans la coquille et dans la
+ * liste des fichiers émis par la construction.
+ *
+ * Cette fonction est employée des deux côtés : par le greffon qui écrit
+ * `precache.json` à la construction, et par le service worker qui le relit.
+ */
+export function fichiersAPrecacher(emis: readonly string[]): string[] {
+  const coquille = ['/', '/index.html', '/manifest.webmanifest']
+  const tous = [...coquille, ...emis.map((f) => (f.startsWith('/') ? f : `/${f}`))]
+  return [...new Set(tous)]
+}

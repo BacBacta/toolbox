@@ -1,0 +1,22 @@
+{
+  "name": "@a237/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "apercu": "vite preview"
+  },
+  "dependencies": {
+    "@a237/engine": "workspace:*",
+    "@a237/render": "workspace:*",
+    "idb-keyval": "^6.3.0",
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "@a237/outils-test": "workspace:*",
+    "@preact/preset-vite": "^2.10.6",
+    "vite": "^8.2.2"
+  }
+}

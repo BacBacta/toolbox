@@ -6,14 +6,18 @@
     "node": ">=20"
   },
   "scripts": {
+    "dev": "pnpm --filter @a237/web dev",
+    "build": "pnpm --filter @a237/web build && pnpm --filter @a237/web exec vite build --config vite.sw.config.ts",
     "test": "vitest run",
     "test:cov": "vitest run --coverage",
     "typecheck": "tsc -b",
-    "verif": "pnpm typecheck && pnpm test:cov"
+    "budget": "node scripts/budget.mjs && node scripts/deps.mjs",
+    "verif": "pnpm typecheck && pnpm test:cov && pnpm build && pnpm budget"
   },
   "devDependencies": {
     "@types/node": "^26.5.0",
     "@vitest/coverage-v8": "^5.0.0",
+    "fake-indexeddb": "^6.2.5",
     "happy-dom": "^20.14.0",
     "preact-render-to-string": "^6.7.0",
     "typescript": "^7.0.2",

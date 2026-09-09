@@ -4,6 +4,7 @@
     { "path": "./packages/outils-test" },
     { "path": "./packages/legal-cm" },
     { "path": "./packages/engine" },
-    { "path": "./packages/render" }
+    { "path": "./packages/render" },
+    { "path": "./apps/web" }
   ]
 }

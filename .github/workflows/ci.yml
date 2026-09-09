@@ -25,6 +25,9 @@ jobs:
 
       # Le seuil de 90 % de couverture est dans vitest.config.ts, et il échoue
       # la CI par lui-même (section 8 du brief : à faire échouer, pas à
-      # surveiller à l'œil). Le budget de poids du bundle arrivera avec
-      # apps/web — il n'y a rien à peser tant que la PWA n'existe pas.
+      # surveiller à l'œil).
       - run: pnpm test:cov
+
+      # Les budgets de poids ne se surveillent pas non plus : ils échouent.
+      - run: pnpm build
+      - run: pnpm budget

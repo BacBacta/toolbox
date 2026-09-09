@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"],
+    "types": ["node"],
+    "rootDir": ".",
+    "outDir": "dist-types",
+    "noEmit": false
+  },
+  "include": ["src", "test", "vite.config.ts", "vite.sw.config.ts"],
+  "references": [
+    { "path": "../../packages/engine" },
+    { "path": "../../packages/render" },
+    { "path": "../../packages/outils-test" }
+  ]
+}
