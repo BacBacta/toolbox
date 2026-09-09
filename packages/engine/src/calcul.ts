@@ -17,6 +17,9 @@ import { valider } from './valider.js'
  * arbre (`expression.ts`), elle devient une configuration comme le reste.
  */
 
+/** Celui d'une calculatrice composée. Voir `ID_COMPOSE` : même raison. */
+export const ID_COMPOSE_CALCUL = 'compose-calcul'
+
 export interface EntreeDemandee {
   readonly clef: string
   readonly titre: string

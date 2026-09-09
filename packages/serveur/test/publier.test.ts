@@ -1,3 +1,4 @@
+import { facture, squeletteParId } from '@a237/engine'
 import { describe, expect, it } from 'vitest'
 import { controler } from '../src/publier.js'
 import type { Depot } from '../src/publier.js'
@@ -12,18 +13,63 @@ import type { Depot } from '../src/publier.js'
 
 const LIEN = 'K7M2XQ4BN9PZ'
 
+/*
+ * L'état est celui du squelette, pas un objet réduit à son numéro.
+ *
+ * Le serveur refuse désormais ce qu'il ne saura pas dessiner, et un `{ numero }`
+ * seul n'est l'état valide d'aucun document : le prendre pour dépôt d'essai
+ * aurait fait passer tous ces contrôles pour des refus de contenu.
+ */
 function depot(modif: Partial<Depot['instantane']> = {}, lien = LIEN): Depot {
+  const skeleton = typeof modif.skeleton === 'string' ? modif.skeleton : 'facture'
+  const parDefaut = squeletteParId(skeleton)?.defaults ?? facture.defaults
   return {
     lien,
     instantane: {
       skeleton: 'facture',
       nom: 'Facture',
-      etat: { numero: 'FA-2026-0001' },
+      etat: parDefaut,
       version: 1,
       publieLe: '2026-09-09T07:45:00.000Z',
       ...modif,
     },
   }
+}
+
+/** Un registre composé : sa configuration voyage avec lui. */
+const COMPOSE = {
+  etat: { nom: 'Ponte des poules', lignes: [{ jour: 'Lundi', pondus: 12 }] },
+  registre: {
+    titre: 'Ponte des poules',
+    titreNom: 'Jour',
+    kicker: 'REGISTRE',
+    colonnes: [
+      { clef: 'jour', titre: 'Jour', type: 'texte' as const },
+      { clef: 'pondus', titre: 'Pondus', type: 'nombre' as const },
+    ],
+    libelleVide: 'Aucun jour noté.',
+    libelleAjout: 'Ajouter un jour',
+    relancesVides: 'Un registre de ponte ne se relance pas.',
+  },
+}
+
+/** Et une calculatrice composée : sa formule est un arbre, pas du code. */
+const CALCUL = {
+  etat: { nom: 'Marge du sac', valeurs: { achat: 25_000, vente: 18_000 } },
+  calcul: {
+    titre: 'Marge du sac',
+    titreNom: 'Marge',
+    kicker: 'CALCUL',
+    entrees: [
+      { clef: 'achat', titre: 'Prix d’achat', unite: 'F' as const, defaut: 0 },
+      { clef: 'vente', titre: 'Prix de vente', unite: 'F' as const, defaut: 0 },
+    ],
+    sortie: {
+      libelle: 'Marge',
+      unite: 'F' as const,
+      formule: { op: 'moins' as const, gauche: { ref: 'vente' }, droite: { ref: 'achat' } },
+    },
+  },
 }
 
 describe('ce que le serveur refuse', () => {
@@ -93,17 +139,50 @@ describe('ce que le serveur accepte', () => {
 
   it('les registres composés par le modèle, qui n’ont pas de squelette', () => {
     // `compose` n'est le nom d'aucun squelette, et c'est voulu : le registre
-    // composé vit sur le téléphone comme les autres et se publie pareil.
-    expect(controler(depot({ skeleton: 'compose' }), null)).toBeNull()
-    expect(controler(depot({ skeleton: 'compose-calcul' }), null)).toBeNull()
+    // composé vit sur le téléphone comme les autres et se publie pareil. Sa
+    // configuration voyage avec lui — c'est elle qui dit comment le dessiner,
+    // et sans elle il n'y a rien à dessiner du tout.
+    expect(controler(depot({ skeleton: 'compose', etat: COMPOSE.etat, registre: COMPOSE.registre }), null)).toBeNull()
+    expect(controler(depot({ skeleton: 'compose-calcul', etat: CALCUL.etat, calcul: CALCUL.calcul }), null)).toBeNull()
+  })
+
+  it('mais pas un composé dont la configuration manque', () => {
+    // Sans elle, la page de lecture répondait 200 avec « Ce lien ne mène à
+    // rien » : l'outil payé était le seul qu'on ne pouvait pas partager.
+    expect(controler(depot({ skeleton: 'compose' }), null)?.corps.erreur).toBe('instantane-illisible')
   })
 
   it('tous les documents et registres du catalogue, sauf les deux exclus', async () => {
     const { SQUELETTES, NON_PUBLIABLES } = await import('@a237/engine')
     for (const s of SQUELETTES) {
-      const verdict = controler(depot({ skeleton: s.id }), null)
+      const verdict = controler(depot({ skeleton: s.id, etat: s.defaults }), null)
       if (NON_PUBLIABLES.includes(s.id)) expect(verdict?.statut).toBe(403)
       else expect(verdict).toBeNull()
     }
+  })
+})
+
+describe('le dépôt qu’on ne saura pas relire', () => {
+  /*
+   * Le refus appartient à la publication, pas à la lecture. L'envoyeur est là
+   * quand il publie : on peut le lui dire. Le destinataire, lui, découvre le
+   * problème seul, devant un lien qu'on lui a donné — et l'envoyeur ne sait
+   * même pas qu'il y en a un, puisque sa publication avait répondu 200.
+   */
+  it('refuse un état que le document ne sait pas lire', () => {
+    // Il manque les lignes : `calculerLignes` les parcourt, et jetait.
+    const verdict = controler(depot({ etat: { numero: 'FA-2026-0001' } }), null)
+    expect(verdict?.statut).toBe(400)
+    expect(verdict?.corps.erreur).toBe('instantane-illisible')
+  })
+
+  it('refuse un état qui n’est pas un objet', () => {
+    for (const etat of [null, 'texte', 42, []]) {
+      expect(controler(depot({ etat }), null)?.corps.erreur).toBe('instantane-illisible')
+    }
+  })
+
+  it('laisse passer celui qui se dessine', () => {
+    expect(controler(depot(), null)).toBeNull()
   })
 })

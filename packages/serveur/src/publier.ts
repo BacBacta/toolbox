@@ -1,14 +1,14 @@
 import type { Instantane } from '@a237/engine'
 import { accepteLaVersion, lienValide, publiable, pourquoiNonPubliable } from '@a237/engine'
-import { squeletteConnu } from './html.js'
+import { rendable, squeletteConnu } from './html.js'
 
 /**
  * Déposer un instantané.
  *
  * Le serveur ne fait pas confiance à ce qu'il reçoit — pas parce que le client
  * est malveillant, mais parce qu'un client peut être une version plus ancienne,
- * une file d'attente qui rejoue, ou n'importe qui avec `curl`. Trois contrôles,
- * et chacun refuse pour une raison distincte que l'app peut afficher.
+ * une file d'attente qui rejoue, ou n'importe qui avec `curl`. Chaque contrôle
+ * refuse pour une raison distincte que l'app peut afficher.
  */
 
 /** Un instantané plus gros que ça n'est pas un outil, c'est un dépôt. */
@@ -74,6 +74,21 @@ export function controler(recu: unknown, detenu: DejaLa | null): Verdict | null 
      */
     return refus(409, 'version-perimee', { versionServeur: detenu?.version ?? null })
   }
+
+  /*
+   * Le dernier contrôle, et le plus tardif : est-ce que ça se dessine ?
+   *
+   * Les précédents portent sur la forme du dépôt ; celui-ci sur son contenu.
+   * Un état auquel il manque ce que le document lit passait tous les autres,
+   * puis faisait jeter le rendu **à la lecture** — le destinataire recevait la
+   * page d'erreur de l'hébergeur, et l'envoyeur n'apprenait rien, puisque sa
+   * publication avait répondu 200. Le refus appartient à la publication :
+   * l'envoyeur est là, on peut le lui dire.
+   *
+   * Il vient en dernier parce qu'il coûte un rendu, et qu'il n'y a pas lieu de
+   * le dépenser pour un lien mal formé ou une version périmée.
+   */
+  if (!rendable(inst as Instantane)) return refus(400, 'instantane-illisible')
 
   return null
 }

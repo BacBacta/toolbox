@@ -7,11 +7,12 @@ Quatre scripts, quatre choses qu'aucun test unitaire ne peut voir.
 par mots-clés, création d'un carnet de njangi, ajout de membres, versement,
 dessin de la carte, lien de relance `wa.me`, service worker, et **mode avion**.
 
-`compose.mjs` ouvre un registre **composé par le modèle** dans un vrai
-navigateur : la configuration vient du réseau, traverse le stockage, et c'est
-`RegistreListe` — écrit à la main — qui la dessine. La réponse est une vraie
-sortie de production capturée telle quelle, pas une réponse inventée : sa
-première colonne est de type `nombre`, ce qui a longtemps été interdit.
+`compose.mjs` suit un outil **composé par le modèle** du premier mot tapé
+jusqu'au lien reçu : la configuration vient du réseau, traverse le stockage,
+`RegistreListe` — écrit à la main — la dessine, et elle repart au serveur pour
+devenir une page. La réponse est une vraie sortie de production capturée telle
+quelle, pas une réponse inventée : sa première colonne est de type `nombre`, ce
+qui a longtemps été interdit. Il lui faut le Worker et son KV.
 
 `hors-ligne.mjs` joue la boucle du § 2.7 en entier : on coupe le réseau, on
 crée un outil, on demande à le diffuser, et on regarde la file partir **toute
@@ -44,6 +45,17 @@ coquille dans le cache courant y laissait une coquille neuve réclamant des
 fichiers que ce cache n'avait pas : le mode avion tombait. La mise à jour se
 fait donc là où elle est atomique — la réinstallation du service worker.
 
+`compose.mjs` a trouvé le pire des trois, et c'est le dernier maillon qui l'a
+révélé : la configuration d'un outil composé voyage avec lui au lieu de vivre
+dans un squelette, et le serveur, qui ne connaissait que les squelettes, ne
+trouvait rien à dessiner derrière le lien. La page répondait **200 avec « Ce
+lien ne mène à rien »** — le destinataire allait vérifier une adresse qui était
+juste, et l'envoyeur ne savait pas qu'il y avait un problème, puisque sa
+publication avait répondu 200. **L'outil payé était le seul qu'on ne pouvait pas
+partager.** Les deux fabriques vivent depuis dans le moteur, d'où l'écran et le
+serveur les tirent toutes les deux ; le statut ne suffisait pas à voir le
+défaut, il fallait lire la page.
+
 `hors-ligne.mjs` en a trouvé un troisième, du même genre : `creerOutil` pose
 `version: 0`, et le serveur exigeait une version supérieure ou égale à 1.
 Publier un outil **qu'on vient de créer** — le cas normal, puisqu'on diffuse
@@ -67,19 +79,24 @@ de production, et ces scripts se lancent à la main, depuis un dossier où
 `playwright-core` est installé.
 
 ```bash
-pnpm build
-PLAYWRIGHT=/tmp/e2e/node_modules/playwright-core/index.mjs node e2e/compose.mjs
 mkdir -p /tmp/e2e && cd /tmp/e2e && npm install playwright-core --no-save
-cd /tmp/e2e && node /chemin/vers/atelier237/e2e/fumee.mjs
+export PLAYWRIGHT=/tmp/e2e/node_modules/playwright-core/index.mjs
+
+pnpm build
+node e2e/fumee.mjs
 
 # mise-a-jour.mjs construit lui-même, deux fois : il se lance depuis le dépôt.
-PLAYWRIGHT=/tmp/e2e/node_modules/playwright-core/index.mjs node e2e/mise-a-jour.mjs
+node e2e/mise-a-jour.mjs
 
-# hors-ligne.mjs a besoin du Worker et de son KV : un serveur, dans un autre
-# terminal, puis le script. BASE change l'adresse si le port est déjà pris.
-pnpm build && wrangler pages dev --port 8798 --ip 127.0.0.1
-PLAYWRIGHT=/tmp/e2e/node_modules/playwright-core/index.mjs node e2e/hors-ligne.mjs
+# compose.mjs et hors-ligne.mjs ont besoin du Worker et de son KV : un serveur,
+# dans un autre terminal, puis les scripts. BASE change l'adresse si le port
+# est déjà pris.
+wrangler pages dev --port 8798 --ip 127.0.0.1
+node e2e/compose.mjs
+node e2e/hors-ligne.mjs
 ```
+
+Chacun sort en code 1 s'il échoue : ils s'enchaînent avec `&&`.
 
 Le navigateur est celui de l'environnement (`/opt/pw-browsers`) ; son chemin se
 passe par `CHROME`, sinon celui de cet environnement est pris par défaut.

@@ -1,5 +1,5 @@
 import type { CardSpec, Instantane, RenderContext } from '@a237/engine'
-import { squeletteParId } from '@a237/engine'
+import { squeletteDeCalcul, squeletteDeRegistre, squeletteParId } from '@a237/engine'
 import {
   DocumentAttestation, DocumentCv, DocumentDette, DocumentDevis, DocumentFacture,
   DocumentMotivation, DocumentRecu,
@@ -51,9 +51,14 @@ export function documentDe(instantane: Instantane, ctx: RenderContext): JSX.Elem
  *
  * Rend `null` si le squelette est inconnu du serveur : un lien publié par une
  * version plus récente de l'application ne doit pas faire tomber la page.
+ *
+ * Un outil composé par le modèle n'a pas de squelette — sa configuration
+ * voyage avec lui, dans l'instantané. On la remonte en squelette, exactement
+ * comme le fait l'écran : c'est la même fabrique. Sans cela, l'outil payé
+ * était le seul qu'on ne pouvait pas partager.
  */
 export function carteDe(instantane: Instantane, ctx: RenderContext): CardSpec | null {
-  const squelette = squeletteParId(instantane.skeleton)
+  const squelette = squeletteCompose(instantane) ?? squeletteParId(instantane.skeleton)
   if (squelette === null) return null
   try {
     return squelette.card(instantane.etat as never, ctx)
@@ -62,6 +67,13 @@ export function carteDe(instantane: Instantane, ctx: RenderContext): CardSpec | 
     // une page sobre à une page cassée.
     return null
   }
+}
+
+/** Le squelette que porte l'instantané lui-même, s'il en porte un. */
+function squeletteCompose(instantane: Instantane): { card: (e: never, c: RenderContext) => CardSpec } | null {
+  if (instantane.registre !== undefined) return squeletteDeRegistre(instantane.registre) as never
+  if (instantane.calcul !== undefined) return squeletteDeCalcul(instantane.calcul) as never
+  return null
 }
 
 /** La carte, dessinée en HTML — pas en image. */

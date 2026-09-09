@@ -27,6 +27,17 @@ import { valider } from './valider.js'
  * `TypeColonne` vient de `compute/liste.ts` : c'est le même vocabulaire, et le
  * redéclarer ici en ferait deux qui divergeraient au premier type ajouté.
  */
+/**
+ * L'identifiant d'un registre composé par le modèle.
+ *
+ * Il vit ici, avec le contrat, et non avec la fabrique qui en tire un
+ * squelette : l'atelier a besoin du nom pour créer l'outil, et rien d'autre.
+ * Le prendre là où est la fabrique faisait entrer les deux fabriques de
+ * squelettes dans la coquille initiale — deux kilo-octets avant le premier
+ * affichage, pour deux chaînes de caractères.
+ */
+export const ID_COMPOSE = 'compose'
+
 export interface ColonneDemandee {
   readonly clef: string
   readonly titre: string

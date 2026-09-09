@@ -61,3 +61,24 @@ export function PageIntrouvable(): JSX.Element {
     </main>
   )
 }
+
+/**
+ * La page quand le document est là mais ne se dessine pas.
+ *
+ * Distincte de l'introuvable, parce que ce n'est pas la même nouvelle : le
+ * lien est bon, il a bien été envoyé, et c'est le serveur qui n'y arrive pas.
+ * Dire « ce lien ne mène à rien » enverrait la personne vérifier une adresse
+ * qui est correcte.
+ */
+export function PageIllisible(): JSX.Element {
+  return (
+    <main class="lecture lecture-vide">
+      <h1>Ce document ne peut pas être affiché</h1>
+      <p>
+        Le lien est bon, mais le document déposé n’est pas lisible ici.
+        Demande à la personne qui te l’a envoyé de le rediffuser.
+      </p>
+      <p class="lecture-marque">Atelier&nbsp;237</p>
+    </main>
+  )
+}

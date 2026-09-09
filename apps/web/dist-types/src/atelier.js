@@ -1,10 +1,7 @@
 import { jsx as _jsx, jsxs as _jsxs } from "preact/jsx-runtime";
-import { CE_QUE_COUTE, EXTRAIT_VIDE, comprendre, etageDe, montantF } from '@a237/engine';
+import { CE_QUE_COUTE, EXTRAIT_VIDE, ID_COMPOSE, ID_COMPOSE_CALCUL, comprendre, etageDe, montantF, } from '@a237/engine';
 import { useState } from 'preact/hooks';
 import { composer } from './composer.js';
-/** Les identifiants des outils qui n'ont pas de squelette. Voir `outils/`. */
-const ID_COMPOSE_REGISTRE = 'compose';
-const ID_COMPOSE_CALCUL = 'compose-calcul';
 /**
  * Des exemples qui montrent ce qu'une phrase peut porter, pas seulement le nom
  * d'un outil : le premier prouve qu'un montant et une période sont entendus.
@@ -45,7 +42,7 @@ export function Atelier(props) {
         void composer(demande).then((r) => {
             if (r.sorte === 'compose') {
                 reussi();
-                props.onCreer(ID_COMPOSE_REGISTRE, EXTRAIT_VIDE, { registre: r.registre }, r.fcfa);
+                props.onCreer(ID_COMPOSE, EXTRAIT_VIDE, { registre: r.registre }, r.fcfa);
             }
             else if (r.sorte === 'calcule') {
                 reussi();

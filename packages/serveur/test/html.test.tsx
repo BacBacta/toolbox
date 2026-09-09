@@ -1,7 +1,7 @@
 import { devis, njangi, prix } from '@a237/engine'
 import type { Instantane, RenderContext } from '@a237/engine'
 import { describe, expect, it } from 'vitest'
-import { metaDe, pageDeLecture, pageIntrouvable } from '../src/html.js'
+import { metaDe, pageDeLecture, pageIntrouvable, rendable } from '../src/html.js'
 
 const CTX: RenderContext = {
   lien: 'atelier237.pages.dev/d/K7M2XQ4BN9PZ',
@@ -122,5 +122,93 @@ describe('les métadonnées', () => {
   it('retombent sur le nom de l’outil quand le squelette est inconnu', () => {
     const meta = metaDe(instantane('bail', {}, 'Contrat'), CTX, LIEN)
     expect(meta.titre).toBe('Contrat')
+  })
+})
+
+describe('un instantané que le rendu ne sait pas dessiner', () => {
+  /*
+   * `/api/publier` est une adresse publique : le client n'est pas la seule
+   * chose qui écrit dedans. Un état auquel il manque ce que le document lit —
+   * ici les lignes d'un devis — faisait jeter le rendu, et le destinataire du
+   * lien recevait la page d'erreur de Cloudflare. L'envoyeur, lui, n'en savait
+   * rien : sa publication avait répondu 200.
+   */
+  const ABIME = instantane('devis', { numero: 'DV-2026-0118' }, 'Devis')
+
+  it('se dit irrecevable au lieu de laisser jeter', () => {
+    expect(rendable(ABIME)).toBe(false)
+    expect(rendable(DEVIS)).toBe(true)
+  })
+
+  it('donne une page lisible plutôt qu’une exception', () => {
+    // Ce qui est déjà déposé le reste : un rendu qui change de forme ne doit
+    // pas transformer un lien envoyé hier en page d'erreur du serveur.
+    const page = pageDeLecture(ABIME, CTX, LIEN)
+    expect(page).toContain('<!doctype html>')
+    expect(page).toContain('ne peut pas être affiché')
+    expect(page).not.toContain('<script')
+  })
+})
+
+describe('un outil composé par le modèle', () => {
+  /*
+   * C'est l'outil payé (§ 4, étage 2), et c'était le seul qu'on ne pouvait pas
+   * lire : sa configuration voyage avec lui et non dans un squelette, donc le
+   * serveur ne trouvait rien à dessiner. Il répondait 200 avec « Ce lien ne
+   * mène à rien » — la personne à qui on l'avait envoyé allait vérifier une
+   * adresse qui était juste, et l'envoyeur ne savait pas qu'il y avait un
+   * problème, puisque sa publication avait répondu 200.
+   */
+  const REGISTRE = {
+    ...instantane('compose', { nom: 'Ponte des poules', lignes: [{ jour: 'Lundi', pondus: 12, vendus: 8 }] }, 'Ponte des poules'),
+    registre: {
+      titre: 'Ponte des poules',
+      titreNom: 'Jour',
+      kicker: 'REGISTRE',
+      colonnes: [
+        { clef: 'jour', titre: 'Jour', type: 'texte' as const },
+        { clef: 'pondus', titre: 'Pondus', type: 'nombre' as const },
+        { clef: 'vendus', titre: 'Vendus', type: 'nombre' as const },
+      ],
+      libelleVide: 'Aucun jour noté.',
+      libelleAjout: 'Ajouter un jour',
+      relancesVides: 'Un registre de ponte ne se relance pas.',
+    },
+  }
+
+  it('se lit, au lieu de dire que le lien ne mène à rien', () => {
+    const page = pageDeLecture(REGISTRE, CTX, LIEN)
+    expect(page).toContain('Ponte des poules')
+    expect(page).not.toContain('ne mène à rien')
+    expect(page).not.toContain('ne peut pas être affiché')
+  })
+
+  it('et le serveur le juge recevable', () => {
+    expect(rendable(REGISTRE)).toBe(true)
+  })
+
+  const CALCUL = {
+    ...instantane('compose-calcul', { nom: 'Marge du sac', valeurs: { achat: 25000, vente: 18000 } }, 'Marge'),
+    calcul: {
+      titre: 'Marge du sac',
+      titreNom: 'Marge',
+      kicker: 'CALCUL',
+      entrees: [
+        { clef: 'achat', titre: 'Prix d’achat', unite: 'F' as const, defaut: 0 },
+        { clef: 'vente', titre: 'Prix de vente', unite: 'F' as const, defaut: 0 },
+      ],
+      sortie: {
+        libelle: 'Marge',
+        unite: 'F' as const,
+        formule: { op: 'moins' as const, gauche: { ref: 'vente' }, droite: { ref: 'achat' } },
+      },
+    },
+  }
+
+  it('la calculatrice composée aussi', () => {
+    const page = pageDeLecture(CALCUL, CTX, LIEN)
+    expect(page).toContain('Marge')
+    expect(page).not.toContain('ne mène à rien')
+    expect(rendable(CALCUL)).toBe(true)
   })
 })

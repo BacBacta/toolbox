@@ -2766,6 +2766,82 @@ var MOTIF_LIEN = new RegExp(`^[23456789ABCDEFGHJKLMNPQRSTVWXYZ]{12}$`);
 function lienValide(lien) {
 	return MOTIF_LIEN.test(lien);
 }
+/**
+* Évalue l'arbre. Jamais d'exception, jamais de NaN, jamais d'infini.
+*
+* Une calculatrice qui affiche « NaN » à quelqu'un qui compte sa journée est
+* pire qu'une calculatrice absente : elle fait douter de tout le reste. Une
+* division par zéro rend zéro, ce qui est faux, mais lisible et sans surprise.
+*/
+function evaluer(e, lire) {
+	const brut = brute(e, lire, 0);
+	return Number.isFinite(brut) ? brut : 0;
+}
+function brute(e, lire, niveau) {
+	if (niveau > 6) return 0;
+	if ("nombre" in e) return e.nombre;
+	if ("ref" in e) return lire(e.ref);
+	const g = brute(e.gauche, lire, niveau + 1);
+	const d = brute(e.droite, lire, niveau + 1);
+	switch (e.op) {
+		case "plus": return g + d;
+		case "moins": return g - d;
+		case "fois": return g * d;
+		case "divise": return d === 0 ? 0 : g / d;
+		case "pourcent": return g * d / 100;
+		case "min": return Math.min(g, d);
+		case "max": return Math.max(g, d);
+	}
+}
+//#endregion
+//#region ../engine/src/calcul.ts
+/**
+* La deuxième forme que le modèle peut composer : une calculatrice.
+*
+* Un registre tient une liste ; une calculatrice répond à une question. « Ce
+* qu'il me reste à payer », « ma marge sur chaque vente », « la part de
+* chacun » : ce sont les plus petits outils du produit, et sans doute ceux
+* qu'on ouvre le plus souvent.
+*
+* Elle manquait, et ça se voyait : tout ce qui n'était pas une liste se
+* heurtait à un refus. Le moteur savait pourtant déjà les dessiner — seule la
+* formule bloquait, parce qu'elle était écrite en TypeScript. Déclarée en
+* arbre (`expression.ts`), elle devient une configuration comme le reste.
+*/
+/** Celui d'une calculatrice composée. Voir `ID_COMPOSE` : même raison. */
+var ID_COMPOSE_CALCUL = "compose-calcul";
+//#endregion
+//#region ../engine/src/registre.ts
+/**
+* La seule chose que le modèle a le droit de produire.
+*
+* Invariant § 2.1 du brief : **jamais de génération de code libre**. Le modèle
+* ne rend pas du HTML, pas du JavaScript, pas un gabarit — il remplit une
+* configuration de registre, et c'est `RegistreListe`, écrit à la main et
+* testé, qui la dessine. Ce fichier est la frontière : au-delà, rien de ce que
+* le modèle a dit n'atteint l'écran sans être passé par ici.
+*
+* Le contrat vit dans le moteur, pas dans le paquet qui appelle le modèle : le
+* client doit pouvoir revérifier ce que le serveur lui envoie sans importer de
+* quoi appeler un fournisseur. Deux validateurs qui se recopient finiraient par
+* diverger, et c'est celui du client qui se tairait.
+*
+* Le choix du registre décrit par ses colonnes n'est pas arbitraire. Quatre
+* squelettes du prototype n'étaient déjà que ça, et la fabrique en tire schéma,
+* validation, calculs, carte, partage et formulaire. Un cinquième registre
+* coûte vingt lignes de description — c'est exactement ce qu'un modèle sait
+* écrire, et exactement ce qu'il ne peut pas casser.
+*/
+/**
+* L'identifiant d'un registre composé par le modèle.
+*
+* Il vit ici, avec le contrat, et non avec la fabrique qui en tire un
+* squelette : l'atelier a besoin du nom pour créer l'outil, et rien d'autre.
+* Le prendre là où est la fabrique faisait entrer les deux fabriques de
+* squelettes dans la coquille initiale — deux kilo-octets avant le premier
+* affichage, pour deux chaînes de caractères.
+*/
+var ID_COMPOSE = "compose";
 //#endregion
 //#region ../engine/src/schema/devis.ts
 /**
@@ -3112,6 +3188,152 @@ function schemaListe(config, titreNom) {
 	};
 }
 //#endregion
+//#region ../engine/src/compute/calc.ts
+/** La valeur d'une entrée, nettoyée : jamais NaN, jamais négative. */
+function valeurDe(etat, clef) {
+	const v = etat.valeurs[clef];
+	return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0;
+}
+function lecteur(etat) {
+	return (clef) => valeurDe(etat, clef);
+}
+/** Le résultat, arrondi au franc. La formule ne voit que des nombres valides. */
+function resultatCalc(config, etat) {
+	const brut = config.sortie.calcul(lecteur(etat));
+	return Number.isFinite(brut) ? Math.round(brut) : 0;
+}
+function precisionCalc(config, etat) {
+	return config.sortie.precision?.(lecteur(etat)) ?? null;
+}
+function partCalc(config, etat) {
+	const part = config.sortie.part?.(lecteur(etat));
+	if (part === void 0 || part === null || !Number.isFinite(part)) return null;
+	return Math.max(0, Math.min(1, part));
+}
+/**
+* Change une entrée.
+* @throws RangeError sur une valeur négative ou non finie — une calculatrice
+*   qui accepte n'importe quoi rend n'importe quoi.
+*/
+function changerValeur(etat, clef, valeur) {
+	if (!Number.isFinite(valeur) || valeur < 0) throw new RangeError(`valeur invalide pour « ${clef} » : ${valeur}`);
+	return {
+		...etat,
+		valeurs: {
+			...etat.valeurs,
+			[clef]: valeur
+		}
+	};
+}
+/** L'état de départ : chaque entrée à sa valeur par défaut. */
+function valeursParDefaut(config) {
+	const valeurs = {};
+	for (const e of config.entrees) valeurs[e.clef] = e.defaut;
+	return valeurs;
+}
+function schemaCalc(config, titreNom) {
+	const proprietes = {};
+	for (const e of config.entrees) proprietes[e.clef] = {
+		type: "number",
+		minimum: 0,
+		maximum: 1e9,
+		title: e.unite === "F" ? `${e.titre} (F CFA)` : e.titre
+	};
+	return {
+		type: "object",
+		additionalProperties: false,
+		required: ["nom", "valeurs"],
+		properties: {
+			nom: {
+				type: "string",
+				minLength: 1,
+				maxLength: 60,
+				title: titreNom
+			},
+			valeurs: {
+				type: "object",
+				additionalProperties: false,
+				required: config.entrees.map((e) => e.clef),
+				properties: proprietes,
+				title: "Valeurs"
+			}
+		}
+	};
+}
+//#endregion
+//#region ../engine/src/skeletons/calc.ts
+function afficher(valeur, unite) {
+	return unite === "F" ? montantF(valeur) : nf(valeur);
+}
+function squeletteCalc(def) {
+	const config = def.config;
+	const card = (etat, ctx) => {
+		const precision = precisionCalc(config, etat);
+		return {
+			kicker: config.kicker,
+			title: etat.nom,
+			sub: def.title,
+			tag: null,
+			bigLabel: config.sortie.libelle.toUpperCase(),
+			big: afficher(resultatCalc(config, etat), config.sortie.unite),
+			pct: partCalc(config, etat),
+			subline: precision ?? def.title,
+			listTitle: "CE QUI A ÉTÉ SAISI",
+			items: config.entrees.map((e) => ({
+				n: e.titre,
+				ok: true,
+				warn: false,
+				val: afficher(valeurDe(etat, e.clef), e.unite)
+			})),
+			link: ctx.lien,
+			stamp: arreteLe(ctx.maintenant)
+		};
+	};
+	const share = (etat, ctx) => {
+		const precision = precisionCalc(config, etat);
+		const lignes = [
+			`${etat.nom.toUpperCase()} — ${def.title.toLowerCase()}`,
+			...config.entrees.map((e) => `${e.titre} : ${afficher(valeurDe(etat, e.clef), e.unite)}`),
+			`${config.sortie.libelle} : ${afficher(resultatCalc(config, etat), config.sortie.unite)}`,
+			precision ?? "",
+			ctx.lien
+		].filter((l) => l !== "");
+		return {
+			title: etat.nom,
+			desc: `${config.sortie.libelle} : ${afficher(resultatCalc(config, etat), config.sortie.unite)}`,
+			name: def.id,
+			txt: lignes.join("\n"),
+			broad: null,
+			warn: null,
+			card: card(etat, ctx),
+			relances: [],
+			relancesVides: def.relancesVides
+		};
+	};
+	return {
+		id: def.id,
+		group: def.group,
+		title: def.title,
+		keywords: def.keywords,
+		engine: "calc",
+		config,
+		schema: schemaCalc(config, def.titreNom),
+		defaults: {
+			nom: def.title,
+			valeurs: valeursParDefaut(config)
+		},
+		compute: {
+			resultatCalc,
+			precisionCalc,
+			partCalc,
+			changerValeur,
+			valeurDe
+		},
+		card,
+		share
+	};
+}
+//#endregion
 //#region ../engine/src/skeletons/liste.ts
 /**
 * La fabrique de registres.
@@ -3188,7 +3410,7 @@ function squeletteListe(def) {
 		return {
 			kicker: config.kicker,
 			title: etat.nom,
-			sub: def.title,
+			sub: etat.nom === def.title ? "" : def.title,
 			tag: null,
 			bigLabel: grand.libelle,
 			big: grand.valeur,
@@ -3248,6 +3470,67 @@ function squeletteListe(def) {
 		card,
 		share
 	};
+}
+//#endregion
+//#region ../engine/src/compose.ts
+/**
+* Un outil composé par le modèle n'a pas de squelette : sa configuration
+* voyage avec lui, dans l'outil enregistré. Ces deux fabriques la remontent en
+* squelette complet — schéma, calculs, carte et partage.
+*
+* C'est la thèse du brief prise au mot (§ 2.1, § 4) : le modèle n'a produit que
+* de la configuration, et c'est du code écrit à la main et éprouvé qui la
+* dessine. Rien ne distingue un outil composé d'un squelette, sinon d'où vient
+* sa description.
+*
+* Elles vivent ici, dans le moteur, et non dans le fragment qui les dessine,
+* parce que **le serveur en a besoin aussi**. Tant qu'elles n'étaient que du
+* côté de l'écran, la page de lecture ne trouvait rien à dessiner derrière le
+* lien d'un outil composé : elle répondait 200 avec « Ce lien ne mène à rien ».
+* L'outil payé était le seul qu'on ne pouvait pas partager. Deux définitions
+* auraient fini par ne plus dire la même chose ; il n'y en a qu'une.
+*/
+function squeletteDeRegistre(registre) {
+	return squeletteListe({
+		id: ID_COMPOSE,
+		title: registre.titre,
+		group: "registres",
+		keywords: [],
+		titreNom: registre.titreNom,
+		config: {
+			kicker: registre.kicker,
+			colonnes: registre.colonnes,
+			libelleVide: registre.libelleVide,
+			libelleAjout: registre.libelleAjout,
+			relancesVides: registre.relancesVides,
+			...registre.total !== void 0 ? { total: registre.total } : {},
+			...registre.personnes !== void 0 ? { personnes: registre.personnes } : {}
+		}
+	});
+}
+/**
+* La formule est un arbre déclaré, pas du code : `evaluer` l'interprète, et
+* c'est ce qui permet au modèle de décrire un calcul sans jamais obtenir le
+* droit d'en exécuter un (invariant § 2.1).
+*/
+function squeletteDeCalcul(demande) {
+	return squeletteCalc({
+		id: ID_COMPOSE_CALCUL,
+		title: demande.titre,
+		group: "calculs",
+		keywords: [],
+		titreNom: demande.titreNom,
+		relancesVides: "Une calculatrice se consulte, elle ne se relance pas.",
+		config: {
+			kicker: demande.kicker,
+			entrees: demande.entrees,
+			sortie: {
+				libelle: demande.sortie.libelle,
+				unite: demande.sortie.unite,
+				calcul: (val) => evaluer(demande.sortie.formule, val)
+			}
+		}
+	});
 }
 var caisse = squeletteListe({
 	id: "caisse",
@@ -3406,152 +3689,6 @@ var prix = squeletteListe({
 		relancesVides: "Une liste de prix ne se relance pas, elle se diffuse. Le résumé ci-dessus est prêt à coller dans une discussion ou une liste de diffusion."
 	}
 });
-//#endregion
-//#region ../engine/src/compute/calc.ts
-/** La valeur d'une entrée, nettoyée : jamais NaN, jamais négative. */
-function valeurDe(etat, clef) {
-	const v = etat.valeurs[clef];
-	return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0;
-}
-function lecteur(etat) {
-	return (clef) => valeurDe(etat, clef);
-}
-/** Le résultat, arrondi au franc. La formule ne voit que des nombres valides. */
-function resultatCalc(config, etat) {
-	const brut = config.sortie.calcul(lecteur(etat));
-	return Number.isFinite(brut) ? Math.round(brut) : 0;
-}
-function precisionCalc(config, etat) {
-	return config.sortie.precision?.(lecteur(etat)) ?? null;
-}
-function partCalc(config, etat) {
-	const part = config.sortie.part?.(lecteur(etat));
-	if (part === void 0 || part === null || !Number.isFinite(part)) return null;
-	return Math.max(0, Math.min(1, part));
-}
-/**
-* Change une entrée.
-* @throws RangeError sur une valeur négative ou non finie — une calculatrice
-*   qui accepte n'importe quoi rend n'importe quoi.
-*/
-function changerValeur(etat, clef, valeur) {
-	if (!Number.isFinite(valeur) || valeur < 0) throw new RangeError(`valeur invalide pour « ${clef} » : ${valeur}`);
-	return {
-		...etat,
-		valeurs: {
-			...etat.valeurs,
-			[clef]: valeur
-		}
-	};
-}
-/** L'état de départ : chaque entrée à sa valeur par défaut. */
-function valeursParDefaut(config) {
-	const valeurs = {};
-	for (const e of config.entrees) valeurs[e.clef] = e.defaut;
-	return valeurs;
-}
-function schemaCalc(config, titreNom) {
-	const proprietes = {};
-	for (const e of config.entrees) proprietes[e.clef] = {
-		type: "number",
-		minimum: 0,
-		maximum: 1e9,
-		title: e.unite === "F" ? `${e.titre} (F CFA)` : e.titre
-	};
-	return {
-		type: "object",
-		additionalProperties: false,
-		required: ["nom", "valeurs"],
-		properties: {
-			nom: {
-				type: "string",
-				minLength: 1,
-				maxLength: 60,
-				title: titreNom
-			},
-			valeurs: {
-				type: "object",
-				additionalProperties: false,
-				required: config.entrees.map((e) => e.clef),
-				properties: proprietes,
-				title: "Valeurs"
-			}
-		}
-	};
-}
-//#endregion
-//#region ../engine/src/skeletons/calc.ts
-function afficher(valeur, unite) {
-	return unite === "F" ? montantF(valeur) : nf(valeur);
-}
-function squeletteCalc(def) {
-	const config = def.config;
-	const card = (etat, ctx) => {
-		const precision = precisionCalc(config, etat);
-		return {
-			kicker: config.kicker,
-			title: etat.nom,
-			sub: def.title,
-			tag: null,
-			bigLabel: config.sortie.libelle.toUpperCase(),
-			big: afficher(resultatCalc(config, etat), config.sortie.unite),
-			pct: partCalc(config, etat),
-			subline: precision ?? def.title,
-			listTitle: "CE QUI A ÉTÉ SAISI",
-			items: config.entrees.map((e) => ({
-				n: e.titre,
-				ok: true,
-				warn: false,
-				val: afficher(valeurDe(etat, e.clef), e.unite)
-			})),
-			link: ctx.lien,
-			stamp: arreteLe(ctx.maintenant)
-		};
-	};
-	const share = (etat, ctx) => {
-		const precision = precisionCalc(config, etat);
-		const lignes = [
-			`${etat.nom.toUpperCase()} — ${def.title.toLowerCase()}`,
-			...config.entrees.map((e) => `${e.titre} : ${afficher(valeurDe(etat, e.clef), e.unite)}`),
-			`${config.sortie.libelle} : ${afficher(resultatCalc(config, etat), config.sortie.unite)}`,
-			precision ?? "",
-			ctx.lien
-		].filter((l) => l !== "");
-		return {
-			title: etat.nom,
-			desc: `${config.sortie.libelle} : ${afficher(resultatCalc(config, etat), config.sortie.unite)}`,
-			name: def.id,
-			txt: lignes.join("\n"),
-			broad: null,
-			warn: null,
-			card: card(etat, ctx),
-			relances: [],
-			relancesVides: def.relancesVides
-		};
-	};
-	return {
-		id: def.id,
-		group: def.group,
-		title: def.title,
-		keywords: def.keywords,
-		engine: "calc",
-		config,
-		schema: schemaCalc(config, def.titreNom),
-		defaults: {
-			nom: def.title,
-			valeurs: valeursParDefaut(config)
-		},
-		compute: {
-			resultatCalc,
-			precisionCalc,
-			partCalc,
-			changerValeur,
-			valeurDe
-		},
-		card,
-		share
-	};
-}
 var scolarite = squeletteCalc({
 	id: "scolarite",
 	title: "Frais scolaires",
@@ -4744,6 +4881,27 @@ function PageIntrouvable() {
 		]
 	});
 }
+/**
+* La page quand le document est là mais ne se dessine pas.
+*
+* Distincte de l'introuvable, parce que ce n'est pas la même nouvelle : le
+* lien est bon, il a bien été envoyé, et c'est le serveur qui n'y arrive pas.
+* Dire « ce lien ne mène à rien » enverrait la personne vérifier une adresse
+* qui est correcte.
+*/
+function PageIllisible() {
+	return /* @__PURE__ */ u("main", {
+		class: "lecture lecture-vide",
+		children: [
+			/* @__PURE__ */ u("h1", { children: "Ce document ne peut pas être affiché" }),
+			/* @__PURE__ */ u("p", { children: "Le lien est bon, mais le document déposé n’est pas lisible ici. Demande à la personne qui te l’a envoyé de le rediffuser." }),
+			/* @__PURE__ */ u("p", {
+				class: "lecture-marque",
+				children: "Atelier\xA0237"
+			})
+		]
+	});
+}
 //#endregion
 //#region ../render/src/encres.ts
 /**
@@ -5715,15 +5873,26 @@ function documentDe(instantane, ctx) {
 *
 * Rend `null` si le squelette est inconnu du serveur : un lien publié par une
 * version plus récente de l'application ne doit pas faire tomber la page.
+*
+* Un outil composé par le modèle n'a pas de squelette — sa configuration
+* voyage avec lui, dans l'instantané. On la remonte en squelette, exactement
+* comme le fait l'écran : c'est la même fabrique. Sans cela, l'outil payé
+* était le seul qu'on ne pouvait pas partager.
 */
 function carteDe(instantane, ctx) {
-	const squelette = squeletteParId(instantane.skeleton);
+	const squelette = squeletteCompose(instantane) ?? squeletteParId(instantane.skeleton);
 	if (squelette === null) return null;
 	try {
 		return squelette.card(instantane.etat, ctx);
 	} catch {
 		return null;
 	}
+}
+/** Le squelette que porte l'instantané lui-même, s'il en porte un. */
+function squeletteCompose(instantane) {
+	if (instantane.registre !== void 0) return squeletteDeRegistre(instantane.registre);
+	if (instantane.calcul !== void 0) return squeletteDeCalcul(instantane.calcul);
+	return null;
 }
 /** La carte, dessinée en HTML — pas en image. */
 function VueCarte(props) {
@@ -5839,7 +6008,29 @@ function metaDe(instantane, ctx, lien, image) {
 		...image === void 0 ? {} : { image }
 	};
 }
+/**
+* La page quand le document est déposé mais ne se dessine pas.
+*
+* Elle existe pour ce qui est **déjà** dans KV : le contrôle à la publication
+* ferme la porte devant, il ne réécrit pas ce qui est passé avant lui, et un
+* rendu qui change de forme ne doit pas transformer un lien envoyé hier en
+* page d'erreur de l'hébergeur.
+*/
+function pageIllisible() {
+	return envelopper({
+		titre: "Document illisible — Atelier 237",
+		description: "Ce document ne peut pas être affiché.",
+		lien: ""
+	}, lecture_default, K(/* @__PURE__ */ u(PageIllisible, {})));
+}
 function pageDeLecture(instantane, ctx, lien, image) {
+	try {
+		return dessiner(instantane, ctx, lien, image);
+	} catch {
+		return pageIllisible();
+	}
+}
+function dessiner(instantane, ctx, lien, image) {
 	const meta = metaDe(instantane, ctx, lien, image);
 	const document = documentDe(instantane, ctx);
 	if (document !== null) return envelopper(meta, a4_default + lecture_default, `<main class="lecture">${K(document)}</main>${K(/* @__PURE__ */ u(PiedLecture, { instantane }))}`);

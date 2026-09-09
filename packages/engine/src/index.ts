@@ -92,12 +92,14 @@ export {
   lienValide, pourquoiNonPubliable, publiable,
 } from './publication.js'
 export { cvSchema } from './schema/cv.js'
+export { ID_COMPOSE_CALCUL } from './calcul.js'
 export type { CalculDemande, EntreeDemandee } from './calcul.js'
 export { MAX_ENTREES, schemaCalcul, verifierCalcul } from './calcul.js'
 export type { ReponseModele } from './composition.js'
 export { lireReponseModele } from './composition.js'
 export type { Expression, Operation } from './expression.js'
 export { DESCRIPTION_FORMULE, PROFONDEUR_MAX, evaluer, verifierExpression } from './expression.js'
+export { ID_COMPOSE } from './registre.js'
 export type { ColonneDemandee, RefusModele, RegistreDemande } from './registre.js'
 export { MAX_COLONNES, schemaRefus, schemaRegistre, verifierRegistre } from './registre.js'
 export type { AvecMotsClefs, Correspondance } from './match.js'
@@ -116,6 +118,7 @@ export {
   colonnesSecondaires, comptageBascule, lignesEnAlerte, ligneNeuve, nombreDe,
   retirerLigne, schemaListe, texteDe, totalListe,
 } from './compute/liste.js'
+export { squeletteDeCalcul, squeletteDeRegistre } from './compose.js'
 export { cellule, squeletteListe } from './skeletons/liste.js'
 export type { DefinitionListe, SqueletteListe } from './skeletons/liste.js'
 export { REGISTRES_LISTE } from './skeletons/registres.js'

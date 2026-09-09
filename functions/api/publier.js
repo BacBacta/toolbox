@@ -158,6 +158,8 @@ function numeroSuivant(precedent, annee, prefixe) {
 /** Le taux, exprimé en dix-millièmes, pour calculer en entiers. 1925 = 19,25 %. */
 var TAUX_TVA_CM_POUR_10000 = 1925;
 TAUX_TVA_CM_POUR_10000 / 1e4;
+/** Le libellé tel qu'il doit apparaître sur le document. */
+var LIBELLE_TVA_CM = "TVA 19,25 %";
 /**
 * TVA due sur un montant hors taxes, arrondie au franc.
 *
@@ -321,6 +323,20 @@ function montantF(n) {
 function dateLongue(d) {
 	const p = partsWAT(d);
 	return `${p.jour} ${nom(p.mois)} ${p.annee}`;
+}
+/**
+* La date longue d'une chaîne ISO, ou `null` si elle n'en est pas une.
+*
+* `dateLongue` refuse une date invalide, et elle a raison : dessiner « Invalid
+* Date » sur un document serait pire. Mais une date que l'utilisateur est en
+* train de saisir n'est pas encore une date, et le rendu ne doit pas se
+* casser en l'attendant. Le rendu choisit alors de ne rien écrire.
+*/
+function dateLongueSiValide(iso) {
+	if (iso.trim() === "") return null;
+	const d = new Date(iso);
+	if (Number.isNaN(d.getTime())) return null;
+	return dateLongue(d);
 }
 /** `heureCourte()` → `08h45`. */
 function heureCourte(d) {
@@ -652,6 +668,12 @@ var LIBELLE_STATUT = {
 	"en-retard": "En retard",
 	partielle: "Partiellement réglée",
 	"a-payer": "À payer"
+};
+var LIBELLE_MOYEN = {
+	momo: "MTN Mobile Money",
+	"orange-money": "Orange Money",
+	especes: "Espèces",
+	virement: "Virement"
 };
 function dateEcheance(etat) {
 	return dateIso(etat.echeance, "date d'échéance");
@@ -2788,6 +2810,82 @@ function accepteLaVersion(recue, detenue) {
 	if (!Number.isSafeInteger(recue) || recue < 0) return false;
 	return detenue === null || recue > detenue;
 }
+/**
+* Évalue l'arbre. Jamais d'exception, jamais de NaN, jamais d'infini.
+*
+* Une calculatrice qui affiche « NaN » à quelqu'un qui compte sa journée est
+* pire qu'une calculatrice absente : elle fait douter de tout le reste. Une
+* division par zéro rend zéro, ce qui est faux, mais lisible et sans surprise.
+*/
+function evaluer(e, lire) {
+	const brut = brute(e, lire, 0);
+	return Number.isFinite(brut) ? brut : 0;
+}
+function brute(e, lire, niveau) {
+	if (niveau > 6) return 0;
+	if ("nombre" in e) return e.nombre;
+	if ("ref" in e) return lire(e.ref);
+	const g = brute(e.gauche, lire, niveau + 1);
+	const d = brute(e.droite, lire, niveau + 1);
+	switch (e.op) {
+		case "plus": return g + d;
+		case "moins": return g - d;
+		case "fois": return g * d;
+		case "divise": return d === 0 ? 0 : g / d;
+		case "pourcent": return g * d / 100;
+		case "min": return Math.min(g, d);
+		case "max": return Math.max(g, d);
+	}
+}
+//#endregion
+//#region ../engine/src/calcul.ts
+/**
+* La deuxième forme que le modèle peut composer : une calculatrice.
+*
+* Un registre tient une liste ; une calculatrice répond à une question. « Ce
+* qu'il me reste à payer », « ma marge sur chaque vente », « la part de
+* chacun » : ce sont les plus petits outils du produit, et sans doute ceux
+* qu'on ouvre le plus souvent.
+*
+* Elle manquait, et ça se voyait : tout ce qui n'était pas une liste se
+* heurtait à un refus. Le moteur savait pourtant déjà les dessiner — seule la
+* formule bloquait, parce qu'elle était écrite en TypeScript. Déclarée en
+* arbre (`expression.ts`), elle devient une configuration comme le reste.
+*/
+/** Celui d'une calculatrice composée. Voir `ID_COMPOSE` : même raison. */
+var ID_COMPOSE_CALCUL = "compose-calcul";
+//#endregion
+//#region ../engine/src/registre.ts
+/**
+* La seule chose que le modèle a le droit de produire.
+*
+* Invariant § 2.1 du brief : **jamais de génération de code libre**. Le modèle
+* ne rend pas du HTML, pas du JavaScript, pas un gabarit — il remplit une
+* configuration de registre, et c'est `RegistreListe`, écrit à la main et
+* testé, qui la dessine. Ce fichier est la frontière : au-delà, rien de ce que
+* le modèle a dit n'atteint l'écran sans être passé par ici.
+*
+* Le contrat vit dans le moteur, pas dans le paquet qui appelle le modèle : le
+* client doit pouvoir revérifier ce que le serveur lui envoie sans importer de
+* quoi appeler un fournisseur. Deux validateurs qui se recopient finiraient par
+* diverger, et c'est celui du client qui se tairait.
+*
+* Le choix du registre décrit par ses colonnes n'est pas arbitraire. Quatre
+* squelettes du prototype n'étaient déjà que ça, et la fabrique en tire schéma,
+* validation, calculs, carte, partage et formulaire. Un cinquième registre
+* coûte vingt lignes de description — c'est exactement ce qu'un modèle sait
+* écrire, et exactement ce qu'il ne peut pas casser.
+*/
+/**
+* L'identifiant d'un registre composé par le modèle.
+*
+* Il vit ici, avec le contrat, et non avec la fabrique qui en tire un
+* squelette : l'atelier a besoin du nom pour créer l'outil, et rien d'autre.
+* Le prendre là où est la fabrique faisait entrer les deux fabriques de
+* squelettes dans la coquille initiale — deux kilo-octets avant le premier
+* affichage, pour deux chaînes de caractères.
+*/
+var ID_COMPOSE = "compose";
 //#endregion
 //#region ../engine/src/schema/devis.ts
 /**
@@ -3134,6 +3232,152 @@ function schemaListe(config, titreNom) {
 	};
 }
 //#endregion
+//#region ../engine/src/compute/calc.ts
+/** La valeur d'une entrée, nettoyée : jamais NaN, jamais négative. */
+function valeurDe(etat, clef) {
+	const v = etat.valeurs[clef];
+	return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0;
+}
+function lecteur(etat) {
+	return (clef) => valeurDe(etat, clef);
+}
+/** Le résultat, arrondi au franc. La formule ne voit que des nombres valides. */
+function resultatCalc(config, etat) {
+	const brut = config.sortie.calcul(lecteur(etat));
+	return Number.isFinite(brut) ? Math.round(brut) : 0;
+}
+function precisionCalc(config, etat) {
+	return config.sortie.precision?.(lecteur(etat)) ?? null;
+}
+function partCalc(config, etat) {
+	const part = config.sortie.part?.(lecteur(etat));
+	if (part === void 0 || part === null || !Number.isFinite(part)) return null;
+	return Math.max(0, Math.min(1, part));
+}
+/**
+* Change une entrée.
+* @throws RangeError sur une valeur négative ou non finie — une calculatrice
+*   qui accepte n'importe quoi rend n'importe quoi.
+*/
+function changerValeur(etat, clef, valeur) {
+	if (!Number.isFinite(valeur) || valeur < 0) throw new RangeError(`valeur invalide pour « ${clef} » : ${valeur}`);
+	return {
+		...etat,
+		valeurs: {
+			...etat.valeurs,
+			[clef]: valeur
+		}
+	};
+}
+/** L'état de départ : chaque entrée à sa valeur par défaut. */
+function valeursParDefaut(config) {
+	const valeurs = {};
+	for (const e of config.entrees) valeurs[e.clef] = e.defaut;
+	return valeurs;
+}
+function schemaCalc(config, titreNom) {
+	const proprietes = {};
+	for (const e of config.entrees) proprietes[e.clef] = {
+		type: "number",
+		minimum: 0,
+		maximum: 1e9,
+		title: e.unite === "F" ? `${e.titre} (F CFA)` : e.titre
+	};
+	return {
+		type: "object",
+		additionalProperties: false,
+		required: ["nom", "valeurs"],
+		properties: {
+			nom: {
+				type: "string",
+				minLength: 1,
+				maxLength: 60,
+				title: titreNom
+			},
+			valeurs: {
+				type: "object",
+				additionalProperties: false,
+				required: config.entrees.map((e) => e.clef),
+				properties: proprietes,
+				title: "Valeurs"
+			}
+		}
+	};
+}
+//#endregion
+//#region ../engine/src/skeletons/calc.ts
+function afficher(valeur, unite) {
+	return unite === "F" ? montantF(valeur) : nf(valeur);
+}
+function squeletteCalc(def) {
+	const config = def.config;
+	const card = (etat, ctx) => {
+		const precision = precisionCalc(config, etat);
+		return {
+			kicker: config.kicker,
+			title: etat.nom,
+			sub: def.title,
+			tag: null,
+			bigLabel: config.sortie.libelle.toUpperCase(),
+			big: afficher(resultatCalc(config, etat), config.sortie.unite),
+			pct: partCalc(config, etat),
+			subline: precision ?? def.title,
+			listTitle: "CE QUI A ÉTÉ SAISI",
+			items: config.entrees.map((e) => ({
+				n: e.titre,
+				ok: true,
+				warn: false,
+				val: afficher(valeurDe(etat, e.clef), e.unite)
+			})),
+			link: ctx.lien,
+			stamp: arreteLe(ctx.maintenant)
+		};
+	};
+	const share = (etat, ctx) => {
+		const precision = precisionCalc(config, etat);
+		const lignes = [
+			`${etat.nom.toUpperCase()} — ${def.title.toLowerCase()}`,
+			...config.entrees.map((e) => `${e.titre} : ${afficher(valeurDe(etat, e.clef), e.unite)}`),
+			`${config.sortie.libelle} : ${afficher(resultatCalc(config, etat), config.sortie.unite)}`,
+			precision ?? "",
+			ctx.lien
+		].filter((l) => l !== "");
+		return {
+			title: etat.nom,
+			desc: `${config.sortie.libelle} : ${afficher(resultatCalc(config, etat), config.sortie.unite)}`,
+			name: def.id,
+			txt: lignes.join("\n"),
+			broad: null,
+			warn: null,
+			card: card(etat, ctx),
+			relances: [],
+			relancesVides: def.relancesVides
+		};
+	};
+	return {
+		id: def.id,
+		group: def.group,
+		title: def.title,
+		keywords: def.keywords,
+		engine: "calc",
+		config,
+		schema: schemaCalc(config, def.titreNom),
+		defaults: {
+			nom: def.title,
+			valeurs: valeursParDefaut(config)
+		},
+		compute: {
+			resultatCalc,
+			precisionCalc,
+			partCalc,
+			changerValeur,
+			valeurDe
+		},
+		card,
+		share
+	};
+}
+//#endregion
 //#region ../engine/src/skeletons/liste.ts
 /**
 * La fabrique de registres.
@@ -3210,7 +3454,7 @@ function squeletteListe(def) {
 		return {
 			kicker: config.kicker,
 			title: etat.nom,
-			sub: def.title,
+			sub: etat.nom === def.title ? "" : def.title,
 			tag: null,
 			bigLabel: grand.libelle,
 			big: grand.valeur,
@@ -3270,6 +3514,67 @@ function squeletteListe(def) {
 		card,
 		share
 	};
+}
+//#endregion
+//#region ../engine/src/compose.ts
+/**
+* Un outil composé par le modèle n'a pas de squelette : sa configuration
+* voyage avec lui, dans l'outil enregistré. Ces deux fabriques la remontent en
+* squelette complet — schéma, calculs, carte et partage.
+*
+* C'est la thèse du brief prise au mot (§ 2.1, § 4) : le modèle n'a produit que
+* de la configuration, et c'est du code écrit à la main et éprouvé qui la
+* dessine. Rien ne distingue un outil composé d'un squelette, sinon d'où vient
+* sa description.
+*
+* Elles vivent ici, dans le moteur, et non dans le fragment qui les dessine,
+* parce que **le serveur en a besoin aussi**. Tant qu'elles n'étaient que du
+* côté de l'écran, la page de lecture ne trouvait rien à dessiner derrière le
+* lien d'un outil composé : elle répondait 200 avec « Ce lien ne mène à rien ».
+* L'outil payé était le seul qu'on ne pouvait pas partager. Deux définitions
+* auraient fini par ne plus dire la même chose ; il n'y en a qu'une.
+*/
+function squeletteDeRegistre(registre) {
+	return squeletteListe({
+		id: ID_COMPOSE,
+		title: registre.titre,
+		group: "registres",
+		keywords: [],
+		titreNom: registre.titreNom,
+		config: {
+			kicker: registre.kicker,
+			colonnes: registre.colonnes,
+			libelleVide: registre.libelleVide,
+			libelleAjout: registre.libelleAjout,
+			relancesVides: registre.relancesVides,
+			...registre.total !== void 0 ? { total: registre.total } : {},
+			...registre.personnes !== void 0 ? { personnes: registre.personnes } : {}
+		}
+	});
+}
+/**
+* La formule est un arbre déclaré, pas du code : `evaluer` l'interprète, et
+* c'est ce qui permet au modèle de décrire un calcul sans jamais obtenir le
+* droit d'en exécuter un (invariant § 2.1).
+*/
+function squeletteDeCalcul(demande) {
+	return squeletteCalc({
+		id: ID_COMPOSE_CALCUL,
+		title: demande.titre,
+		group: "calculs",
+		keywords: [],
+		titreNom: demande.titreNom,
+		relancesVides: "Une calculatrice se consulte, elle ne se relance pas.",
+		config: {
+			kicker: demande.kicker,
+			entrees: demande.entrees,
+			sortie: {
+				libelle: demande.sortie.libelle,
+				unite: demande.sortie.unite,
+				calcul: (val) => evaluer(demande.sortie.formule, val)
+			}
+		}
+	});
 }
 var caisse = squeletteListe({
 	id: "caisse",
@@ -3428,152 +3733,6 @@ var prix = squeletteListe({
 		relancesVides: "Une liste de prix ne se relance pas, elle se diffuse. Le résumé ci-dessus est prêt à coller dans une discussion ou une liste de diffusion."
 	}
 });
-//#endregion
-//#region ../engine/src/compute/calc.ts
-/** La valeur d'une entrée, nettoyée : jamais NaN, jamais négative. */
-function valeurDe(etat, clef) {
-	const v = etat.valeurs[clef];
-	return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : 0;
-}
-function lecteur(etat) {
-	return (clef) => valeurDe(etat, clef);
-}
-/** Le résultat, arrondi au franc. La formule ne voit que des nombres valides. */
-function resultatCalc(config, etat) {
-	const brut = config.sortie.calcul(lecteur(etat));
-	return Number.isFinite(brut) ? Math.round(brut) : 0;
-}
-function precisionCalc(config, etat) {
-	return config.sortie.precision?.(lecteur(etat)) ?? null;
-}
-function partCalc(config, etat) {
-	const part = config.sortie.part?.(lecteur(etat));
-	if (part === void 0 || part === null || !Number.isFinite(part)) return null;
-	return Math.max(0, Math.min(1, part));
-}
-/**
-* Change une entrée.
-* @throws RangeError sur une valeur négative ou non finie — une calculatrice
-*   qui accepte n'importe quoi rend n'importe quoi.
-*/
-function changerValeur(etat, clef, valeur) {
-	if (!Number.isFinite(valeur) || valeur < 0) throw new RangeError(`valeur invalide pour « ${clef} » : ${valeur}`);
-	return {
-		...etat,
-		valeurs: {
-			...etat.valeurs,
-			[clef]: valeur
-		}
-	};
-}
-/** L'état de départ : chaque entrée à sa valeur par défaut. */
-function valeursParDefaut(config) {
-	const valeurs = {};
-	for (const e of config.entrees) valeurs[e.clef] = e.defaut;
-	return valeurs;
-}
-function schemaCalc(config, titreNom) {
-	const proprietes = {};
-	for (const e of config.entrees) proprietes[e.clef] = {
-		type: "number",
-		minimum: 0,
-		maximum: 1e9,
-		title: e.unite === "F" ? `${e.titre} (F CFA)` : e.titre
-	};
-	return {
-		type: "object",
-		additionalProperties: false,
-		required: ["nom", "valeurs"],
-		properties: {
-			nom: {
-				type: "string",
-				minLength: 1,
-				maxLength: 60,
-				title: titreNom
-			},
-			valeurs: {
-				type: "object",
-				additionalProperties: false,
-				required: config.entrees.map((e) => e.clef),
-				properties: proprietes,
-				title: "Valeurs"
-			}
-		}
-	};
-}
-//#endregion
-//#region ../engine/src/skeletons/calc.ts
-function afficher(valeur, unite) {
-	return unite === "F" ? montantF(valeur) : nf(valeur);
-}
-function squeletteCalc(def) {
-	const config = def.config;
-	const card = (etat, ctx) => {
-		const precision = precisionCalc(config, etat);
-		return {
-			kicker: config.kicker,
-			title: etat.nom,
-			sub: def.title,
-			tag: null,
-			bigLabel: config.sortie.libelle.toUpperCase(),
-			big: afficher(resultatCalc(config, etat), config.sortie.unite),
-			pct: partCalc(config, etat),
-			subline: precision ?? def.title,
-			listTitle: "CE QUI A ÉTÉ SAISI",
-			items: config.entrees.map((e) => ({
-				n: e.titre,
-				ok: true,
-				warn: false,
-				val: afficher(valeurDe(etat, e.clef), e.unite)
-			})),
-			link: ctx.lien,
-			stamp: arreteLe(ctx.maintenant)
-		};
-	};
-	const share = (etat, ctx) => {
-		const precision = precisionCalc(config, etat);
-		const lignes = [
-			`${etat.nom.toUpperCase()} — ${def.title.toLowerCase()}`,
-			...config.entrees.map((e) => `${e.titre} : ${afficher(valeurDe(etat, e.clef), e.unite)}`),
-			`${config.sortie.libelle} : ${afficher(resultatCalc(config, etat), config.sortie.unite)}`,
-			precision ?? "",
-			ctx.lien
-		].filter((l) => l !== "");
-		return {
-			title: etat.nom,
-			desc: `${config.sortie.libelle} : ${afficher(resultatCalc(config, etat), config.sortie.unite)}`,
-			name: def.id,
-			txt: lignes.join("\n"),
-			broad: null,
-			warn: null,
-			card: card(etat, ctx),
-			relances: [],
-			relancesVides: def.relancesVides
-		};
-	};
-	return {
-		id: def.id,
-		group: def.group,
-		title: def.title,
-		keywords: def.keywords,
-		engine: "calc",
-		config,
-		schema: schemaCalc(config, def.titreNom),
-		defaults: {
-			nom: def.title,
-			valeurs: valeursParDefaut(config)
-		},
-		compute: {
-			resultatCalc,
-			precisionCalc,
-			partCalc,
-			changerValeur,
-			valeurDe
-		},
-		card,
-		share
-	};
-}
 var scolarite = squeletteCalc({
 	id: "scolarite",
 	title: "Frais scolaires",
@@ -4110,31 +4269,37 @@ function squeletteParId(id) {
 //#endregion
 //#region ../../node_modules/.pnpm/preact@10.29.8_preact-render-to-string@6.7.0/node_modules/preact/dist/preact.module.js
 var n;
-var l;
-var u;
-var i$1;
-var r;
-var o;
+var l$1;
+var u$2;
+var i$2;
+var r$1;
+var o$1;
 var e;
-var f;
-var c;
-var a;
-var s;
-var h;
-var p;
-var v;
-var d = {};
-var w = [];
-var _ = /acit|ex(?:s|g|n|p|$)|rph|grid|ows|mnc|ntw|ine[ch]|zoo|^ord|itera/i;
-var g = Array.isArray;
-function m(n, l) {
+var f$2;
+var c$1;
+var a$1;
+var s$1;
+var h$1;
+var p$1;
+var v$1;
+var d$1 = {};
+var w$1 = [];
+var _$1 = /acit|ex(?:s|g|n|p|$)|rph|grid|ows|mnc|ntw|ine[ch]|zoo|^ord|itera/i;
+var g$1 = Array.isArray;
+function m$1(n, l) {
 	for (var u in l) n[u] = l[u];
 	return n;
 }
-function b(n) {
+function b$1(n) {
 	n && n.parentNode && n.parentNode.removeChild(n);
 }
-function x(n, t, i, r, o) {
+function k$1(l, u, t) {
+	var i, r, o, e = {};
+	for (o in u) "key" == o ? i = u[o] : "ref" == o ? r = u[o] : e[o] = u[o];
+	if (arguments.length > 2 && (e.children = arguments.length > 3 ? n.call(arguments, 2) : t), "function" == typeof l && null != l.defaultProps) for (o in l.defaultProps) void 0 === e[o] && (e[o] = l.defaultProps[o]);
+	return x$1(l, e, i, r, null);
+}
+function x$1(n, t, i, r, o) {
 	var e = {
 		type: n,
 		props: t,
@@ -4146,53 +4311,53 @@ function x(n, t, i, r, o) {
 		__e: null,
 		__c: null,
 		constructor: void 0,
-		__v: null == o ? ++u : o,
+		__v: null == o ? ++u$2 : o,
 		__i: -1,
 		__u: 0
 	};
-	return null == o && null != l.vnode && l.vnode(e), e;
+	return null == o && null != l$1.vnode && l$1.vnode(e), e;
 }
 function S(n) {
 	return n.children;
 }
-function C(n, l) {
+function C$1(n, l) {
 	this.props = n, this.context = l;
 }
-function $(n, l) {
-	if (null == l) return n.__ ? $(n.__, n.__i + 1) : null;
+function $$1(n, l) {
+	if (null == l) return n.__ ? $$1(n.__, n.__i + 1) : null;
 	for (var u; l < n.__k.length; l++) if (null != (u = n.__k[l]) && null != u.__e) return u.__e;
-	return "function" == typeof n.type ? $(n) : null;
+	return "function" == typeof n.type ? $$1(n) : null;
 }
-function I(n) {
+function I$1(n) {
 	if (n.__P && n.__d) {
-		var u = n.__v, t = u.__e, i = [], r = [], o = m({}, u);
-		o.__v = u.__v + 1, l.vnode && l.vnode(o), q(n.__P, o, u, n.__n, n.__P.namespaceURI, 32 & u.__u ? [t] : null, i, null == t ? $(u) : t, !!(32 & u.__u), r), o.__v = u.__v, o.__.__k[o.__i] = o, D(i, o, r), u.__e = u.__ = null, o.__e != t && P(o);
+		var u = n.__v, t = u.__e, i = [], r = [], o = m$1({}, u);
+		o.__v = u.__v + 1, l$1.vnode && l$1.vnode(o), q$1(n.__P, o, u, n.__n, n.__P.namespaceURI, 32 & u.__u ? [t] : null, i, null == t ? $$1(u) : t, !!(32 & u.__u), r), o.__v = u.__v, o.__.__k[o.__i] = o, D$1(i, o, r), u.__e = u.__ = null, o.__e != t && P$1(o);
 	}
 }
-function P(n) {
+function P$1(n) {
 	if (null != (n = n.__) && null != n.__c) return n.__e = n.__c.base = null, n.__k.some(function(l) {
 		if (null != l && null != l.__e) return n.__e = n.__c.base = l.__e;
-	}), P(n);
+	}), P$1(n);
 }
-function A(n) {
-	(!n.__d && (n.__d = !0) && i$1.push(n) && !H.__r++ || r != l.debounceRendering) && ((r = l.debounceRendering) || o)(H);
+function A$1(n) {
+	(!n.__d && (n.__d = !0) && i$2.push(n) && !H$1.__r++ || r$1 != l$1.debounceRendering) && ((r$1 = l$1.debounceRendering) || o$1)(H$1);
 }
-function H() {
+function H$1() {
 	try {
-		for (var n, l = 1; i$1.length;) i$1.length > l && i$1.sort(e), n = i$1.shift(), l = i$1.length, I(n);
+		for (var n, l = 1; i$2.length;) i$2.length > l && i$2.sort(e), n = i$2.shift(), l = i$2.length, I$1(n);
 	} finally {
-		i$1.length = H.__r = 0;
+		i$2.length = H$1.__r = 0;
 	}
 }
 function L(n, l, u, t, i, r, o, e, f, c, a) {
-	var s, h, p, v, y, _, g = t && t.__k || w, m = l.length;
-	for (f = T(u, l, g, f, m), s = 0; s < m; s++) null != (p = u.__k[s]) && (h = -1 != p.__i && g[p.__i] || d, p.__i = s, _ = q(n, p, h, i, r, o, e, f, c, a), v = p.__e, p.ref && h.ref != p.ref && (h.ref && J(h.ref, null, p), a.push(p.ref, p.__c || v, p)), null == y && null != v && (y = v), 4 & p.__u ? (f = j(p, f, n), h.__e && (h.__e = null)) : "function" == typeof p.type && void 0 !== _ ? f = _ : v && (f = v.nextSibling), p.__u &= -7);
+	var s, h, p, v, y, _, g = t && t.__k || w$1, m = l.length;
+	for (f = T(u, l, g, f, m), s = 0; s < m; s++) null != (p = u.__k[s]) && (h = -1 != p.__i && g[p.__i] || d$1, p.__i = s, _ = q$1(n, p, h, i, r, o, e, f, c, a), v = p.__e, p.ref && h.ref != p.ref && (h.ref && J$1(h.ref, null, p), a.push(p.ref, p.__c || v, p)), null == y && null != v && (y = v), 4 & p.__u ? (f = j(p, f, n), h.__e && (h.__e = null)) : "function" == typeof p.type && void 0 !== _ ? f = _ : v && (f = v.nextSibling), p.__u &= -7);
 	return u.__e = y, f;
 }
 function T(n, l, u, t, i) {
 	var r, o, e, f, c, a = u.length, s = a, h = 0;
-	for (n.__k = new Array(i), r = 0; r < i; r++) null != (o = l[r]) && "boolean" != typeof o && "function" != typeof o ? ("string" == typeof o || "number" == typeof o || "bigint" == typeof o || o.constructor == String ? o = n.__k[r] = x(null, o, null, null, null) : g(o) ? o = n.__k[r] = x(S, { children: o }, null, null, null) : void 0 === o.constructor && o.__b > 0 ? o = n.__k[r] = x(o.type, o.props, o.key, o.ref ? o.ref : null, o.__v) : n.__k[r] = o, f = r + h, o.__ = n, o.__b = n.__b + 1, e = null, -1 != (c = o.__i = O(o, u, f, s)) && (s--, (e = u[c]) && (e.__u |= 2)), null == e || null == e.__v ? (-1 == c && (i > a ? h-- : i < a && h++), "function" != typeof o.type && (o.__u |= 4)) : c != f && (c == f - 1 ? h-- : c == f + 1 ? h++ : (c > f ? h-- : h++, o.__u |= 4))) : n.__k[r] = null;
-	if (s) for (r = 0; r < a; r++) null != (e = u[r]) && 0 == (2 & e.__u) && (e.__e == t && (t = $(e)), K(e, e));
+	for (n.__k = new Array(i), r = 0; r < i; r++) null != (o = l[r]) && "boolean" != typeof o && "function" != typeof o ? ("string" == typeof o || "number" == typeof o || "bigint" == typeof o || o.constructor == String ? o = n.__k[r] = x$1(null, o, null, null, null) : g$1(o) ? o = n.__k[r] = x$1(S, { children: o }, null, null, null) : void 0 === o.constructor && o.__b > 0 ? o = n.__k[r] = x$1(o.type, o.props, o.key, o.ref ? o.ref : null, o.__v) : n.__k[r] = o, f = r + h, o.__ = n, o.__b = n.__b + 1, e = null, -1 != (c = o.__i = O$1(o, u, f, s)) && (s--, (e = u[c]) && (e.__u |= 2)), null == e || null == e.__v ? (-1 == c && (i > a ? h-- : i < a && h++), "function" != typeof o.type && (o.__u |= 4)) : c != f && (c == f - 1 ? h-- : c == f + 1 ? h++ : (c > f ? h-- : h++, o.__u |= 4))) : n.__k[r] = null;
+	if (s) for (r = 0; r < a; r++) null != (e = u[r]) && 0 == (2 & e.__u) && (e.__e == t && (t = $$1(e)), K$1(e, e));
 	return t;
 }
 function j(n, l, u) {
@@ -4201,13 +4366,13 @@ function j(n, l, u) {
 		for (t = n.__k, i = 0; t && i < t.length; i++) t[i] && (t[i].__ = n, l = j(t[i], l, u));
 		return l;
 	}
-	n.__e != l && (l && n.type && !l.parentNode && (l = $(n)), l = u.insertBefore(n.__e, l || null));
+	n.__e != l && (l && n.type && !l.parentNode && (l = $$1(n)), l = u.insertBefore(n.__e, l || null));
 	do
 		l = l && l.nextSibling;
 	while (null != l && 8 == l.nodeType);
 	return l;
 }
-function O(n, l, u, t) {
+function O$1(n, l, u, t) {
 	var i, r, o, e = n.key, f = n.type, c = l[u], a = null != c && 0 == (2 & c.__u);
 	if (null === c && null == e || a && e == c.key && f == c.type) return u;
 	if (t > (a ? 1 : 0)) {
@@ -4215,17 +4380,17 @@ function O(n, l, u, t) {
 	}
 	return -1;
 }
-function z(n, l, u) {
-	"-" == l[0] ? n.setProperty(l, null == u ? "" : u) : n[l] = null == u ? "" : "number" != typeof u || _.test(l) ? u : u + "px";
+function z$1(n, l, u) {
+	"-" == l[0] ? n.setProperty(l, null == u ? "" : u) : n[l] = null == u ? "" : "number" != typeof u || _$1.test(l) ? u : u + "px";
 }
-function N(n, l, u, t, i) {
+function N$1(n, l, u, t, i) {
 	var r, o;
 	n: if ("style" == l) if ("string" == typeof u) n.style.cssText = u;
 	else {
-		if ("string" == typeof t && (n.style.cssText = t = ""), t) for (l in t) u && l in u || z(n.style, l, "");
-		if (u) for (l in u) t && u[l] == t[l] || z(n.style, l, u[l]);
+		if ("string" == typeof t && (n.style.cssText = t = ""), t) for (l in t) u && l in u || z$1(n.style, l, "");
+		if (u) for (l in u) t && u[l] == t[l] || z$1(n.style, l, u[l]);
 	}
-	else if ("o" == l[0] && "n" == l[1]) r = l != (l = l.replace(s, "$1")), o = l.toLowerCase(), l = o in n || "onFocusOut" == l || "onFocusIn" == l ? o.slice(2) : l.slice(2), n.l || (n.l = {}), n.l[l + r] = u, u ? t ? u[a] = t[a] : (u[a] = h, n.addEventListener(l, r ? v : p, r)) : n.removeEventListener(l, r ? v : p, r);
+	else if ("o" == l[0] && "n" == l[1]) r = l != (l = l.replace(s$1, "$1")), o = l.toLowerCase(), l = o in n || "onFocusOut" == l || "onFocusIn" == l ? o.slice(2) : l.slice(2), n.l || (n.l = {}), n.l[l + r] = u, u ? t ? u[a$1] = t[a$1] : (u[a$1] = h$1, n.addEventListener(l, r ? v$1 : p$1, r)) : n.removeEventListener(l, r ? v$1 : p$1, r);
 	else {
 		if ("http://www.w3.org/2000/svg" == i) l = l.replace(/xlink(H|:h)/, "h").replace(/sName$/, "s");
 		else if ("width" != l && "height" != l && "href" != l && "list" != l && "form" != l && "tabIndex" != l && "download" != l && "rowSpan" != l && "colSpan" != l && "role" != l && "popover" != l && l in n) try {
@@ -4235,72 +4400,72 @@ function N(n, l, u, t, i) {
 		"function" == typeof u || (null == u || !1 === u && "-" != l[4] ? n.removeAttribute(l) : n.setAttribute(l, "popover" == l && 1 == u ? "" : u));
 	}
 }
-function V(n) {
+function V$1(n) {
 	return function(u) {
 		if (this.l) {
 			var t = this.l[u.type + n];
-			if (null == u[c]) u[c] = h++;
-			else if (u[c] < t[a]) return;
-			return t(l.event ? l.event(u) : u);
+			if (null == u[c$1]) u[c$1] = h$1++;
+			else if (u[c$1] < t[a$1]) return;
+			return t(l$1.event ? l$1.event(u) : u);
 		}
 	};
 }
-function q(n, u, t, i, r, o, e, f, c, a) {
+function q$1(n, u, t, i, r, o, e, f, c, a) {
 	var s, h, p, v, y, d, _, k, x, M, I, P, A, H, T, j, F = u.type;
 	if (void 0 !== u.constructor) return null;
-	128 & t.__u && (c = !!(32 & t.__u), o = [f = u.__e = t.__e]), (s = l.__b) && s(u);
+	128 & t.__u && (c = !!(32 & t.__u), o = [f = u.__e = t.__e]), (s = l$1.__b) && s(u);
 	n: if ("function" == typeof F) {
 		h = e.length;
 		try {
-			if (x = u.props, M = F.prototype && F.prototype.render, I = (s = F.contextType) && i[s.__c], P = s ? I ? I.props.value : s.__ : i, t.__c ? k = (p = u.__c = t.__c).__ = p.__E : (M ? u.__c = p = new F(x, P) : (u.__c = p = new C(x, P), p.constructor = F, p.render = Q), I && I.sub(p), p.state || (p.state = {}), p.__n = i, v = p.__d = !0, p.__h = [], p._sb = []), M && null == p.__s && (p.__s = p.state), M && null != F.getDerivedStateFromProps && (p.__s == p.state && (p.__s = m({}, p.__s)), m(p.__s, F.getDerivedStateFromProps(x, p.__s))), y = p.props, d = p.state, p.__v = u, v) M && null == F.getDerivedStateFromProps && null != p.componentWillMount && p.componentWillMount(), M && null != p.componentDidMount && p.__h.push(p.componentDidMount);
+			if (x = u.props, M = F.prototype && F.prototype.render, I = (s = F.contextType) && i[s.__c], P = s ? I ? I.props.value : s.__ : i, t.__c ? k = (p = u.__c = t.__c).__ = p.__E : (M ? u.__c = p = new F(x, P) : (u.__c = p = new C$1(x, P), p.constructor = F, p.render = Q), I && I.sub(p), p.state || (p.state = {}), p.__n = i, v = p.__d = !0, p.__h = [], p._sb = []), M && null == p.__s && (p.__s = p.state), M && null != F.getDerivedStateFromProps && (p.__s == p.state && (p.__s = m$1({}, p.__s)), m$1(p.__s, F.getDerivedStateFromProps(x, p.__s))), y = p.props, d = p.state, p.__v = u, v) M && null == F.getDerivedStateFromProps && null != p.componentWillMount && p.componentWillMount(), M && null != p.componentDidMount && p.__h.push(p.componentDidMount);
 			else {
 				if (M && null == F.getDerivedStateFromProps && x !== y && null != p.componentWillReceiveProps && p.componentWillReceiveProps(x, P), u.__v == t.__v || !p.__e && null != p.shouldComponentUpdate && !1 === p.shouldComponentUpdate(x, p.__s, P)) {
 					u.__v != t.__v && (p.props = x, p.state = p.__s, p.__d = !1), u.__e = t.__e, u.__k = t.__k, u.__k.some(function(n) {
 						n && (n.__ = u);
-					}), w.push.apply(p.__h, p._sb), p._sb = [], p.__h.length && e.push(p), f = $(t);
+					}), w$1.push.apply(p.__h, p._sb), p._sb = [], p.__h.length && e.push(p), f = $$1(t);
 					break n;
 				}
 				null != p.componentWillUpdate && p.componentWillUpdate(x, p.__s, P), M && null != p.componentDidUpdate && p.__h.push(function() {
 					p.componentDidUpdate(y, d, _);
 				});
 			}
-			if (p.context = P, p.props = x, p.__P = n, p.__e = !1, A = l.__r, H = 0, M) p.state = p.__s, p.__d = !1, A && A(u), s = p.render(p.props, p.state, p.context), w.push.apply(p.__h, p._sb), p._sb = [];
+			if (p.context = P, p.props = x, p.__P = n, p.__e = !1, A = l$1.__r, H = 0, M) p.state = p.__s, p.__d = !1, A && A(u), s = p.render(p.props, p.state, p.context), w$1.push.apply(p.__h, p._sb), p._sb = [];
 			else do
 				p.__d = !1, A && A(u), s = p.render(p.props, p.state, p.context), p.state = p.__s;
 			while (p.__d && ++H < 25);
-			p.state = p.__s, null != p.getChildContext && (i = m(m({}, i), p.getChildContext())), M && !v && null != p.getSnapshotBeforeUpdate && (_ = p.getSnapshotBeforeUpdate(y, d)), T = null != s && s.type === S && null == s.key ? E(s.props.children) : s, f = L(n, g(T) ? T : [T], u, t, i, r, o, e, f, c, a), p.base = u.__e, u.__u &= -161, p.__h.length && e.push(p), k && (p.__E = p.__ = null);
+			p.state = p.__s, null != p.getChildContext && (i = m$1(m$1({}, i), p.getChildContext())), M && !v && null != p.getSnapshotBeforeUpdate && (_ = p.getSnapshotBeforeUpdate(y, d)), T = null != s && s.type === S && null == s.key ? E(s.props.children) : s, f = L(n, g$1(T) ? T : [T], u, t, i, r, o, e, f, c, a), p.base = u.__e, u.__u &= -161, p.__h.length && e.push(p), k && (p.__E = p.__ = null);
 		} catch (n) {
 			if (e.length = h, u.__v = null, c || null != o) {
 				if (n.then) {
 					for (u.__u |= c ? 160 : 128; f && 8 == f.nodeType && f.nextSibling;) f = f.nextSibling;
 					null != o && (o[o.indexOf(f)] = null), u.__e = f;
-				} else if (null != o) for (j = o.length; j--;) b(o[j]);
+				} else if (null != o) for (j = o.length; j--;) b$1(o[j]);
 			} else u.__e = t.__e;
-			u.__k ??= t.__k || [], n.then || B(u), l.__e(n, u, t);
+			u.__k ??= t.__k || [], n.then || B$1(u), l$1.__e(n, u, t);
 		}
 	} else null == o && u.__v == t.__v ? (u.__k = t.__k, u.__e = t.__e) : f = u.__e = G(t.__e, u, t, i, r, o, e, c, a);
-	return (s = l.diffed) && s(u), 128 & u.__u ? void 0 : f;
+	return (s = l$1.diffed) && s(u), 128 & u.__u ? void 0 : f;
 }
-function B(n) {
-	n && (n.__c && (n.__c.__e = !0), n.__k && n.__k.some(B));
+function B$1(n) {
+	n && (n.__c && (n.__c.__e = !0), n.__k && n.__k.some(B$1));
 }
-function D(n, u, t) {
-	for (var i = 0; i < t.length; i++) J(t[i], t[++i], t[++i]);
-	l.__c && l.__c(u, n), n.some(function(u) {
+function D$1(n, u, t) {
+	for (var i = 0; i < t.length; i++) J$1(t[i], t[++i], t[++i]);
+	l$1.__c && l$1.__c(u, n), n.some(function(u) {
 		try {
 			n = u.__h, u.__h = [], n.some(function(n) {
 				n.call(u);
 			});
 		} catch (n) {
-			l.__e(n, u.__v);
+			l$1.__e(n, u.__v);
 		}
 	});
 }
 function E(n) {
-	return "object" != typeof n || null == n || n.__b > 0 ? n : g(n) ? n.map(E) : void 0 !== n.constructor ? null : m({}, n);
+	return "object" != typeof n || null == n || n.__b > 0 ? n : g$1(n) ? n.map(E) : void 0 !== n.constructor ? null : m$1({}, n);
 }
 function G(u, t, i, r, o, e, f, c, a) {
-	var s, h, p, v, y, w, _, m = i.props || d, k = t.props, x = t.type;
+	var s, h, p, v, y, w, _, m = i.props || d$1, k = t.props, x = t.type;
 	if ("svg" == x ? o = "http://www.w3.org/2000/svg" : "math" == x ? o = "http://www.w3.org/1998/Math/MathML" : o || (o = "http://www.w3.org/1999/xhtml"), null != e) {
 		for (s = 0; s < e.length; s++) if ((y = e[s]) && "setAttribute" in y == !!x && (x ? y.localName == x : 3 == y.nodeType)) {
 			u = y, e[s] = null;
@@ -4309,64 +4474,1428 @@ function G(u, t, i, r, o, e, f, c, a) {
 	}
 	if (null == u) {
 		if (null == x) return document.createTextNode(k);
-		u = document.createElementNS(o, x, k.is && k), c && (l.__m && l.__m(t, e), c = !1), e = null;
+		u = document.createElementNS(o, x, k.is && k), c && (l$1.__m && l$1.__m(t, e), c = !1), e = null;
 	}
 	if (null == x) m === k || c && u.data == k || (u.data = k);
 	else {
 		if (e = "textarea" == x && null != k.defaultValue ? null : e && n.call(u.childNodes), !c && null != e) for (m = {}, s = 0; s < u.attributes.length; s++) m[(y = u.attributes[s]).name] = y.value;
-		for (s in m) y = m[s], "dangerouslySetInnerHTML" == s ? p = y : "children" == s || s in k || "value" == s && "defaultValue" in k || "checked" == s && "defaultChecked" in k || N(u, s, null, y, o);
-		for (s in k) y = k[s], "children" == s ? v = y : "dangerouslySetInnerHTML" == s ? h = y : "value" == s ? w = y : "checked" == s ? _ = y : c && "function" != typeof y || m[s] === y || N(u, s, y, m[s], o);
+		for (s in m) y = m[s], "dangerouslySetInnerHTML" == s ? p = y : "children" == s || s in k || "value" == s && "defaultValue" in k || "checked" == s && "defaultChecked" in k || N$1(u, s, null, y, o);
+		for (s in k) y = k[s], "children" == s ? v = y : "dangerouslySetInnerHTML" == s ? h = y : "value" == s ? w = y : "checked" == s ? _ = y : c && "function" != typeof y || m[s] === y || N$1(u, s, y, m[s], o);
 		if (h) c || p && (h.__html == p.__html || h.__html == u.innerHTML) || (u.innerHTML = h.__html), t.__k = [];
-		else if (p && (u.innerHTML = ""), L("template" == t.type ? u.content : u, g(v) ? v : [v], t, i, r, "foreignObject" == x ? "http://www.w3.org/1999/xhtml" : o, e, f, e ? e[0] : i.__k && $(i, 0), c, a), null != e) for (s = e.length; s--;) b(e[s]);
-		c && "textarea" != x || (s = "value", "progress" == x && null == w ? u.removeAttribute("value") : null != w && (w !== u[s] || "progress" == x && !w || "option" == x && w != m[s]) && N(u, s, w, m[s], o), s = "checked", null != _ && _ != u[s] && N(u, s, _, m[s], o));
+		else if (p && (u.innerHTML = ""), L("template" == t.type ? u.content : u, g$1(v) ? v : [v], t, i, r, "foreignObject" == x ? "http://www.w3.org/1999/xhtml" : o, e, f, e ? e[0] : i.__k && $$1(i, 0), c, a), null != e) for (s = e.length; s--;) b$1(e[s]);
+		c && "textarea" != x || (s = "value", "progress" == x && null == w ? u.removeAttribute("value") : null != w && (w !== u[s] || "progress" == x && !w || "option" == x && w != m[s]) && N$1(u, s, w, m[s], o), s = "checked", null != _ && _ != u[s] && N$1(u, s, _, m[s], o));
 	}
 	return u;
 }
-function J(n, u, t) {
+function J$1(n, u, t) {
 	try {
 		if ("function" == typeof n) {
 			var i = "function" == typeof n.__u;
 			i && n.__u(), i && null == u || (n.__u = n(u));
 		} else n.current = u;
 	} catch (n) {
-		l.__e(n, t);
+		l$1.__e(n, t);
 	}
 }
-function K(n, u, t) {
+function K$1(n, u, t) {
 	var i, r;
-	if (l.unmount && l.unmount(n), (i = n.ref) && (i.current && i.current != n.__e || J(i, null, u)), null != (i = n.__c)) {
+	if (l$1.unmount && l$1.unmount(n), (i = n.ref) && (i.current && i.current != n.__e || J$1(i, null, u)), null != (i = n.__c)) {
 		if (i.componentWillUnmount) try {
 			i.componentWillUnmount();
 		} catch (n) {
-			l.__e(n, u);
+			l$1.__e(n, u);
 		}
 		i.base = i.__P = i.__n = null;
 	}
-	if (i = n.__k) for (r = 0; r < i.length; r++) i[r] && K(i[r], u, t || "function" != typeof n.type);
-	t || b(n.__e), n.__c = n.__ = n.__e = void 0;
+	if (i = n.__k) for (r = 0; r < i.length; r++) i[r] && K$1(i[r], u, t || "function" != typeof n.type);
+	t || b$1(n.__e), n.__c = n.__ = n.__e = void 0;
 }
 function Q(n, l, u) {
 	return this.constructor(n, u);
 }
-n = w.slice, l = { __e: function(n, l, u, t) {
+n = w$1.slice, l$1 = { __e: function(n, l, u, t) {
 	for (var i, r, o; l = l.__;) if ((i = l.__c) && !i.__) try {
 		if ((r = i.constructor) && null != r.getDerivedStateFromError && (i.setState(r.getDerivedStateFromError(n)), o = i.__d), null != i.componentDidCatch && (i.componentDidCatch(n, t || {}), o = i.__d), o) return i.__E = i;
 	} catch (l) {
 		n = l;
 	}
 	throw n;
-} }, u = 0, C.prototype.setState = function(n, l) {
-	var u = null != this.__s && this.__s != this.state ? this.__s : this.__s = m({}, this.state);
-	"function" == typeof n && (n = n(m({}, u), this.props)), n && m(u, n), null != n && this.__v && (l && this._sb.push(l), A(this));
-}, C.prototype.forceUpdate = function(n) {
-	this.__v && (this.__e = !0, n && this.__h.push(n), A(this));
-}, C.prototype.render = S, i$1 = [], o = "function" == typeof Promise ? Promise.prototype.then.bind(Promise.resolve()) : setTimeout, e = function(n, l) {
+} }, u$2 = 0, C$1.prototype.setState = function(n, l) {
+	var u = null != this.__s && this.__s != this.state ? this.__s : this.__s = m$1({}, this.state);
+	"function" == typeof n && (n = n(m$1({}, u), this.props)), n && m$1(u, n), null != n && this.__v && (l && this._sb.push(l), A$1(this));
+}, C$1.prototype.forceUpdate = function(n) {
+	this.__v && (this.__e = !0, n && this.__h.push(n), A$1(this));
+}, C$1.prototype.render = S, i$2 = [], o$1 = "function" == typeof Promise ? Promise.prototype.then.bind(Promise.resolve()) : setTimeout, e = function(n, l) {
 	return n.__v.__b - l.__v.__b;
-}, H.__r = 0, f = Math.random().toString(8), c = "__d" + f, a = "__a" + f, s = /(PointerCapture)$|Capture$/i, h = 0, p = V(!1), v = V(!0);
+}, H$1.__r = 0, f$2 = Math.random().toString(8), c$1 = "__d" + f$2, a$1 = "__a" + f$2, s$1 = /(PointerCapture)$|Capture$/i, h$1 = 0, p$1 = V$1(!1), v$1 = V$1(!0);
+//#endregion
+//#region ../../node_modules/.pnpm/preact-render-to-string@6.7.0_preact@10.29.8/node_modules/preact-render-to-string/dist/index.module.js
+var r = "diffed";
+var o = "__c";
+var i$1 = "__s";
+var a = "__c";
+var c = "__k";
+var u$1 = "__d";
+var s = "__s";
+var l = /[\s\n\\/='"\0<>]/;
+var f$1 = /^(xlink|xmlns|xml)([A-Z])/;
+var p = /^(?:accessK|auto[A-Z]|cell|ch|col|cont|cross|dateT|encT|form[A-Z]|frame|hrefL|inputM|maxL|minL|noV|playsI|popoverT|readO|rowS|src[A-Z]|tabI|useM|item[A-Z])/;
+var h = /^ac|^ali|arabic|basel|cap|clipPath$|clipRule$|color|dominant|enable|fill|flood|font|glyph[^R]|horiz|image|letter|lighting|marker[^WUH]|overline|panose|pointe|paint|rendering|shape|stop|strikethrough|stroke|text[^L]|transform|underline|unicode|units|^v[^i]|^w|^xH/;
+var d = /* @__PURE__ */ new Set(["draggable", "spellcheck"]);
+function v(e) {
+	void 0 !== e.__g ? e.__g |= 8 : e[u$1] = !0;
+}
+function m(e) {
+	void 0 !== e.__g ? e.__g &= -9 : e[u$1] = !1;
+}
+function y(e) {
+	return void 0 !== e.__g ? !!(8 & e.__g) : !0 === e[u$1];
+}
+var _ = /["&<]/;
+function g(e) {
+	if (0 === e.length || !1 === _.test(e)) return e;
+	for (var t = 0, n = 0, r = "", o = ""; n < e.length; n++) {
+		switch (e.charCodeAt(n)) {
+			case 34:
+				o = "&quot;";
+				break;
+			case 38:
+				o = "&amp;";
+				break;
+			case 60:
+				o = "&lt;";
+				break;
+			default: continue;
+		}
+		n !== t && (r += e.slice(t, n)), r += o, t = n + 1;
+	}
+	return n !== t && (r += e.slice(t, n)), r;
+}
+var b = {};
+var x = /* @__PURE__ */ new Set([
+	"animation-iteration-count",
+	"border-image-outset",
+	"border-image-slice",
+	"border-image-width",
+	"box-flex",
+	"box-flex-group",
+	"box-ordinal-group",
+	"column-count",
+	"fill-opacity",
+	"flex",
+	"flex-grow",
+	"flex-negative",
+	"flex-order",
+	"flex-positive",
+	"flex-shrink",
+	"flood-opacity",
+	"font-weight",
+	"grid-column",
+	"grid-row",
+	"line-clamp",
+	"line-height",
+	"opacity",
+	"order",
+	"orphans",
+	"stop-opacity",
+	"stroke-dasharray",
+	"stroke-dashoffset",
+	"stroke-miterlimit",
+	"stroke-opacity",
+	"stroke-width",
+	"tab-size",
+	"widows",
+	"z-index",
+	"zoom"
+]);
+var k = /[A-Z]/g;
+function w(e) {
+	var t = "";
+	for (var n in e) {
+		var r = e[n];
+		if (null != r && "" !== r) {
+			var o = "-" == n[0] ? n : b[n] || (b[n] = n.replace(k, "-$&").toLowerCase()), i = ";";
+			"number" != typeof r || o.startsWith("--") || x.has(o) || (i = "px;"), t = t + o + ":" + r + i;
+		}
+	}
+	return t || void 0;
+}
+function C() {
+	this.__d = !0;
+}
+function A(e, t) {
+	return {
+		__v: e,
+		context: t,
+		props: e.props,
+		setState: C,
+		forceUpdate: C,
+		__d: !0,
+		__h: new Array(0)
+	};
+}
+var D;
+var P;
+var $;
+var U;
+var F = {};
+var M = [];
+var W = Array.isArray;
+var z = Object.assign;
+var H = "";
+var N = "<!--$s-->";
+var q = "<!--/$s-->";
+function B(e) {
+	return "string" == typeof e ? N + e + q : W(e) ? (e.unshift(N), e.push(q), e) : e && "function" == typeof e.then ? e.then(B) : N + e + q;
+}
+function I(a, u, s) {
+	var l = l$1[i$1];
+	l$1[i$1] = !0, D = l$1.__b, P = l$1[r], $ = l$1.__r, U = l$1.unmount;
+	var f = k$1(S, null);
+	f[c] = [a];
+	try {
+		var p = R(a, u || F, !1, void 0, f, !1, s);
+		return W(p) ? p.join(H) : p;
+	} catch (e) {
+		if (e.then) throw new Error("Use \"renderToStringAsync\" for suspenseful rendering.");
+		throw e;
+	} finally {
+		l$1[o] && l$1[o](a, M), l$1[i$1] = l, M.length = 0;
+	}
+}
+function O(e, t) {
+	var n, r = e.type, o = !0;
+	return e[a] ? (o = !1, (n = e[a]).state = n[s]) : n = new r(e.props, t), e[a] = n, n.__v = e, n.props = e.props, n.context = t, v(n), n.state ?? (n.state = F), n[s] ?? (n[s] = n.state), r.getDerivedStateFromProps ? n.state = z({}, n.state, r.getDerivedStateFromProps(n.props, n.state)) : o && n.componentWillMount ? (n.componentWillMount(), n.state = n[s] !== n.state ? n[s] : n.state) : !o && n.componentWillUpdate && n.componentWillUpdate(), $ && $(e), n.render(n.props, n.state, t);
+}
+function R(t, r, o, i, u, _, b) {
+	if (null == t || !0 === t || !1 === t || t === H) return H;
+	var x = typeof t;
+	if ("object" != x) return "function" == x ? H : "string" == x ? g(t) : t + H;
+	if (W(t)) {
+		var k, C = H;
+		u[c] = t;
+		for (var S$2 = t.length, L = 0; L < S$2; L++) {
+			var E = t[L];
+			if (null != E && "boolean" != typeof E) {
+				var j, T = R(E, r, o, i, u, _, b);
+				"string" == typeof T ? C += T : (k || (k = new Array(S$2)), C && k.push(C), C = H, W(T) ? (j = k).push.apply(j, T) : k.push(T));
+			}
+		}
+		return k ? (C && k.push(C), k) : C;
+	}
+	if (void 0 !== t.constructor) return H;
+	t.__ = u, D && D(t);
+	var Z = t.type, M = t.props;
+	if ("function" == typeof Z) {
+		var N, q, I, K = r;
+		if (Z === S) {
+			if ("tpl" in M) {
+				for (var G = H, Q = 0; Q < M.tpl.length; Q++) if (G += M.tpl[Q], M.exprs && Q < M.exprs.length) {
+					var X = M.exprs[Q];
+					if (null == X) continue;
+					"object" != typeof X || void 0 !== X.constructor && !W(X) ? G += X : G += R(X, r, o, i, t, _, b);
+				}
+				return G;
+			}
+			if ("UNSTABLE_comment" in M) return "<!--" + g(M.UNSTABLE_comment) + "-->";
+			q = M.children;
+		} else {
+			if (null != (N = Z.contextType)) {
+				var Y = r[N.__c];
+				K = Y ? Y.props.value : N.__;
+			}
+			var ee = Z.prototype && "function" == typeof Z.prototype.render;
+			if (ee) q = O(t, K), I = t[a];
+			else {
+				t[a] = I = A(t, K);
+				for (var te = 0; y(I) && te++ < 25;) {
+					m(I), $ && $(t);
+					try {
+						q = Z.call(I, M, K);
+					} catch (e) {
+						throw _ && e && "function" == typeof e.then && (t._suspended = !0), e;
+					}
+				}
+				v(I);
+			}
+			if (null != I.getChildContext && (r = z({}, r, I.getChildContext())), ee && l$1.errorBoundaries && (Z.getDerivedStateFromError || I.componentDidCatch)) {
+				q = null != q && q.type === S && null == q.key && null == q.props.tpl ? q.props.children : q;
+				try {
+					return R(q, r, o, i, t, _, !1);
+				} catch (e) {
+					return Z.getDerivedStateFromError && (I[s] = Z.getDerivedStateFromError(e)), I.componentDidCatch && I.componentDidCatch(e, F), y(I) ? (q = O(t, r), null != (I = t[a]).getChildContext && (r = z({}, r, I.getChildContext())), R(q = null != q && q.type === S && null == q.key && null == q.props.tpl ? q.props.children : q, r, o, i, t, _, b)) : H;
+				} finally {
+					P && P(t), U && U(t);
+				}
+			}
+		}
+		q = null != q && q.type === S && null == q.key && null == q.props.tpl ? q.props.children : q;
+		try {
+			var ne = R(q, r, o, i, t, _, b);
+			return P && P(t), l$1.unmount && l$1.unmount(t), t._suspended ? B(ne) : ne;
+		} catch (n) {
+			if (!_ && b && b.onError) {
+				var re = function e(n) {
+					return b.onError(n, t, function(t, n) {
+						try {
+							return R(t, r, o, i, n, _, b);
+						} catch (t) {
+							return e(t);
+						}
+					});
+				}(n);
+				if (void 0 !== re) return re;
+				var oe = l$1.__e;
+				return oe && oe(n, t), H;
+			}
+			if (!_) throw n;
+			if (!n || "function" != typeof n.then) throw n;
+			return n.then(function e() {
+				try {
+					var n = R(q, r, o, i, t, _, b);
+					return t._suspended ? B(n) : n;
+				} catch (t) {
+					if (!t || "function" != typeof t.then) throw t;
+					return t.then(e);
+				}
+			});
+		}
+	}
+	var ie, ae = "<" + Z, ce = H;
+	for (var ue in M) {
+		var se = M[ue];
+		if ("function" != typeof (se = J(se) ? se.value : se) || "class" === ue || "className" === ue) {
+			switch (ue) {
+				case "children":
+					ie = se;
+					continue;
+				case "key":
+				case "ref":
+				case "__self":
+				case "__source": continue;
+				case "htmlFor":
+					if ("for" in M) continue;
+					ue = "for";
+					break;
+				case "className":
+					if ("class" in M) continue;
+					ue = "class";
+					break;
+				case "defaultChecked":
+					ue = "checked";
+					break;
+				case "defaultSelected":
+					ue = "selected";
+					break;
+				case "defaultValue":
+				case "value":
+					switch (ue = "value", Z) {
+						case "textarea":
+							ie = se;
+							continue;
+						case "select":
+							i = se;
+							continue;
+						case "option": i != se || "selected" in M || (ae += " selected");
+					}
+					break;
+				case "dangerouslySetInnerHTML":
+					ce = se && se.__html;
+					continue;
+				case "style":
+					"object" == typeof se && (se = w(se));
+					break;
+				case "acceptCharset":
+					ue = "accept-charset";
+					break;
+				case "httpEquiv":
+					ue = "http-equiv";
+					break;
+				default:
+					if (l.test(ue)) continue;
+					f$1.test(ue) ? ue = ue.replace(f$1, "$1:$2").toLowerCase() : "-" !== ue[4] && !d.has(ue) || null == se ? o ? h.test(ue) && (ue = "panose1" === ue ? "panose-1" : ue.replace(/([A-Z])/g, "-$1").toLowerCase()) : p.test(ue) && (ue = ue.toLowerCase()) : se += H;
+			}
+			null != se && !1 !== se && (ae = !0 === se || se === H ? ae + " " + ue : ae + " " + ue + "=\"" + ("string" == typeof se ? g(se) : se + H) + "\"");
+		}
+	}
+	if (l.test(Z)) throw new Error(Z + " is not a valid HTML tag name in " + ae + ">");
+	if (ce || ("string" == typeof ie ? ce = g(ie) : null != ie && !1 !== ie && !0 !== ie && (ce = R(ie, r, "svg" === Z || "foreignObject" !== Z && o, i, t, _, b))), P && P(t), U && U(t), !ce && V.has(Z)) return ae + "/>";
+	var le = "</" + Z + ">", fe = ae + ">";
+	return W(ce) ? [fe].concat(ce, [le]) : "string" != typeof ce ? [
+		fe,
+		ce,
+		le
+	] : fe + ce + le;
+}
+var V = /* @__PURE__ */ new Set([
+	"area",
+	"base",
+	"br",
+	"col",
+	"command",
+	"embed",
+	"hr",
+	"img",
+	"input",
+	"keygen",
+	"link",
+	"meta",
+	"param",
+	"source",
+	"track",
+	"wbr"
+]);
+var K = I;
+function J(e) {
+	return null !== e && "object" == typeof e && "function" == typeof e.peek && "value" in e;
+}
+//#endregion
+//#region ../../node_modules/.pnpm/preact@10.29.8_preact-render-to-string@6.7.0/node_modules/preact/jsx-runtime/dist/jsxRuntime.module.js
+var f = 0;
 Array.isArray;
-Array.isArray;
+function u(e, t, n, o, i, u) {
+	t || (t = {});
+	var a, c, p = t;
+	if ("ref" in p) for (c in p = {}, t) "ref" == c ? a = t[c] : p[c] = t[c];
+	var l = {
+		type: e,
+		props: p,
+		key: n,
+		ref: a,
+		__k: null,
+		__: null,
+		__b: 0,
+		__e: null,
+		__c: null,
+		constructor: void 0,
+		__v: --f,
+		__i: -1,
+		__u: 0,
+		__source: i,
+		__self: u
+	};
+	if ("function" == typeof e && (a = e.defaultProps)) for (c in a) void 0 === p[c] && (p[c] = a[c]);
+	return l$1.vnode && l$1.vnode(l), l;
+}
+//#endregion
+//#region ../render/src/encres.ts
+/**
+* Les quatre encres des documents.
+*
+* Des aplats, jamais de dégradé : ça divise par trois le poids du PNG partagé
+* (invariant § 2.6). Ces valeurs vivront dans `packages/ui` le jour où ce
+* paquet aura une raison d'exister — c'est-à-dire quand il portera l'i18n et
+* les composants partagés. Quatre couleurs ne justifient pas un paquet.
+*/
+var ENCRES = {
+	encre: {
+		hex: "#1F2A44",
+		nom: "Encre"
+	},
+	bordeaux: {
+		hex: "#6E1F2B",
+		nom: "Bordeaux"
+	},
+	foret: {
+		hex: "#1B4D3E",
+		nom: "Forêt"
+	},
+	ardoise: {
+		hex: "#39434A",
+		nom: "Ardoise"
+	}
+};
+function hexEncre(e) {
+	return ENCRES[e].hex;
+}
+//#endregion
+//#region ../render/src/doc/chrome.tsx
+/**
+* Les pièces communes aux documents A4.
+*
+* Rien n'est injecté en HTML : tout passe par des enfants JSX, que Preact
+* échappe. C'est l'invariant § 2.1 tenu à l'endroit où il compte — le rendu.
+* Un test vérifie qu'aucune source de ce paquet n'appelle
+* `dangerouslySetInnerHTML`.
+*/
+/** Une feuille A4 à la taille vraie. L'aperçu est mis à l'échelle par le CSS. */
+function PageA4(props) {
+	return /* @__PURE__ */ u("div", {
+		class: "a4-cadre",
+		children: /* @__PURE__ */ u("article", {
+			class: "a4",
+			style: { "--pa": hexEncre(props.encre) },
+			children: props.children
+		})
+	});
+}
+/** Ne rend une ligne que si elle porte quelque chose. */
+function Lignes(props) {
+	return /* @__PURE__ */ u(S, { children: props.valeurs.filter((v) => v !== null && v.trim() !== "").map((v, i) => /* @__PURE__ */ u("div", { children: v }, `${i}-${v}`)) });
+}
+/**
+* L'entête légal. Il porte les mentions de la section 5 du brief : raison
+* sociale, forme juridique, activité, adresse, RCCM, NIU et centre des impôts.
+* Un champ vide ne laisse pas une étiquette orpheline.
+*/
+function Entete(props) {
+	const e = props.emetteur;
+	return /* @__PURE__ */ u("header", {
+		class: "a4-entete",
+		children: [/* @__PURE__ */ u("div", { children: [/* @__PURE__ */ u("div", {
+			class: "raison",
+			children: e.nom
+		}), /* @__PURE__ */ u("div", {
+			class: "coordonnees",
+			children: /* @__PURE__ */ u(Lignes, { valeurs: [
+				e.activite,
+				e.adresse,
+				[e.tel && `Tél. ${e.tel}`, e.mail].filter(Boolean).join(" · ") || null
+			] })
+		})] }), /* @__PURE__ */ u("div", {
+			class: "immat",
+			children: /* @__PURE__ */ u(Lignes, { valeurs: [
+				e.forme,
+				e.rccm && `RCCM ${e.rccm}`,
+				e.niu && `NIU ${e.niu}`,
+				e.centre
+			] })
+		})]
+	});
+}
+function TitreDocument(props) {
+	return /* @__PURE__ */ u(S, { children: [/* @__PURE__ */ u("h1", {
+		class: "a4-titre",
+		children: props.titre
+	}), /* @__PURE__ */ u("div", {
+		class: "a4-sous-titre",
+		children: props.sousTitre
+	})] });
+}
+/**
+* Le bloc destinataire. Le NIU du client y figure dès qu'on l'a : en B2B il est
+* obligatoire, et sans lui le client ne peut pas déduire.
+*/
+function BlocClient(props) {
+	return /* @__PURE__ */ u("section", {
+		class: "a4-bloc-client",
+		children: [
+			/* @__PURE__ */ u("div", {
+				class: "etiquette",
+				children: "Client"
+			}),
+			/* @__PURE__ */ u("div", { children: /* @__PURE__ */ u("strong", { children: props.nom }) }),
+			/* @__PURE__ */ u(Lignes, { valeurs: [props.niu && `NIU ${props.niu}`, props.complement] })
+		]
+	});
+}
+function ZonesSignature(props) {
+	return /* @__PURE__ */ u("section", {
+		class: "a4-signatures",
+		children: props.zones.map((z) => /* @__PURE__ */ u("div", {
+			class: "zone",
+			children: [
+				/* @__PURE__ */ u("div", {
+					class: "libelle",
+					children: z.libelle
+				}),
+				z.mention !== void 0 && /* @__PURE__ */ u("div", {
+					class: "mention",
+					children: z.mention
+				}),
+				/* @__PURE__ */ u("div", { class: "cadre" })
+			]
+		}, z.libelle))
+	});
+}
+/** Le pied légal, obligatoire, plus d'éventuelles mentions propres au document. */
+function PiedLegal(props) {
+	return /* @__PURE__ */ u("footer", {
+		class: "a4-pied",
+		children: [/* @__PURE__ */ u("div", { children: piedLegal(props.emetteur) }), props.complement !== void 0 && /* @__PURE__ */ u("div", { children: props.complement })]
+	});
+}
+function NumeroPage(props) {
+	return /* @__PURE__ */ u("div", {
+		class: "a4-numero-page",
+		children: [
+			props.page,
+			"/",
+			props.total
+		]
+	});
+}
+/** Un texte libre découpé en paragraphes sur les lignes vides. Jamais de HTML. */
+function Paragraphes(props) {
+	return /* @__PURE__ */ u(S, { children: props.texte.split(/\n\s*\n/).map((b) => b.trim()).filter((b) => b !== "").map((b, i) => /* @__PURE__ */ u("p", { children: b }, `${i}-${b.slice(0, 12)}`)) });
+}
+//#endregion
+//#region ../render/src/doc/tableau.tsx
+/**
+* Le tableau des lignes, **avec la TVA colonne par colonne**.
+*
+* La section 5 du brief l'exige : « TVA 19,25 %, indiquée ligne par ligne, puis
+* en bloc HT / TVA / TTC ». Le prototype n'affichait que le bloc. Un contrôleur
+* doit pouvoir recalculer chaque ligne au stylo et retomber sur le total — d'où
+* aussi la règle d'arrondi du moteur, qui arrondit à la ligne avant de sommer.
+*/
+function TableauLignes(props) {
+	if (props.totaux.lignes.length === 0) return /* @__PURE__ */ u("div", {
+		class: "a4-vide",
+		children: "Aucune ligne pour l’instant."
+	});
+	return /* @__PURE__ */ u("table", {
+		class: "a4-tableau",
+		children: [/* @__PURE__ */ u("thead", { children: /* @__PURE__ */ u("tr", { children: [
+			/* @__PURE__ */ u("th", { children: "Désignation" }),
+			/* @__PURE__ */ u("th", {
+				class: "nombre",
+				children: "Qté"
+			}),
+			/* @__PURE__ */ u("th", {
+				class: "nombre",
+				children: "P.U. HT"
+			}),
+			/* @__PURE__ */ u("th", {
+				class: "nombre",
+				children: "Montant HT"
+			}),
+			/* @__PURE__ */ u("th", {
+				class: "nombre",
+				children: LIBELLE_TVA_CM
+			}),
+			/* @__PURE__ */ u("th", {
+				class: "nombre",
+				children: "Montant TTC"
+			})
+		] }) }), /* @__PURE__ */ u("tbody", { children: props.totaux.lignes.map((l, i) => /* @__PURE__ */ u("tr", { children: [
+			/* @__PURE__ */ u("td", { children: l.designation }),
+			/* @__PURE__ */ u("td", {
+				class: "nombre",
+				children: nf(l.quantite)
+			}),
+			/* @__PURE__ */ u("td", {
+				class: "nombre",
+				children: nf(l.prixUnitaire)
+			}),
+			/* @__PURE__ */ u("td", {
+				class: "nombre",
+				children: nf(l.montantHT)
+			}),
+			/* @__PURE__ */ u("td", {
+				class: "nombre",
+				children: nf(l.tva)
+			}),
+			/* @__PURE__ */ u("td", {
+				class: "nombre",
+				children: nf(l.montantTTC)
+			})
+		] }, `${i}-${l.designation}`)) })]
+	});
+}
+/** Le bloc HT / TVA / TTC, plus ce que le document ajoute au-dessous. */
+function BlocTotaux(props) {
+	return /* @__PURE__ */ u("section", {
+		class: "a4-totaux",
+		children: props.lignes.map((l) => /* @__PURE__ */ u("div", {
+			class: l.fort === true ? "ligne fort" : "ligne",
+			children: [/* @__PURE__ */ u("span", { children: l.libelle }), /* @__PURE__ */ u("span", { children: montantF(l.montant) })]
+		}, l.libelle))
+	});
+}
+//#endregion
+//#region ../render/src/doc/actes.tsx
+/**
+* Les quatre actes et lettres, sur A4.
+*
+* Rien n'est redessiné : tout se monte sur les pièces de `chrome.tsx`, déjà
+* testées et déjà stylées par `a4.css`. Ce qui change d'un document à l'autre,
+* c'est l'ordre des pièces et ce qu'on met dedans — pas le papier.
+*
+* Deux d'entre eux portent l'entête légal de l'entreprise, deux ne le portent
+* pas. Ce n'est pas un oubli : un RCCM au-dessus d'une lettre de motivation
+* serait une faute de registre, et un juge qui lit une reconnaissance de dette
+* cherche deux personnes, pas une société.
+*/
+function DocumentAttestation(props) {
+	const etat = props.etat;
+	return /* @__PURE__ */ u(PageA4, {
+		encre: etat.encre,
+		children: [
+			/* @__PURE__ */ u(Entete, { emetteur: etat.emetteur }),
+			/* @__PURE__ */ u(TitreDocument, {
+				titre: etat.objet === "" ? "Attestation" : etat.objet,
+				sousTitre: `N° ${etat.numero}`
+			}),
+			/* @__PURE__ */ u("section", {
+				class: "a4-mentions a4-corps",
+				children: etat.texte.trim() === "" ? /* @__PURE__ */ u("div", {
+					class: "a4-vide",
+					children: "Le corps de l’attestation reste à écrire."
+				}) : /* @__PURE__ */ u(Paragraphes, { texte: etat.texte })
+			}),
+			/* @__PURE__ */ u(ZonesSignature, { zones: [{
+				libelle: `${etat.emetteur.adresse === "" ? "Fait" : "Fait à " + villeDe(etat.emetteur.adresse)}, le ${dateLongue(dateEmission(etat))}`,
+				mention: "Le responsable — cachet et signature"
+			}] }),
+			/* @__PURE__ */ u(PiedLegal, { emetteur: etat.emetteur }),
+			/* @__PURE__ */ u(NumeroPage, {
+				page: 1,
+				total: 1
+			})
+		]
+	});
+}
+/**
+* La ville, tirée de l'adresse.
+*
+* Approximatif et assumé : on prend le dernier mot, qui est la ville dans
+* « Rue Bépanda-Omnisport, BP 4127 Douala ». Se tromper met un mot de travers
+* sur une ligne de date ; demander une ville de plus dans le formulaire coûte
+* un champ à tout le monde pour une ligne que personne ne relit.
+*/
+function villeDe(adresse) {
+	const mots = adresse.trim().split(/[\s,]+/).filter((m) => m !== "");
+	return mots[mots.length - 1] ?? "";
+}
+function DocumentRecu(props) {
+	const etat = props.etat;
+	const t = totauxRecu(etat);
+	return /* @__PURE__ */ u(PageA4, {
+		encre: etat.encre,
+		children: [
+			/* @__PURE__ */ u(Entete, { emetteur: etat.emetteur }),
+			/* @__PURE__ */ u(TitreDocument, {
+				titre: "Reçu",
+				sousTitre: `N° ${etat.numero} · ${dateLongue(dateEmission(etat))}`
+			}),
+			/* @__PURE__ */ u("section", {
+				class: "a4-bloc-client",
+				children: [/* @__PURE__ */ u("div", {
+					class: "etiquette",
+					children: "Reçu de"
+				}), /* @__PURE__ */ u("div", { children: /* @__PURE__ */ u("strong", { children: etat.recuDe }) })]
+			}),
+			etat.lignes.length === 0 ? /* @__PURE__ */ u("div", {
+				class: "a4-vide",
+				children: "Aucune ligne pour l’instant."
+			}) : /* @__PURE__ */ u("table", {
+				class: "a4-tableau",
+				children: [/* @__PURE__ */ u("thead", { children: /* @__PURE__ */ u("tr", { children: [/* @__PURE__ */ u("th", { children: "Désignation" }), /* @__PURE__ */ u("th", {
+					class: "nombre",
+					children: "Montant"
+				})] }) }), /* @__PURE__ */ u("tbody", { children: etat.lignes.map((l, i) => /* @__PURE__ */ u("tr", { children: [/* @__PURE__ */ u("td", { children: l.designation }), /* @__PURE__ */ u("td", {
+					class: "nombre",
+					children: nf(l.montant)
+				})] }, `${i}-${l.designation}`)) })]
+			}),
+			/* @__PURE__ */ u(BlocTotaux, { lignes: [
+				{
+					libelle: "Total",
+					montant: t.total
+				},
+				{
+					libelle: "Somme reçue ce jour",
+					montant: t.avance
+				},
+				{
+					libelle: "Reste à payer",
+					montant: t.reste,
+					fort: true
+				}
+			] }),
+			/* @__PURE__ */ u("div", {
+				class: "a4-en-lettres",
+				children: [
+					"Somme reçue ce jour : ",
+					montantEnLettres(t.avance),
+					"."
+				]
+			}),
+			/* @__PURE__ */ u(ZonesSignature, { zones: [{
+				libelle: "Cachet et signature",
+				mention: ""
+			}] }),
+			/* @__PURE__ */ u(PiedLegal, {
+				emetteur: etat.emetteur,
+				complement: "Reçu établi en francs CFA. Il atteste d’un paiement reçu, il ne remplace pas la facture."
+			}),
+			/* @__PURE__ */ u(NumeroPage, {
+				page: 1,
+				total: 1
+			})
+		]
+	});
+}
+function DocumentDette(props) {
+	const etat = props.etat;
+	return /* @__PURE__ */ u(PageA4, {
+		encre: etat.encre,
+		children: [
+			/* @__PURE__ */ u(TitreDocument, {
+				titre: "Reconnaissance de dette",
+				sousTitre: `Acte sous seing privé · ${dateLongue(dateEmission(etat))}`
+			}),
+			/* @__PURE__ */ u("section", {
+				class: "a4-parties",
+				children: [/* @__PURE__ */ u("div", { children: [
+					/* @__PURE__ */ u("span", {
+						class: "qui",
+						children: "L’emprunteur"
+					}),
+					" ",
+					etat.emprunteur.nom,
+					etat.emprunteur.piece === "" ? "" : `, ${etat.emprunteur.piece}`
+				] }), /* @__PURE__ */ u("div", { children: [
+					/* @__PURE__ */ u("span", {
+						class: "qui",
+						children: "Le prêteur"
+					}),
+					" ",
+					etat.preteur.nom,
+					etat.preteur.piece === "" ? "" : `, ${etat.preteur.piece}`
+				] })]
+			}),
+			/* @__PURE__ */ u("section", {
+				class: "a4-mentions a4-corps",
+				children: /* @__PURE__ */ u(Paragraphes, { texte: etat.texte })
+			}),
+			/* @__PURE__ */ u("section", {
+				class: "a4-encadre",
+				children: [
+					/* @__PURE__ */ u("div", {
+						class: "etiquette",
+						children: "Montant du prêt"
+					}),
+					/* @__PURE__ */ u("div", {
+						class: "chiffre",
+						children: montantF(etat.montant)
+					}),
+					/* @__PURE__ */ u("div", {
+						class: "lettres",
+						children: [
+							"Soit ",
+							montantEnLettres(etat.montant),
+							"."
+						]
+					}),
+					etat.echeance === "" ? null : /* @__PURE__ */ u("div", {
+						class: "echeance",
+						children: ["Échéance de remboursement : ", /* @__PURE__ */ u("strong", { children: etat.echeance })]
+					})
+				]
+			}),
+			/* @__PURE__ */ u(ZonesSignature, { zones: [{
+				libelle: "L’emprunteur",
+				mention: "« Lu et approuvé », date et signature"
+			}, {
+				libelle: "Le prêteur",
+				mention: "Date et signature"
+			}] }),
+			/* @__PURE__ */ u("footer", {
+				class: "a4-pied",
+				children: [/* @__PURE__ */ u("div", { children: [
+					etat.lieu === "" ? "Fait" : `Fait à ${etat.lieu}`,
+					" le",
+					" ",
+					dateLongue(dateEmission(etat)),
+					", en deux exemplaires originaux, dont un remis à chaque partie."
+				] }), /* @__PURE__ */ u("div", { children: "Acte sous seing privé. Pour un montant important, l’enregistrement auprès des impôts est conseillé." })]
+			}),
+			/* @__PURE__ */ u(NumeroPage, {
+				page: 1,
+				total: 1
+			})
+		]
+	});
+}
+function DocumentMotivation(props) {
+	const etat = props.etat;
+	const e = etat.expediteur;
+	return /* @__PURE__ */ u(PageA4, {
+		encre: etat.encre,
+		children: [
+			/* @__PURE__ */ u("section", {
+				class: "a4-lettre-tete",
+				children: [/* @__PURE__ */ u("div", {
+					class: "expediteur",
+					children: [/* @__PURE__ */ u("strong", { children: e.nom }), [
+						e.tel,
+						e.mail,
+						e.ville
+					].filter((s) => s !== "").map((s) => /* @__PURE__ */ u("div", { children: s }, s))]
+				}), /* @__PURE__ */ u("div", {
+					class: "destinataire",
+					children: etat.destinataire.split("\n").filter((l) => l.trim() !== "").map((l, i) => /* @__PURE__ */ u("div", { children: l }, `${i}-${l}`))
+				})]
+			}),
+			/* @__PURE__ */ u("div", {
+				class: "a4-lettre-date",
+				children: [e.ville === "" ? "" : `${e.ville}, le `, dateLongue(dateEmission(etat))]
+			}),
+			/* @__PURE__ */ u("div", {
+				class: "a4-lettre-objet",
+				children: etat.objet
+			}),
+			/* @__PURE__ */ u("section", {
+				class: "a4-mentions a4-corps",
+				children: etat.corps.trim() === "" ? /* @__PURE__ */ u("div", {
+					class: "a4-vide",
+					children: "Le corps de la lettre reste à écrire."
+				}) : /* @__PURE__ */ u(Paragraphes, { texte: etat.corps })
+			}),
+			/* @__PURE__ */ u("div", {
+				class: "a4-lettre-signature",
+				children: e.nom
+			}),
+			/* @__PURE__ */ u(NumeroPage, {
+				page: 1,
+				total: 1
+			})
+		]
+	});
+}
+//#endregion
+//#region ../render/src/doc/cv.tsx
+/**
+* Le CV sur A4, en quatre gabarits.
+*
+* Quatre mises en page pour un seul contenu : c'est le seul document de
+* l'atelier où la forme est l'enjeu. Une facture se lit parce qu'il le faut ;
+* un CV se lit parce qu'il donne envie, et un magasinier qui postule à la
+* mairie n'envoie pas la même feuille qu'un graphiste qui postule en agence.
+*
+* Aucun n'emprunte à `chrome.tsx` autre chose que la feuille et le numéro de
+* page : l'entête légal, le bloc client et les zones de signature n'ont rien à
+* faire ici.
+*
+* Aucun ne réserve de place pour une photo. Le prototype dessinait un carré
+* portant le mot « photo » : à l'écran c'est une intention, à l'impression
+* c'est un carré vide marqué « photo » sur la feuille qu'on tend à un
+* employeur. Tant que l'atelier ne sait pas stocker une image, il vaut mieux
+* ne rien promettre.
+*/
+/** Les puces d'un poste. Une ligne vide ne laisse pas de puce orpheline. */
+function Faits(props) {
+	return /* @__PURE__ */ u(S, { children: props.points.filter((p) => p.trim() !== "").map((p, i) => /* @__PURE__ */ u("div", {
+		class: "cv-fait",
+		children: p
+	}, `${i}-${p.slice(0, 12)}`)) });
+}
+/**
+* La date d'une entrée : en marge dans le gabarit éditorial, sur la même ligne
+* que l'employeur partout ailleurs.
+*
+* C'est la seule différence de structure entre les gabarits en dehors de la
+* bande latérale du gabarit « bloc ». Mettre l'employeur en marge avec la date,
+* comme on l'a d'abord fait, y produit un pavé ferré à droite sur trois lignes
+* en face d'un titre d'une seule.
+*/
+function Marge(props) {
+	if (!props.enMarge || props.quand.trim() === "") return null;
+	return /* @__PURE__ */ u("div", {
+		class: "cv-marge",
+		children: props.quand
+	});
+}
+function ligneOu(qui, quand, enMarge, separateur) {
+	return [qui, enMarge ? "" : quand].filter((s) => s.trim() !== "").join(` ${separateur} `);
+}
+function Diplomes(props) {
+	return /* @__PURE__ */ u(S, { children: props.diplomes.map((d, i) => /* @__PURE__ */ u("div", {
+		class: "cv-item",
+		children: [
+			/* @__PURE__ */ u(Marge, {
+				quand: d.annee,
+				enMarge: props.enMarge
+			}),
+			/* @__PURE__ */ u("div", {
+				class: "cv-quoi",
+				children: d.intitule
+			}),
+			/* @__PURE__ */ u("div", {
+				class: "cv-ou",
+				children: ligneOu(d.etablissement, d.annee, props.enMarge, props.separateur)
+			})
+		]
+	}, `${i}-${d.intitule}`)) });
+}
+function Postes(props) {
+	return /* @__PURE__ */ u(S, { children: props.postes.map((p, i) => /* @__PURE__ */ u("div", {
+		class: "cv-item",
+		children: [
+			/* @__PURE__ */ u(Marge, {
+				quand: p.periode,
+				enMarge: props.enMarge
+			}),
+			/* @__PURE__ */ u("div", {
+				class: "cv-quoi",
+				children: p.intitule
+			}),
+			/* @__PURE__ */ u("div", {
+				class: "cv-ou",
+				children: ligneOu(p.employeur, p.periode, props.enMarge, props.separateur)
+			}),
+			/* @__PURE__ */ u(Faits, { points: p.points })
+		]
+	}, `${i}-${p.intitule}`)) });
+}
+/** Le titre d'une section. Rien ne s'affiche si la section est vide. */
+function Section(props) {
+	if (props.vide) return null;
+	return /* @__PURE__ */ u(S, { children: [/* @__PURE__ */ u("h4", {
+		class: "cv-section",
+		children: props.titre
+	}), props.children] });
+}
+/** Le profil, écrit en paragraphes comme partout ailleurs dans l'atelier. */
+function Profil(props) {
+	if (props.texte.trim() === "") return null;
+	return /* @__PURE__ */ u(S, { children: [/* @__PURE__ */ u("h4", {
+		class: "cv-section",
+		children: props.titre
+	}), /* @__PURE__ */ u("div", {
+		class: "cv-profil",
+		children: /* @__PURE__ */ u(Paragraphes, { texte: props.texte })
+	})] });
+}
+function Contact(props) {
+	return /* @__PURE__ */ u("div", {
+		class: "cv-contact",
+		children: [
+			props.id.tel,
+			props.id.mail,
+			props.id.ville
+		].filter((s) => s.trim() !== "").join(" · ")
+	});
+}
+function motsDe(langue) {
+	return INTITULES[langue];
+}
+function DocumentCv(props) {
+	const etat = props.etat;
+	const t = motsDe(etat.langue);
+	const id = etat.identite;
+	const classes = `a4-cv ${etat.gabarit}${etat.dense ? " dense" : ""}`;
+	const enMarge = etat.gabarit === "editorial";
+	const separateur = etat.gabarit === "notaire" ? "—" : "·";
+	const experience = /* @__PURE__ */ u(Section, {
+		titre: t.experience,
+		vide: etat.postes.length === 0,
+		children: /* @__PURE__ */ u(Postes, {
+			postes: etat.postes,
+			enMarge,
+			separateur
+		})
+	});
+	const formation = /* @__PURE__ */ u(Section, {
+		titre: t.formation,
+		vide: etat.diplomes.length === 0,
+		children: /* @__PURE__ */ u(Diplomes, {
+			diplomes: etat.diplomes,
+			enMarge,
+			separateur
+		})
+	});
+	if (etat.gabarit === "bloc") return /* @__PURE__ */ u(PageA4, {
+		encre: etat.encre,
+		children: [/* @__PURE__ */ u("div", {
+			class: classes,
+			children: [/* @__PURE__ */ u("aside", {
+				class: "cv-bande",
+				children: [
+					/* @__PURE__ */ u("div", {
+						class: "cv-nom",
+						children: id.nom
+					}),
+					/* @__PURE__ */ u("div", {
+						class: "cv-titre",
+						children: id.titre
+					}),
+					/* @__PURE__ */ u(Section, {
+						titre: t.contact,
+						vide: false,
+						children: /* @__PURE__ */ u(S, { children: [
+							id.tel,
+							id.mail,
+							id.ville
+						].filter((s) => s.trim() !== "").map((s) => /* @__PURE__ */ u("div", {
+							class: "cv-ligne",
+							children: s
+						}, s)) })
+					}),
+					/* @__PURE__ */ u(Section, {
+						titre: t.competences,
+						vide: etat.competences.length === 0,
+						children: /* @__PURE__ */ u(S, { children: etat.competences.map((c) => /* @__PURE__ */ u("div", {
+							class: "cv-ligne",
+							children: c
+						}, c)) })
+					}),
+					/* @__PURE__ */ u(Section, {
+						titre: t.langues,
+						vide: etat.langues.length === 0,
+						children: /* @__PURE__ */ u(S, { children: etat.langues.map((l) => /* @__PURE__ */ u("div", {
+							class: "cv-ligne",
+							children: l
+						}, l)) })
+					})
+				]
+			}), /* @__PURE__ */ u("div", {
+				class: "cv-principal",
+				children: [
+					/* @__PURE__ */ u(Profil, {
+						texte: etat.resume,
+						titre: t.profil
+					}),
+					experience,
+					formation
+				]
+			})]
+		}), /* @__PURE__ */ u(NumeroPage, {
+			page: 1,
+			total: 1
+		})]
+	});
+	return /* @__PURE__ */ u(PageA4, {
+		encre: etat.encre,
+		children: [/* @__PURE__ */ u("div", {
+			class: classes,
+			children: [
+				/* @__PURE__ */ u("header", {
+					class: "cv-tete",
+					children: [
+						/* @__PURE__ */ u("div", {
+							class: "cv-nom",
+							children: id.nom
+						}),
+						/* @__PURE__ */ u("div", {
+							class: "cv-titre",
+							children: id.titre
+						}),
+						/* @__PURE__ */ u(Contact, { id })
+					]
+				}),
+				/* @__PURE__ */ u(Profil, {
+					texte: etat.resume,
+					titre: t.profil
+				}),
+				experience,
+				formation,
+				/* @__PURE__ */ u(Section, {
+					titre: t.competences,
+					vide: etat.competences.length === 0,
+					children: /* @__PURE__ */ u("div", {
+						class: "cv-serie",
+						children: etat.competences.join(" · ")
+					})
+				}),
+				/* @__PURE__ */ u(Section, {
+					titre: t.langues,
+					vide: etat.langues.length === 0,
+					children: /* @__PURE__ */ u("div", {
+						class: "cv-serie",
+						children: etat.langues.join(" · ")
+					})
+				})
+			]
+		}), /* @__PURE__ */ u(NumeroPage, {
+			page: 1,
+			total: 1
+		})]
+	});
+}
+//#endregion
+//#region ../render/src/doc/devis.tsx
+/**
+* Le devis, sur A4.
+*
+* Il propose : il porte une validité et un acompte demandé à la commande. Ce
+* qui engage fiscalement, c'est la facture — voir `facture.tsx`, qui partage
+* tout l'appareillage légal avec celui-ci.
+*/
+function DocumentDevis(props) {
+	const etat = props.etat;
+	const c = chiffrer(etat);
+	const totaux = [
+		{
+			libelle: "Sous-total HT",
+			montant: c.totalHT
+		},
+		{
+			libelle: LIBELLE_TVA_CM,
+			montant: c.totalTVA
+		},
+		{
+			libelle: "Total TTC",
+			montant: c.totalTTC,
+			fort: true
+		}
+	];
+	if (etat.acompte > 0) {
+		totaux.push({
+			libelle: `Acompte à la commande (${etat.acompte} %)`,
+			montant: c.acompteDu
+		});
+		totaux.push({
+			libelle: "Solde à la livraison",
+			montant: c.soldeDu
+		});
+	}
+	return /* @__PURE__ */ u(PageA4, {
+		encre: etat.encre,
+		children: [
+			/* @__PURE__ */ u(Entete, { emetteur: etat.emetteur }),
+			/* @__PURE__ */ u(TitreDocument, {
+				titre: "Devis",
+				sousTitre: `N° ${etat.numero} · émis le ${dateLongue(dateEmission(etat))}`
+			}),
+			/* @__PURE__ */ u(BlocClient, {
+				nom: etat.client.nom,
+				niu: etat.client.niu,
+				complement: etat.objet === void 0 ? null : `Objet : ${etat.objet}`
+			}),
+			/* @__PURE__ */ u(TableauLignes, { totaux: c }),
+			/* @__PURE__ */ u(BlocTotaux, { lignes: totaux }),
+			/* @__PURE__ */ u("div", {
+				class: "a4-en-lettres",
+				children: [
+					"Soit ",
+					montantEnLettres(c.totalTTC),
+					", toutes taxes comprises."
+				]
+			}),
+			/* @__PURE__ */ u("section", {
+				class: "a4-mentions",
+				children: [/* @__PURE__ */ u("p", { children: [
+					"Validité de la présente offre : ",
+					etat.validite,
+					" à compter de la date d’émission."
+				] }), etat.acompte > 0 && /* @__PURE__ */ u("p", { children: [
+					"Acompte de ",
+					etat.acompte,
+					" % à la commande, solde à la livraison."
+				] })]
+			}),
+			/* @__PURE__ */ u(ZonesSignature, { zones: [{
+				libelle: "Le fournisseur",
+				mention: "Cachet et signature"
+			}, {
+				libelle: "Bon pour accord — le client",
+				mention: "Date, signature et cachet"
+			}] }),
+			/* @__PURE__ */ u(PiedLegal, {
+				emetteur: etat.emetteur,
+				complement: "Devis établi en francs CFA. Numérotation unique, continue et chronologique."
+			}),
+			/* @__PURE__ */ u(NumeroPage, {
+				page: 1,
+				total: 1
+			})
+		]
+	});
+}
+//#endregion
+//#region ../render/src/doc/facture.tsx
+/**
+* La facture, sur A4.
+*
+* C'est le document que la DGI contrôle : entête complet, NIU de l'émetteur et
+* du client, TVA ligne par ligne puis en bloc, numérotation continue, pied
+* légal. Une facture envoyée par WhatsApp est valable si le PDF est complet
+* (BRIEF.md § 5) — d'où l'exigence que tout ce qui compte s'imprime ici.
+*
+* La date de rendu est passée en argument et non lue à l'horloge : le même
+* document doit sortir pareil sur le téléphone qui l'édite et sur le serveur
+* qui le rend.
+*/
+function DocumentFacture(props) {
+	const etat = props.etat;
+	const c = chiffrerFacture(etat);
+	const retard = joursDeRetard(etat, props.maintenant);
+	const echeance = dateLongue(dateEcheance(etat));
+	const complementClient = [etat.objet === void 0 ? null : `Objet : ${etat.objet}`, etat.devisNumero === void 0 ? null : `En référence au devis N° ${etat.devisNumero}`].filter((x) => x !== null).join(" — ") || null;
+	const totaux = [
+		{
+			libelle: "Sous-total HT",
+			montant: c.totalHT
+		},
+		{
+			libelle: LIBELLE_TVA_CM,
+			montant: c.totalTVA
+		},
+		{
+			libelle: "Total TTC",
+			montant: c.totalTTC,
+			fort: true
+		}
+	];
+	if (c.verse > 0) {
+		totaux.push({
+			libelle: "Déjà réglé",
+			montant: c.verse
+		});
+		totaux.push({
+			libelle: "Reste à payer",
+			montant: c.reste
+		});
+	}
+	if (c.tropPercu > 0) totaux.push({
+		libelle: "Trop-perçu à restituer",
+		montant: c.tropPercu
+	});
+	return /* @__PURE__ */ u(PageA4, {
+		encre: etat.encre,
+		children: [
+			/* @__PURE__ */ u(Entete, { emetteur: etat.emetteur }),
+			/* @__PURE__ */ u(TitreDocument, {
+				titre: "Facture",
+				sousTitre: `N° ${etat.numero} · émise le ${dateLongue(dateEmission(etat))} · échéance le ${echeance}`
+			}),
+			/* @__PURE__ */ u(BlocClient, {
+				nom: etat.client.nom,
+				niu: etat.client.niu,
+				complement: complementClient
+			}),
+			/* @__PURE__ */ u(TableauLignes, { totaux: c }),
+			/* @__PURE__ */ u(BlocTotaux, { lignes: totaux }),
+			/* @__PURE__ */ u("div", {
+				class: "a4-en-lettres",
+				children: [
+					"Arrêtée la présente facture à la somme de ",
+					montantEnLettres(c.totalTTC),
+					", toutes taxes comprises."
+				]
+			}),
+			/* @__PURE__ */ u("section", {
+				class: "a4-mentions",
+				children: [
+					c.estSoldee ? /* @__PURE__ */ u("p", { children: "Facture soldée. Reçu vaut quittance." }) : /* @__PURE__ */ u("p", { children: [
+						"Montant à régler : ",
+						montantF(c.reste),
+						", au plus tard le ",
+						echeance,
+						".",
+						retard > 0 && ` Échéance dépassée de ${retard} jour${retard > 1 ? "s" : ""}.`
+					] }),
+					etat.conditionsReglement !== "" && /* @__PURE__ */ u("p", { children: etat.conditionsReglement }),
+					etat.reglements.length > 0 && /* @__PURE__ */ u("p", { children: [
+						"Règlements reçus :",
+						" ",
+						etat.reglements.map((r) => {
+							const quand = dateLongueSiValide(r.date);
+							const ref = r.reference === void 0 || r.reference === "" ? "" : `, réf. ${r.reference}`;
+							return `${montantF(r.montant)}${quand === null ? "" : ` le ${quand}`} (${LIBELLE_MOYEN[r.moyen]}${ref})`;
+						}).join(" · "),
+						"."
+					] })
+				]
+			}),
+			/* @__PURE__ */ u(ZonesSignature, { zones: [{
+				libelle: "Cachet et signature",
+				mention: "Pour l’entreprise"
+			}] }),
+			/* @__PURE__ */ u(PiedLegal, {
+				emetteur: etat.emetteur,
+				complement: "Facture établie en francs CFA. Numérotation unique, continue et chronologique."
+			}),
+			/* @__PURE__ */ u(NumeroPage, {
+				page: 1,
+				total: 1
+			})
+		]
+	});
+}
+//#endregion
+//#region src/rendu.tsx
+/**
+* Ce qu'on dessine derrière un lien, selon ce qui a été publié.
+*
+* Deux formes, et le squelette dit laquelle. Les sept documents A4 sont déjà
+* des pages en lecture seule : on rend le document lui-même, celui que le
+* client aurait reçu imprimé. C'est tout l'intérêt du lien — ouvrir un devis
+* plutôt que recevoir une image qu'on ne peut ni chercher ni copier.
+*
+* Les registres, eux, sont des écrans avec des boutons. On ne les rejoue pas :
+* on rend leur **carte**, que chaque squelette sait déjà produire et qui est
+* déjà éprouvée. Elle dit l'essentiel — un titre, un grand chiffre, une liste —
+* et ne prétend pas être l'outil.
+*/
+var DOCUMENTS = {
+	devis: DocumentDevis,
+	facture: DocumentFacture,
+	attestation: DocumentAttestation,
+	recu: DocumentRecu,
+	dette: DocumentDette,
+	motivation: DocumentMotivation,
+	cv: DocumentCv
+};
+/** La facture a besoin de l'instant pour dire son retard ; les autres non. */
+function estFacture(skeleton) {
+	return skeleton === "facture";
+}
+function documentDe(instantane, ctx) {
+	const Composant = Object.hasOwn(DOCUMENTS, instantane.skeleton) ? DOCUMENTS[instantane.skeleton] : void 0;
+	if (Composant === void 0) return null;
+	const etat = instantane.etat;
+	return estFacture(instantane.skeleton) ? /* @__PURE__ */ u(DocumentFacture, {
+		etat,
+		maintenant: ctx.maintenant
+	}) : /* @__PURE__ */ u(Composant, { etat });
+}
+/**
+* La carte d'un instantané, quand il n'y a pas de document à dessiner.
+*
+* Rend `null` si le squelette est inconnu du serveur : un lien publié par une
+* version plus récente de l'application ne doit pas faire tomber la page.
+*
+* Un outil composé par le modèle n'a pas de squelette — sa configuration
+* voyage avec lui, dans l'instantané. On la remonte en squelette, exactement
+* comme le fait l'écran : c'est la même fabrique. Sans cela, l'outil payé
+* était le seul qu'on ne pouvait pas partager.
+*/
+function carteDe(instantane, ctx) {
+	const squelette = squeletteCompose(instantane) ?? squeletteParId(instantane.skeleton);
+	if (squelette === null) return null;
+	try {
+		return squelette.card(instantane.etat, ctx);
+	} catch {
+		return null;
+	}
+}
+/** Le squelette que porte l'instantané lui-même, s'il en porte un. */
+function squeletteCompose(instantane) {
+	if (instantane.registre !== void 0) return squeletteDeRegistre(instantane.registre);
+	if (instantane.calcul !== void 0) return squeletteDeCalcul(instantane.calcul);
+	return null;
+}
 //#endregion
 //#region src/html.tsx
+/**
+* Ce dépôt se dessine-t-il ?
+*
+* `/api/publier` est une adresse publique, et le contrôle de forme ne dit rien
+* du contenu : un état auquel il manque ce que le document lit passait, puis
+* faisait jeter le rendu au moment de la lecture. La seule vérification qui ne
+* puisse pas diverger du rendu est le rendu lui-même — un schéma recopié côté
+* serveur finirait par ne plus dire la même chose que l'écran.
+*/
+function rendable(instantane) {
+	try {
+		const ctx = {
+			lien: "",
+			maintenant: new Date(instantane.publieLe)
+		};
+		const document = documentDe(instantane, ctx);
+		if (document !== null) {
+			K(document);
+			return true;
+		}
+		return carteDe(instantane, ctx) !== null;
+	} catch {
+		return false;
+	}
+}
 /** Le squelette est-il connu de ce serveur ? Sert au contrôle de publication. */
 function squeletteConnu(skeleton) {
 	return squeletteParId(skeleton) !== null;
@@ -4395,6 +5924,7 @@ function controler(recu, detenu) {
 	if (!squeletteConnu(skeleton) && skeleton !== "compose" && skeleton !== "compose-calcul") return refus(400, "squelette-inconnu");
 	if (!publiable(skeleton)) return refus(403, "non-publiable", { pourquoi: pourquoiNonPubliable(skeleton) });
 	if (!accepteLaVersion(typeof inst.version === "number" ? inst.version : NaN, detenu?.version ?? null)) return refus(409, "version-perimee", { versionServeur: detenu?.version ?? null });
+	if (!rendable(inst)) return refus(400, "instantane-illisible");
 	return null;
 }
 //#endregion

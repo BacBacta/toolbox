@@ -1,33 +1,40 @@
 /**
- * Un registre composé par le modèle, ouvert dans un vrai navigateur.
+ * Un outil composé par le modèle, du premier mot tapé jusqu'au lien reçu.
  *
- * C'est le seul maillon que les tests unitaires ne voient pas : la
- * configuration vient du réseau, traverse le stockage, et c'est
- * `RegistreListe` — écrit à la main — qui la dessine. Si le pont casse
- * quelque part, il casse ici.
+ * C'est le maillon que les tests unitaires ne voient pas : la configuration
+ * vient du réseau, traverse le stockage, c'est `RegistreListe` — écrit à la
+ * main — qui la dessine, et elle repart au serveur pour devenir une page. Si
+ * le pont casse quelque part, il casse ici.
  *
  * La réponse est **une vraie sortie de production**, capturée telle quelle.
  * Une réponse inventée testerait ce que j'imagine que le modèle produit ; sa
  * première colonne est de type `nombre`, ce qui a longtemps été interdit et
  * faisait échouer deux générations sur dix.
  *
+ * La fin du parcours est celle qui a failli manquer. L'outil composé est
+ * l'outil **payé**, et c'était le seul qu'on ne pouvait pas partager : sa
+ * configuration voyage avec lui au lieu de vivre dans un squelette, le serveur
+ * ne trouvait donc rien à dessiner derrière le lien, et la page répondait 200
+ * avec « Ce lien ne mène à rien ». L'envoyeur n'en savait rien.
+ *
+ *   pnpm build && wrangler pages dev --port 8798 --ip 127.0.0.1
  *   PLAYWRIGHT=/chemin/vers/playwright-core/index.mjs node e2e/compose.mjs
+ *
+ * Il lui faut le Worker et son KV : `BASE` change l'adresse si le port est
+ * déjà pris. L'appel au modèle, lui, est intercepté dans le navigateur — la
+ * clef reste chez son propriétaire (§ 2.8).
  */
-import { readFileSync, statSync } from 'node:fs'
-import { createServer } from 'node:http'
-import { extname, join, normalize } from 'node:path'
-
-const RACINE = new URL('..', import.meta.url).pathname
-const DIST = join(RACINE, 'apps/web/dist')
+const BASE = process.env.BASE ?? 'http://127.0.0.1:8798'
 const CHROME = process.env.CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
 const { chromium } = await import(process.env.PLAYWRIGHT ?? 'playwright-core')
 
-const TYPES = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript',
-  '.css': 'text/css',
-  '.json': 'application/json',
-  '.webmanifest': 'application/manifest+json',
+// Un serveur absent doit se dire, pas se deviner : sans ce mot, l'échec arrive
+// sous la forme d'une capture d'écran vide et d'un sélecteur introuvable.
+try {
+  await fetch(BASE, { method: 'HEAD' })
+} catch {
+  console.log(`KO  aucun serveur sur ${BASE} — lancer \`wrangler pages dev --port 8798\``)
+  process.exit(1)
 }
 
 /** Capturé en production le 9 septembre 2026, sur « un carnet pour mes poules ». */
@@ -53,27 +60,6 @@ const REPONSE = {
   },
   fcfa: 0.12,
 }
-
-const serveur = createServer((req, res) => {
-  const chemin = decodeURIComponent((req.url ?? '/').split('?')[0])
-  let f = join(DIST, normalize(chemin))
-  try {
-    if (statSync(f).isDirectory()) f = join(f, 'index.html')
-  } catch {
-    f = join(DIST, 'index.html')
-  }
-  let corps
-  try {
-    corps = readFileSync(f)
-  } catch {
-    res.writeHead(404).end('non')
-    return
-  }
-  res.writeHead(200, { 'Content-Type': TYPES[extname(f)] ?? 'application/octet-stream' })
-  res.end(corps)
-})
-await new Promise((r) => serveur.listen(5200, '127.0.0.1', r))
-const BASE = 'http://127.0.0.1:5200'
 
 const navigateur = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] })
 const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 } })
@@ -177,6 +163,41 @@ const carte = await page.evaluate(() => {
 dit(carte?.largeur === 1080, 'sa carte se dessine', `${carte?.largeur}×${carte?.hauteur}`)
 dit((carte?.teintes ?? 0) > 3, 'et elle est vraiment peinte', `${carte?.teintes} teintes`)
 
+/*
+ * Et le lien : la moitié du geste qui n'existait pas.
+ *
+ * « Diffuser » dépose l'instantané avant de bâtir le partage, donc l'outil
+ * porte maintenant son adresse. Ce que le serveur en fait est le vrai enjeu :
+ * il ne connaît pas ce registre, il ne peut le dessiner qu'avec la
+ * configuration reçue.
+ */
+const lien = await page.evaluate(
+  () =>
+    new Promise((res) => {
+      const q = indexedDB.open('atelier237-outils')
+      q.onsuccess = () => {
+        const t = q.result.transaction('outils', 'readonly').objectStore('outils').getAll()
+        t.onsuccess = () => res(t.result.find((o) => o.skeleton === 'compose')?.lien ?? null)
+        t.onerror = () => res(null)
+      }
+      q.onerror = () => res(null)
+    }),
+)
+dit(lien !== null, 'la diffusion a déposé l’instantané et gardé son adresse', String(lien))
+
+if (lien !== null) {
+  const lecture = await contexte.newPage()
+  const reponse = await lecture.goto(`${BASE}/d/${lien}`, { waitUntil: 'domcontentloaded' })
+  const lu = await lecture.textContent('body')
+  dit(reponse.status() === 200, 'la page publiée répond', String(reponse.status()))
+  dit(lu.includes('Poules'), 'le registre payé se lit derrière son lien')
+  // 200 avec « Ce lien ne mène à rien » est le défaut exact qui a existé : le
+  // statut ne suffit pas à le voir.
+  dit(!lu.includes('ne mène à rien'), 'et ce n’est pas la page « lien introuvable »')
+  dit(!lu.includes('ne peut pas être affiché'), 'ni celle du document illisible')
+  await lecture.close()
+}
+
 // Et il survit au rechargement : la configuration vit sur le téléphone.
 await page.reload({ waitUntil: 'networkidle' })
 await page.locator('.lien-outil').first().click()
@@ -231,6 +252,5 @@ dit(appels === avant + 1, 'un seul appel payé pour le refus', `${appels - avant
 dit(erreurs.length === 0, 'aucune erreur de page', erreurs.join(' | '))
 
 await navigateur.close()
-serveur.close()
 console.log(echecs === 0 ? 'FIN — tout passe' : `FIN — ${echecs} échec(s)`)
 process.exit(echecs === 0 ? 0 : 1)

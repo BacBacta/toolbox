@@ -3,7 +3,7 @@ import { squeletteParId } from '@a237/engine'
 import { render as enChaine } from 'preact-render-to-string'
 import a4Css from '@a237/render/styles/a4.css?raw'
 import lectureCss from './lecture.css?raw'
-import { PageIntrouvable, PiedLecture } from './page.js'
+import { PageIllisible, PageIntrouvable, PiedLecture } from './page.js'
 import type { MetaPage } from './page.js'
 import { VueCarte, carteDe, documentDe } from './rendu.js'
 
@@ -79,7 +79,63 @@ export function metaDe(
   }
 }
 
+/**
+ * Ce dépôt se dessine-t-il ?
+ *
+ * `/api/publier` est une adresse publique, et le contrôle de forme ne dit rien
+ * du contenu : un état auquel il manque ce que le document lit passait, puis
+ * faisait jeter le rendu au moment de la lecture. La seule vérification qui ne
+ * puisse pas diverger du rendu est le rendu lui-même — un schéma recopié côté
+ * serveur finirait par ne plus dire la même chose que l'écran.
+ */
+export function rendable(instantane: Instantane): boolean {
+  try {
+    const ctx: RenderContext = { lien: '', maintenant: new Date(instantane.publieLe) }
+    const document = documentDe(instantane, ctx)
+    if (document !== null) {
+      enChaine(document)
+      return true
+    }
+    return carteDe(instantane, ctx) !== null
+  } catch {
+    return false
+  }
+}
+
+/**
+ * La page quand le document est déposé mais ne se dessine pas.
+ *
+ * Elle existe pour ce qui est **déjà** dans KV : le contrôle à la publication
+ * ferme la porte devant, il ne réécrit pas ce qui est passé avant lui, et un
+ * rendu qui change de forme ne doit pas transformer un lien envoyé hier en
+ * page d'erreur de l'hébergeur.
+ */
+export function pageIllisible(): string {
+  return envelopper(
+    {
+      titre: 'Document illisible — Atelier 237',
+      description: 'Ce document ne peut pas être affiché.',
+      lien: '',
+    },
+    lectureCss,
+    enChaine(<PageIllisible />),
+  )
+}
+
 export function pageDeLecture(
+  instantane: Instantane,
+  ctx: RenderContext,
+  lien: string,
+  image?: string,
+): string {
+  try {
+    return dessiner(instantane, ctx, lien, image)
+  } catch {
+    return pageIllisible()
+  }
+}
+
+function dessiner(
   instantane: Instantane,
   ctx: RenderContext,
   lien: string,
