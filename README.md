@@ -12,5 +12,22 @@ de gamme, diffusés dans WhatsApp.
   copie pas. Il ne doit jamais être importé par du code de production.
 - Les notes de lecture et les décisions ouvertes sont dans [`docs/`](docs/).
 
-État : **phase 1 non commencée** — en attente de validation de l'arborescence
-(`docs/01-proposition-monorepo.md`).
+## État
+
+**Phase 1, moteur — en cours.** Le cœur pur est écrit et testé ; le rendu n'a pas
+commencé, conformément au point 4 de la section 11 du brief.
+
+| Paquet | État |
+|---|---|
+| `packages/engine` | montant en toutes lettres, TVA ligne par ligne, mise en forme, validateur de schéma, étage 1, deux squelettes (`njangi`, `devis`) |
+| `packages/legal-cm` | TVA 19,25 %, mentions obligatoires, formes NIU et RCCM, numérotation continue |
+| `packages/render`, `apps/web` | pas commencés |
+
+278 tests, couverture du moteur à 97 %. Zéro dépendance de production.
+
+```bash
+pnpm install
+pnpm verif        # typecheck + tests + couverture, comme la CI
+```
+
+Les arbitrages sont journalisés dans [`docs/02-decisions.md`](docs/02-decisions.md).

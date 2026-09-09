@@ -170,19 +170,30 @@ packages:
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2022"],
-    "types": [],
-    "rootDir": "src",
+    "types": ["node"],
+    "rootDir": ".",
     "outDir": "dist"
   },
-  "include": ["src"]
+  "include": ["src", "test"],
+  "references": [{ "path": "../legal-cm" }]
 }
 ```
 
-`"lib": ["ES2022"]` **sans `"DOM"`** et `"types": []` : `document`, `window`,
-`navigator`, `localStorage`, `fetch`, `HTMLCanvasElement` ne compilent tout
-simplement pas dans ce paquet. Le compilateur devient le gardien de la règle de la
-section 3.3, et `test/purete.test.ts` la double au moment de l'exécution en relisant
-le paquet bâti à la recherche de ces identifiants. Un test, pas une convention.
+`"lib": ["ES2022"]` **sans `"DOM"`** : `document`, `window`, `navigator`,
+`localStorage`, `fetch`, `HTMLCanvasElement` ne compilent tout simplement pas dans
+ce paquet. Vérifié en le cassant : les trois premiers font échouer `tsc` sur-le-champ.
+
+> **Correction en cours de route.** La proposition initiale ajoutait `"types": []`,
+> ce qui interdisait aussi les types Node — et donc empêchait `test/purete.test.ts`,
+> qui lit les sources avec `node:fs`, de compiler. Le garde-fou qui compte est `lib`
+> sans `DOM` ; il est conservé intact. L'interdiction des API Node dans `src/` est
+> tenue par le test de pureté, qui refuse tout import non relatif autre que
+> `@a237/legal-cm` — vérifié en ajoutant un `import { readFileSync } from 'node:fs'`
+> dans le moteur, qui le fait bien échouer.
+
+`test/purete.test.ts` double la règle à la lecture, et interdit en plus `new Date()`
+sans argument, `Date.now()` et `Math.random()` : le moteur ne lit ni l'horloge ni le
+hasard. Un test, pas une convention.
 
 `apps/web/tsconfig.json` ajoute `"lib": ["ES2022", "DOM", "DOM.Iterable"]`.
 

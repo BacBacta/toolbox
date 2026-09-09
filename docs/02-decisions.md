@@ -1,0 +1,83 @@
+# Décisions prises, et pourquoi
+
+Journal des arbitrages. Une décision qui n'est écrite nulle part se re-débat
+tous les trois mois.
+
+---
+
+## Validées par le propriétaire du projet
+
+| # | Question | Décision |
+|---|---|---|
+| 1 | Racine du dépôt | Le dépôt **est** la racine, pas de dossier `atelier237/` intermédiaire. |
+| 2 | `facture` en v1 | **Oui, squelette à part entière.** Elle partage le socle `legal-cm` avec le devis, mais porte la numérotation continue, le NIU client obligatoire et les mentions de règlement. C'est le document que la DGI contrôle. Construite après les deux squelettes de la section 11. |
+| 3 | Budget de 120 Ko gzip | Porte sur **la coquille initiale** (html + fragment d'entrée + css préchargée). Chaque outil est un fragment chargé à la demande, plafonné à 25 Ko, mis en cache par le service worker. |
+
+---
+
+## Prises en écrivant le moteur
+
+### Les montants sont des entiers, toujours
+Le franc CFA n'a pas de subdivision. Tout ce qui est monétaire est un entier, la
+TVA se calcule en entiers (`ht × 1925 / 10000`), et une fonction qui reçoit un
+montant fractionnaire lève plutôt que d'arrondir dans le dos de l'appelant.
+
+### On arrondit à la ligne, puis on somme
+Deux lignes à 100 F donnent 19 F de TVA chacune, soit 38 F. Sommer d'abord puis
+arrondir donnerait 39 F. On imprime 38 F, parce que c'est ce qu'un contrôleur
+retrouve en recalculant le document ligne à ligne. Figé par un test.
+
+### Le moteur ne lit ni l'horloge ni le hasard
+`RenderContext.maintenant` est passé en argument. Sans ça les tests ne seraient
+pas déterministes, et surtout la page rendue au bord n'afficherait pas le même
+horodatage que le téléphone qui a publié. Vérifié par `purete.test.ts`, qui
+interdit `new Date()` sans argument, `Date.now()` et `Math.random()`.
+
+### Les dates sont mises en forme à l'heure de Douala, pas à celle de la machine
+Africa/Douala est UTC+1 toute l'année, sans heure d'été. Un document publié à
+23 h 30 à Douala porterait la veille sur une page rendue par un Worker qui vit
+en UTC. `Intl` n'est pas utilisé : sa sortie dépend de la version d'ICU
+embarquée, qui n'est pas la même sur un Tecno de 2019 et au bord de Cloudflare.
+
+### Le schéma dit la forme, `legal-cm` dit l'obligation
+Le NIU du client et la raison sociale sont *présents* dans le schéma mais
+peuvent être vides — sinon on ne pourrait pas ouvrir un devis vierge. C'est
+`mentionsManquantes` qui décide si un document est émettable, et lui seul.
+Mélanger les deux couches laisserait passer un devis sans NIU, ou empêcherait
+d'en commencer un.
+
+### La date d'émission est figée dans l'état, jamais « maintenant »
+Un devis réédité six mois plus tard porte toujours sa date d'origine. Même
+raisonnement pour le numéro. C'est ce qui a motivé l'ajout de `initialiser(ctx)`
+au type `Skeleton` du brief : ces deux champs ne peuvent pas vivre dans une
+constante statique.
+
+### Les champs inconnus sont des chaînes vides, jamais `null`
+L'état fait l'aller-retour par JSON et passe par un validateur volontairement
+minuscule. Ajouter le type `null` au sous-ensemble de JSON Schema coûterait plus
+qu'il ne rapporte. Un numéro de téléphone qu'on n'a pas est une propriété
+absente ; un NIU qu'on n'a pas est `''`.
+
+### Le validateur de schéma est écrit à la main
+Cent lignes, sans dépendance, en vocabulaire JSON Schema standard pour servir
+tel quel de schéma de réponse contrainte au modèle en phase 4. Une clef
+`__proto__` venue de `JSON.parse` est cherchée avec `Object.hasOwn` et non par
+accès direct, sinon elle remonterait la chaîne de prototypes. Testé.
+
+### `zod` n'est pas entré
+Il n'a pas été nécessaire : le validateur écrit à la main fait le travail pour
+moins cher qu'un poids dans un budget de 120 Ko. **Zéro dépendance de
+production** à ce stade — cinq étaient autorisées. La question se reposera au
+Worker, où le budget de poids n'existe pas.
+
+---
+
+## Reportées, et à quel moment il faudra trancher
+
+| Sujet | Quand | Ce qui est déjà prêt |
+|---|---|---|
+| L'état publiable vit-il en D1 ou seulement en KV ? | avant la phase 2 | `docs/00-lecture-du-brief.md` § 2.4 — recommandation : colonne `state` dans `tools`. |
+| Quel mécanisme d'identité ? | avant la phase 2 | § 2.5 — proposition : `device_id` + jeton opaque + code de récupération. |
+| Que se passe-t-il quand le serveur rejette une version périmée ? | phase 2 | § 2.7 — la réponse 409 doit renvoyer la version stockée et l'app poser la question. |
+| Taux USD → XAF pour `ai_calls.cost_xaf` | phase 4 | § 3.1 — le `USD=656` du prototype est le taux fixe **euro**/FCFA appliqué au dollar. À relever à la source, et à mettre en configuration du Worker, pas en constante. |
+| Les six vérifications de la section 6 du brief | à l'ouverture de chaque phase concernée | § 4 — aucune ne concerne la phase 1. |
