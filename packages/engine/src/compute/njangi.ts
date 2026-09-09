@@ -75,6 +75,21 @@ export function fiabilite(m: MembreNjangi): number | null {
   return m.versements / m.tours
 }
 
+/**
+ * Au-dessus de ce taux, un membre est présenté comme fiable.
+ *
+ * C'est une convention d'affichage reprise du prototype, pas une règle de
+ * njangi : aucun trésorier ne calcule 80 %. Elle sert à trier une liste et à
+ * colorer un badge, jamais à exclure quelqu'un.
+ */
+export const SEUIL_FIABILITE = 0.8
+
+/** `null` pour un membre sans historique — on ne le juge pas sur rien. */
+export function estFiable(m: MembreNjangi): boolean | null {
+  const f = fiabilite(m)
+  return f === null ? null : f >= SEUIL_FIABILITE
+}
+
 /** Les membres du moins fiable au plus fiable. Les nouveaux ferment la marche. */
 export function classementFiabilite(etat: EtatNjangi): readonly MembreNjangi[] {
   return [...etat.membres].sort((a, b) => {
@@ -148,4 +163,87 @@ export function prochainTour(etat: EtatNjangi): EtatNjangi {
     historique: [...etat.historique, { tour: etat.tour, collecte: encaisse }],
     membres,
   }
+}
+
+// ───────────────────── transitions d'état, toutes pures ─────────────────────
+//
+// Elles vivent ici et non dans le composant : le moteur est testé sans DOM, et
+// l'écran n'a plus qu'à les appeler. C'est ce qui rend l'interface remplaçable
+// sans toucher à ce que le trésorier considère comme son cahier.
+
+function remplacerMembre(
+  etat: EtatNjangi,
+  index: number,
+  transforme: (m: MembreNjangi) => MembreNjangi,
+): EtatNjangi {
+  const cible = etat.membres[index]
+  if (cible === undefined) throw new RangeError(`aucun membre à l'index ${index}`)
+  return {
+    ...etat,
+    membres: etat.membres.map((m, i) => (i === index ? transforme(m) : m)),
+  }
+}
+
+/** Marque ou démarque le versement d'un membre pour le tour en cours. */
+export function basculerVersement(etat: EtatNjangi, index: number): EtatNjangi {
+  return remplacerMembre(etat, index, (m) => ({ ...m, aVerse: !m.aVerse }))
+}
+
+/**
+ * Ajoute un membre au njangi.
+ *
+ * Il entre sans historique : `versements` et `tours` à zéro, donc une fiabilité
+ * indéterminée jusqu'au premier tour vécu. Il n'a pas encore reçu, ce qui le
+ * place naturellement dans la rotation.
+ *
+ * @throws RangeError sur un nom vide — un carnet de njangi sans nom ne sert à rien.
+ */
+export function ajouterMembre(etat: EtatNjangi, nom: string, tel?: string): EtatNjangi {
+  const propre = nom.trim()
+  if (propre === '') throw new RangeError('nom de membre vide')
+  const membre: MembreNjangi = {
+    nom: propre,
+    ...(tel !== undefined && tel.trim() !== '' ? { tel: tel.trim() } : {}),
+    aVerse: false,
+    aRecu: false,
+    estAuTour: false,
+    versements: 0,
+    tours: 0,
+  }
+  return { ...etat, membres: [...etat.membres, membre] }
+}
+
+/**
+ * Retire un membre.
+ *
+ * Si c'était lui qui devait recevoir ce tour-ci, le drapeau passe au suivant
+ * qui n'a pas encore reçu — sinon le njangi se retrouverait sans bénéficiaire
+ * et `prochainTour` repartirait du début, ce qui ferait passer quelqu'un deux
+ * fois dans le même cycle.
+ */
+export function retirerMembre(etat: EtatNjangi, index: number): EtatNjangi {
+  const partant = etat.membres[index]
+  if (partant === undefined) throw new RangeError(`aucun membre à l'index ${index}`)
+
+  const restants = etat.membres.filter((_, i) => i !== index)
+  if (!partant.estAuTour || restants.length === 0) return { ...etat, membres: restants }
+
+  const repreneur = restants.findIndex((m) => !m.aRecu)
+  const cible = repreneur === -1 ? 0 : repreneur
+  return {
+    ...etat,
+    membres: restants.map((m, i) => (i === cible ? { ...m, estAuTour: true } : m)),
+  }
+}
+
+/**
+ * Change la cotisation.
+ * @throws RangeError sur un montant négatif ou fractionnaire — le XAF n'a pas
+ *   de subdivision, et une cotisation négative n'a pas de sens.
+ */
+export function changerCotisation(etat: EtatNjangi, montant: number): EtatNjangi {
+  if (!Number.isSafeInteger(montant) || montant < 0) {
+    throw new RangeError(`cotisation invalide : ${montant}`)
+  }
+  return { ...etat, cotisation: montant }
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
-  beneficiaireDuTour, classementFiabilite, collecte, fiabilite, prochainTour,
+  ajouterMembre, basculerVersement, beneficiaireDuTour, changerCotisation,
+  classementFiabilite, collecte, estFiable, fiabilite, prochainTour, retirerMembre,
+  SEUIL_FIABILITE,
 } from '../src/compute/njangi.js'
 import type { EtatNjangi, MembreNjangi } from '../src/compute/njangi.js'
 
@@ -165,5 +167,132 @@ describe('prochainTour — la fin d’un cycle', () => {
 
   it('refuse de faire tourner un njangi sans membre', () => {
     expect(() => prochainTour({ ...CARNET, membres: [] })).toThrow(RangeError)
+  })
+})
+
+describe('estFiable — une convention d’affichage, pas un jugement', () => {
+  it('classe au-dessus et au-dessous du seuil', () => {
+    expect(estFiable(membre('x', { versements: 12, tours: 12 }))).toBe(true)
+    expect(estFiable(membre('x', { versements: 8, tours: 10 }))).toBe(true)
+    expect(estFiable(membre('x', { versements: 7, tours: 10 }))).toBe(false)
+  })
+
+  it('ne juge pas un membre sans historique', () => {
+    expect(estFiable(membre('nouvelle'))).toBeNull()
+  })
+
+  it('place le seuil à 80 %, exactement inclus', () => {
+    expect(SEUIL_FIABILITE).toBe(0.8)
+    expect(estFiable(membre('x', { versements: 4, tours: 5 }))).toBe(true)
+  })
+})
+
+describe('basculerVersement', () => {
+  it('marque puis démarque le versement', () => {
+    const marque = basculerVersement(CARNET, 2)
+    expect(marque.membres[2]?.aVerse).toBe(true)
+    expect(basculerVersement(marque, 2).membres[2]?.aVerse).toBe(false)
+  })
+
+  it('ne touche à personne d’autre', () => {
+    const apres = basculerVersement(CARNET, 2)
+    expect(apres.membres[0]).toEqual(CARNET.membres[0])
+    expect(collecte(apres).collecte).toBe(collecte(CARNET).collecte + CARNET.cotisation)
+  })
+
+  it('ne modifie pas l’état qu’on lui passe', () => {
+    basculerVersement(CARNET, 2)
+    expect(CARNET.membres[2]?.aVerse).toBe(false)
+  })
+
+  it('refuse un index hors liste', () => {
+    expect(() => basculerVersement(CARNET, 99)).toThrow(RangeError)
+    expect(() => basculerVersement(CARNET, -1)).toThrow(RangeError)
+  })
+})
+
+describe('ajouterMembre', () => {
+  it('entre sans historique, donc sans réputation', () => {
+    const apres = ajouterMembre(CARNET, 'Rosalie')
+    const neuve = apres.membres[apres.membres.length - 1]
+    expect(neuve).toMatchObject({ nom: 'Rosalie', versements: 0, tours: 0, aRecu: false, aVerse: false })
+    expect(fiabilite(neuve!)).toBeNull()
+  })
+
+  it('nettoie le nom et garde le numéro quand il y en a un', () => {
+    const apres = ajouterMembre(CARNET, '  Rosalie  ', ' 699112233 ')
+    expect(apres.membres[apres.membres.length - 1]).toMatchObject({
+      nom: 'Rosalie', tel: '699112233',
+    })
+  })
+
+  it('n’invente pas de numéro vide', () => {
+    const apres = ajouterMembre(CARNET, 'Rosalie', '   ')
+    expect(apres.membres[apres.membres.length - 1]).not.toHaveProperty('tel')
+  })
+
+  it('refuse un nom vide', () => {
+    expect(() => ajouterMembre(CARNET, '   ')).toThrow(RangeError)
+  })
+
+  it('augmente l’attendu du tour', () => {
+    expect(collecte(ajouterMembre(CARNET, 'Rosalie')).attendu).toBe(collecte(CARNET).attendu + 5_000)
+  })
+})
+
+describe('retirerMembre', () => {
+  it('retire le bon membre', () => {
+    const apres = retirerMembre(CARNET, 2)
+    expect(apres.membres.map((m) => m.nom)).toEqual([
+      'Mama Céline', 'Ernest', 'Jean-Marie', 'Pauline', 'Serge',
+    ])
+  })
+
+  it('passe le tour au suivant qui n’a pas reçu quand le partant devait recevoir', () => {
+    // Ernest est au tour ; après son départ c'est Adèle, qui n'a pas reçu.
+    const apres = retirerMembre(CARNET, 1)
+    expect(beneficiaireDuTour(apres)?.nom).toBe('Adèle')
+  })
+
+  it('retombe sur le premier quand tous les restants ont déjà reçu', () => {
+    const etat: EtatNjangi = {
+      ...CARNET,
+      membres: [
+        membre('A', { aRecu: true }),
+        membre('B', { estAuTour: true }),
+        membre('C', { aRecu: true }),
+      ],
+    }
+    expect(beneficiaireDuTour(retirerMembre(etat, 1))?.nom).toBe('A')
+  })
+
+  it('ne laisse pas un njangi vide sans bénéficiaire fantôme', () => {
+    const seul = { ...CARNET, membres: [membre('A', { estAuTour: true })] }
+    const apres = retirerMembre(seul, 0)
+    expect(apres.membres).toEqual([])
+    expect(beneficiaireDuTour(apres)).toBeNull()
+  })
+
+  it('ne déplace pas le tour quand le partant ne recevait pas', () => {
+    expect(beneficiaireDuTour(retirerMembre(CARNET, 5))?.nom).toBe('Ernest')
+  })
+
+  it('refuse un index hors liste', () => {
+    expect(() => retirerMembre(CARNET, 99)).toThrow(RangeError)
+  })
+})
+
+describe('changerCotisation', () => {
+  it('change le montant et donc l’attendu', () => {
+    expect(collecte(changerCotisation(CARNET, 10_000)).attendu).toBe(60_000)
+  })
+
+  it('accepte zéro', () => {
+    expect(changerCotisation(CARNET, 0).cotisation).toBe(0)
+  })
+
+  it('refuse un montant négatif ou fractionnaire', () => {
+    expect(() => changerCotisation(CARNET, -1)).toThrow(RangeError)
+    expect(() => changerCotisation(CARNET, 5_000.5)).toThrow(RangeError)
   })
 })

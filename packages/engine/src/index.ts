@@ -15,7 +15,9 @@ export {
 export { prochainNumero, trouverAnomalies } from './compute/numerotation.js'
 export type { Collecte, EtatNjangi, MembreNjangi, Periode } from './compute/njangi.js'
 export {
-  beneficiaireDuTour, classementFiabilite, collecte, fiabilite, prochainTour,
+  ajouterMembre, basculerVersement, beneficiaireDuTour, changerCotisation,
+  classementFiabilite, collecte, estFiable, fiabilite, prochainTour,
+  retirerMembre, SEUIL_FIABILITE,
 } from './compute/njangi.js'
 export { calculerLignes, montantAcompte } from './compute/tva.js'
 

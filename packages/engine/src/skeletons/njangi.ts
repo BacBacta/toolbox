@@ -1,5 +1,6 @@
 import {
-  beneficiaireDuTour, collecte, prochainTour, classementFiabilite, fiabilite,
+  ajouterMembre, basculerVersement, beneficiaireDuTour, changerCotisation,
+  classementFiabilite, collecte, estFiable, fiabilite, prochainTour, retirerMembre,
 } from '../compute/njangi.js'
 import type { EtatNjangi, Periode } from '../compute/njangi.js'
 import { arreteLe, montantF } from '../format.js'
@@ -95,7 +96,10 @@ export const njangi: Skeleton<EtatNjangi> = {
   engine: 'registre',
   schema: njangiSchema,
   defaults,
-  compute: { collecte, fiabilite, classementFiabilite, beneficiaireDuTour, prochainTour },
+  compute: {
+    collecte, fiabilite, estFiable, classementFiabilite, beneficiaireDuTour,
+    prochainTour, basculerVersement, ajouterMembre, retirerMembre, changerCotisation,
+  },
   card: njangiCard,
   share: njangiShare,
 }
