@@ -95,6 +95,25 @@ importers:
         specifier: workspace:*
         version: link:../outils-test
 
+  packages/serveur:
+    dependencies:
+      '@a237/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@a237/render':
+        specifier: workspace:*
+        version: link:../render
+      preact:
+        specifier: ^10.29.8
+        version: 10.29.8(preact-render-to-string@6.7.0)
+    devDependencies:
+      preact-render-to-string:
+        specifier: ^6.7.0
+        version: 6.7.0(preact@10.29.8)
+      vite:
+        specifier: ^8.2.2
+        version: 8.2.2(@types/node@26.5.0)
+
 packages:
 
   '@babel/code-frame@7.29.7':

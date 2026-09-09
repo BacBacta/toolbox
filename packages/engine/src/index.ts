@@ -86,6 +86,11 @@ export {
 } from './compute/callbox.js'
 export { callbox, callboxCard, callboxShare } from './skeletons/callbox.js'
 export { callboxSchema } from './schema/callbox.js'
+export type { ConflitVersion, Instantane } from './publication.js'
+export {
+  ALPHABET_LIEN, LONGUEUR_LIEN, NON_PUBLIABLES, accepteLaVersion, lienPublic,
+  lienValide, pourquoiNonPubliable, publiable,
+} from './publication.js'
 export { cvSchema } from './schema/cv.js'
 export type { CalculDemande, EntreeDemandee } from './calcul.js'
 export { MAX_ENTREES, schemaCalcul, verifierCalcul } from './calcul.js'

@@ -17,6 +17,9 @@
       "path": "./packages/ia"
     },
     {
+      "path": "./packages/serveur"
+    },
+    {
       "path": "./apps/web"
     }
   ]

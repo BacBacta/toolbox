@@ -190,6 +190,55 @@ try {
 }
 
 /*
+ * Les deux fonctions de publication, et surtout **leur nom**.
+ *
+ * Pages tire ses routes du nom des fichiers : `d/[lien].js` répond à
+ * `/d/n'importe quoi`. Rollup assainit les crochets d'un nom de sortie, et le
+ * fichier sortait `_lien_.js` — qui ne répond qu'à `/d/_lien_`. Toutes les
+ * pages de lecture auraient rendu 404, et la construction aurait réussi.
+ */
+for (const [chemin, marqueur, quoi] of [
+  ['functions/api/publier.js', 'export { onRequest }', 'l’export nommé que Pages appelle'],
+  ['functions/d/[lien].js', 'export { onRequest }', 'l’export nommé que Pages appelle'],
+  ['functions/d/[lien].js', '<!doctype html>', 'la page de lecture, preuve que le rendu est inclus'],
+]) {
+  try {
+    if (!readFileSync(chemin, 'utf8').includes(marqueur)) {
+      echecs.push(`${chemin} n'a pas ${quoi}`)
+    }
+  } catch {
+    echecs.push(`${chemin} manquant : la publication ne serait pas déployée`)
+  }
+}
+
+/*
+ * Rien d'autre que des routes dans `functions/`.
+ *
+ * Un fragment partagé déposé par Rollup dans `functions/assets/` devient une
+ * route `/assets/…` servie par Pages, qui masquerait les vrais fichiers de
+ * l'application. Chaque fonction porte donc tout ce dont elle a besoin.
+ */
+{
+  const attendus = new Set(['functions/api/ai.js', 'functions/api/publier.js', 'functions/d/[lien].js'])
+  const vus = []
+  const parcourir = (dossier) => {
+    for (const e of readdirSync(dossier, { withFileTypes: true })) {
+      const chemin = `${dossier}/${e.name}`
+      if (e.isDirectory()) parcourir(chemin)
+      else vus.push(chemin)
+    }
+  }
+  try {
+    parcourir('functions')
+    for (const f of vus) {
+      if (!attendus.has(f)) echecs.push(`${f} n'est pas une route attendue de functions/`)
+    }
+  } catch {
+    echecs.push('functions/ manquant : aucune fonction ne serait déployée')
+  }
+}
+
+/*
  * Le service worker doit porter l'empreinte de la construction.
  *
  * Le navigateur ne le réinstalle que si son fichier a changé d'un octet. Avec

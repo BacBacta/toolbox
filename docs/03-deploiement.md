@@ -6,11 +6,15 @@ Ce qui part sur l'hébergeur, c'est **la PWA** : des fichiers statiques, un
 service worker, rien d'autre. Pas de serveur, pas de base, pas de secret.
 L'état vit sur le téléphone.
 
-La publication — lien court, `og:image`, page de lecture sans script, carte dans
-R2, instantané dans KV — **n'existe pas encore**. C'est la phase 2. Tant qu'elle
-n'existe pas, le bouton « Diffuser » produit la carte et le résumé, et
-**n'écrit aucun lien** : ni sur l'image, ni dans les relances. Une adresse
-inventée serait un lien mort envoyé par le trésorier à ses membres, sous son nom.
+La publication existe **côté serveur** : `POST /api/publier` dépose un
+instantané dans KV, `GET /d/:lien` rend la page de lecture. Ce qui manque
+encore, c'est le geste dans l'application — le bouton « Diffuser » produit
+toujours la carte et le résumé et **n'écrit aucun lien**. Une adresse inventée
+serait un lien mort envoyé par le trésorier à ses membres, sous son nom.
+
+L'`og:image` attend R2, qui demande une activation manuelle dans le tableau de
+bord Cloudflare. En attendant, l'aperçu WhatsApp porte le titre et la
+description tirés de la carte, pas l'image.
 
 ## Cloudflare Pages — en ligne
 
@@ -170,6 +174,46 @@ Ce qui reste, et qui compte plus que tout le reste :
    vraiment, pas seulement sur le tien.
 3. Se rappeler que **la publication n'existe pas encore** : la carte se partage,
    mais le lien viendra avec la phase 2.
+
+## La publication
+
+| | |
+|---|---|
+| `POST /api/publier` | dépose `{ lien, instantane }` dans KV |
+| `GET /d/:lien` | rend la page de lecture, sans un script |
+| KV | liaison `INSTANTANES` |
+| R2 | **pas encore activé** — à faire dans le tableau de bord |
+
+Le lien fait **douze caractères** en base32 sans `I`, `1`, `O`, `0` ni `U` :
+il se lit à voix haute au téléphone et se recopie sur un cahier. Le prototype
+en proposait quatre — un million de combinaisons, énumérable en une soirée, sur
+des documents qui portent un nom de client et des montants.
+
+**Deux outils ne se publient pas** : l'ardoise, qui porte des noms et des
+dettes (§ 2.5), et le call-box, qui dit la recette du jour. Le refus est dans
+le serveur et non seulement dans l'écran : un bouton grisé se contourne, une
+adresse publique ne se reprend pas.
+
+La page de lecture rend **le vrai document** pour les sept écrits A4 — c'est
+tout l'intérêt du lien, ouvrir un devis plutôt que recevoir une image qu'on ne
+peut ni chercher ni copier. Les registres rendent leur carte : on ne rejoue pas
+un écran à boutons en lecture seule.
+
+### Deux pièges du rendu serveur
+
+**Le nom du fichier est la route.** `functions/d/[lien].js` répond à
+`/d/n'importe quoi`. Rollup assainit les crochets d'un nom de sortie : le
+fichier sortait `_lien_.js`, qui ne répond qu'à `/d/_lien_`. Toutes les pages
+auraient rendu 404, et la construction aurait réussi. Une garde du budget exige
+le nom exact, et refuse tout fichier de `functions/` qui ne soit pas une route
+attendue — un fragment partagé déposé dans `functions/assets/` deviendrait une
+route `/assets/…` qui masquerait les vrais fichiers de l'application.
+
+**`min(1, calc((100vw - 32px) / 793.7))` est invalide.** Diviser une longueur
+par un nombre rend une longueur, et `min` refuse de mélanger un nombre et une
+longueur : la déclaration est ignorée sans un mot, l'échelle retombe à 1, et le
+document sort à sa taille réelle — coupé par le cadre sur un téléphone. Le
+diviseur porte son unité : `793.7px`.
 
 ## Où poser les variables — deux familles à ne pas confondre
 
