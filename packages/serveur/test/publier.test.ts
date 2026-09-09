@@ -69,9 +69,16 @@ describe('ce que le serveur refuse', () => {
   })
 
   it('une version qui n’en est pas une', () => {
-    for (const version of [0, -1, 1.5, Number.NaN]) {
+    for (const version of [-1, 1.5, Number.NaN]) {
       expect(controler(depot({ version }), null)?.statut).toBe(409)
     }
+  })
+
+  it('mais pas la version zéro, qui est celle d’un outil qu’on vient de créer', () => {
+    // Elle était refusée, et la publication d'un outil jamais modifié échouait
+    // donc en silence — le cas le plus courant, puisqu'on diffuse souvent
+    // juste après avoir créé.
+    expect(controler(depot({ version: 0 }), null)).toBeNull()
   })
 })
 

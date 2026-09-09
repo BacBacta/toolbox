@@ -1,6 +1,6 @@
 # Vérification de bout en bout
 
-Deux scripts, deux choses qu'aucun test unitaire ne peut voir.
+Quatre scripts, quatre choses qu'aucun test unitaire ne peut voir.
 
 `fumee.mjs` ouvre l'application **construite** dans un vrai Chromium, sur un
 écran de 360 × 740 avec le tactile, et vérifie la chaîne complète : recherche
@@ -13,13 +13,18 @@ navigateur : la configuration vient du réseau, traverse le stockage, et c'est
 sortie de production capturée telle quelle, pas une réponse inventée : sa
 première colonne est de type `nombre`, ce qui a longtemps été interdit.
 
+`hors-ligne.mjs` joue la boucle du § 2.7 en entier : on coupe le réseau, on
+crée un outil, on demande à le diffuser, et on regarde la file partir **toute
+seule** quand le réseau revient. Il lui faut le Worker et son KV, donc un vrai
+serveur : `wrangler pages dev`.
+
 `mise-a-jour.mjs` joue le scénario de la **deuxième** mise en ligne : il
 construit une version, l'installe dans le navigateur, construit une version
 modifiée, la met en ligne, et vérifie que l'utilisateur qui rouvre
 l'application voit la nouvelle — sans rien faire, et sans perdre le mode
 avion.
 
-## Pourquoi elles existent, alors qu'il y a 939 tests unitaires
+## Pourquoi elles existent, alors qu'il y a 1 525 tests unitaires
 
 `fumee.mjs` a trouvé un bogue qu'aucun d'eux ne pouvait voir : `precache.json`
 contenait `/index.html` deux fois, `cache.addAll` rejette sur les doublons, et
@@ -39,13 +44,27 @@ coquille dans le cache courant y laissait une coquille neuve réclamant des
 fichiers que ce cache n'avait pas : le mode avion tombait. La mise à jour se
 fait donc là où elle est atomique — la réinstallation du service worker.
 
+`hors-ligne.mjs` en a trouvé un troisième, du même genre : `creerOutil` pose
+`version: 0`, et le serveur exigeait une version supérieure ou égale à 1.
+Publier un outil **qu'on vient de créer** — le cas normal, puisqu'on diffuse
+souvent juste après avoir créé — recevait un 409, la file abandonnait l'entrée,
+et l'utilisateur n'apprenait rien. Les mille cinq cent vingt-cinq tests
+passaient : ils composent leurs propres états, où la version n'est jamais zéro.
+
+Le même script garde un piège que rien d'autre ne voit : le service worker
+servait la coquille de l'application pour `/d/…`. Le destinataire d'un lien,
+s'il avait l'application installée, voyait l'accueil au lieu du document — et
+l'envoyeur n'en savait rien. D'où la vérification sur « Document en lecture
+seule », une chaîne que seule la page publiée porte.
+
 happy-dom ne fournit ni canvas, ni service worker, ni cache : ce que ces
 vérifications couvrent, aucun test unitaire ne le couvrira jamais.
 
 ## L'exécuter
 
-Playwright n'est pas une dépendance du dépôt — la suite complète arrive en
-phase 2, avec le Worker et la page de lecture. En attendant :
+Playwright n'est pas une dépendance du dépôt : le § 8 plafonne les dépendances
+de production, et ces scripts se lancent à la main, depuis un dossier où
+`playwright-core` est installé.
 
 ```bash
 pnpm build
@@ -55,6 +74,11 @@ cd /tmp/e2e && node /chemin/vers/atelier237/e2e/fumee.mjs
 
 # mise-a-jour.mjs construit lui-même, deux fois : il se lance depuis le dépôt.
 PLAYWRIGHT=/tmp/e2e/node_modules/playwright-core/index.mjs node e2e/mise-a-jour.mjs
+
+# hors-ligne.mjs a besoin du Worker et de son KV : un serveur, dans un autre
+# terminal, puis le script. BASE change l'adresse si le port est déjà pris.
+pnpm build && wrangler pages dev --port 8798 --ip 127.0.0.1
+PLAYWRIGHT=/tmp/e2e/node_modules/playwright-core/index.mjs node e2e/hors-ligne.mjs
 ```
 
 Le navigateur est celui de l'environnement (`/opt/pw-browsers`) ; son chemin se

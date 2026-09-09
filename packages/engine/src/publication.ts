@@ -117,8 +117,15 @@ export interface ConflitVersion {
  *
  * Strictement supérieure, et non supérieure ou égale : republier la même
  * version est un rejeu de la file d'attente hors ligne, pas une nouveauté.
+ *
+ * **Zéro est une version.** Un outil qu'on vient de créer est en version 0 :
+ * c'est son premier état, pas l'absence d'état. Exiger un minimum de 1 — ce
+ * que faisait cette fonction — rejetait en silence la publication de tout
+ * outil jamais modifié, c'est-à-dire le cas le plus courant, puisqu'on diffuse
+ * souvent juste après avoir créé. Le rejet arrivait en 409, la file
+ * l'abandonnait, et personne n'était prévenu.
  */
 export function accepteLaVersion(recue: number, detenue: number | null): boolean {
-  if (!Number.isSafeInteger(recue) || recue < 1) return false
+  if (!Number.isSafeInteger(recue) || recue < 0) return false
   return detenue === null || recue > detenue
 }

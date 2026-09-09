@@ -84,8 +84,17 @@ describe('le contrôle de version', () => {
     expect(accepteLaVersion(3, 7)).toBe(false)
   })
 
+  it('accepte la version d’un outil qu’on vient de créer', () => {
+    // Un outil neuf est en version 0 : c'est son premier état, pas l'absence
+    // d'état. Exiger 1 faisait échouer en silence la publication de tout outil
+    // jamais modifié — le cas le plus courant, puisqu'on diffuse souvent juste
+    // après avoir créé.
+    expect(accepteLaVersion(0, null)).toBe(true)
+    expect(accepteLaVersion(0, 0)).toBe(false)
+    expect(accepteLaVersion(1, 0)).toBe(true)
+  })
+
   it('refuse ce qui n’est pas une version', () => {
-    expect(accepteLaVersion(0, null)).toBe(false)
     expect(accepteLaVersion(-1, null)).toBe(false)
     expect(accepteLaVersion(1.5, null)).toBe(false)
     expect(accepteLaVersion(Number.NaN, null)).toBe(false)

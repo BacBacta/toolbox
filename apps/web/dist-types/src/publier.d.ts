@@ -40,11 +40,6 @@ export type Issue = {
     readonly sorte: 'publie';
     readonly lien: string;
 }
-/** Rien n'a changé depuis la dernière publication : le lien vaut toujours. */
- | {
-    readonly sorte: 'deja';
-    readonly lien: string;
-}
 /** L'ardoise et le call-box, pour une raison qui n'est pas technique. */
  | {
     readonly sorte: 'refuse';

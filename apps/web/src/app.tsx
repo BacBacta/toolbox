@@ -4,6 +4,7 @@ import type { Extrait } from '@a237/engine'
 import type { JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
 import { Diffusion } from './diffusion.js'
+import { viderLaFile } from './file.js'
 import { publier, televerserCarte } from './publier.js'
 import { CHARGEURS, outilDisponible } from './outils.js'
 import type { Compose, ModuleOutil } from './outils.js'
@@ -120,6 +121,25 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     void listerOutils().then(setOutils)
+  }, [])
+
+  /*
+   * Ce qui n'est pas parti repart, au lancement et au retour du réseau.
+   *
+   * Une file dans laquelle on dépose sans jamais rien retirer n'est pas une
+   * file d'attente, c'est un tiroir. Rien ne s'affiche : la publication est
+   * une conséquence de « Diffuser », pas une tâche que l'utilisateur suit. Ce
+   * qui change, c'est que l'outil a désormais son adresse.
+   */
+  useEffect(() => {
+    const reprendre = (): void => {
+      void viderLaFile(new Date()).then(async (bilan) => {
+        if (bilan.publies > 0) setOutils(await listerOutils())
+      })
+    }
+    reprendre()
+    globalThis.addEventListener('online', reprendre)
+    return () => globalThis.removeEventListener('online', reprendre)
   }, [])
 
   useEffect(() => {
