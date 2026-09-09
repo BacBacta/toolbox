@@ -78,10 +78,17 @@ describe('on demande plutôt que de parier', () => {
 describe('ce que l’étage 1 ne sait pas faire, il le dit', () => {
   it.each([
     'il me faut un contrat de bail',
-    'je veux faire un cv',
     'un pacte d actionnaires',
   ])('« %s » sort de sa portée', (demande) => {
     expect(c(demande).sorte).toBe('hors-portee')
+  })
+
+  it('« je veux faire un cv » ne sort plus de sa portée : l’atelier en fait un', () => {
+    // Cette demande était hors-portée tant que le CV n'existait pas. Le test
+    // suit le catalogue : ce qui devient possible cesse d'être refusé.
+    const r = c('je veux faire un cv')
+    expect(r.sorte).toBe('sur')
+    if (r.sorte === 'sur') expect(r.fiche.id).toBe('cv')
   })
 
   it('une demande vide ne déclenche rien', () => {

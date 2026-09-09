@@ -408,3 +408,230 @@
   font-size: 10pt;
   text-align: right;
 }
+
+/* ───────────────────────────── curriculum vitæ ─────────────────────────────
+ *
+ * Quatre gabarits pour une même feuille. Ils ne diffèrent que par la police,
+ * la façon d'annoncer une section et la présence d'une colonne : la structure
+ * du contenu est la même pour les quatre, et c'est ce qui permet de changer de
+ * gabarit sans rien ressaisir.
+ *
+ * Aucune police web ici non plus (invariant § 2.6). « Serif » et « grotesque »
+ * se jouent avec les familles génériques que tout téléphone possède.
+ */
+
+.a4-cv {
+  --cv-inter: 1.5;
+  --cv-saut: 5mm;
+}
+
+.a4-cv.dense {
+  --cv-inter: 1.28;
+  --cv-saut: 3mm;
+  font-size: 9pt;
+}
+
+.a4-cv .cv-nom {
+  font-size: 20pt;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+}
+
+.a4-cv .cv-titre {
+  margin-top: 1mm;
+  color: var(--pa);
+  font-size: 11pt;
+  font-weight: 600;
+}
+
+.a4-cv .cv-contact {
+  margin-top: 2mm;
+  color: var(--gris);
+  font-size: 9pt;
+}
+
+.a4-cv .cv-section {
+  margin: var(--cv-saut) 0 2mm;
+  color: var(--pa);
+  font-size: 9pt;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.a4-cv .cv-profil {
+  line-height: var(--cv-inter);
+  text-align: justify;
+}
+
+.a4-cv .cv-profil p {
+  margin: 0 0 2mm;
+}
+
+.a4-cv .cv-item {
+  margin-bottom: 3mm;
+  line-height: var(--cv-inter);
+}
+
+.a4-cv .cv-quoi {
+  font-size: 10pt;
+  font-weight: 600;
+}
+
+.a4-cv .cv-ou {
+  color: var(--gris);
+  font-size: 9pt;
+}
+
+/* La puce est dessinée, pas listée : un <ul> imprime des marges que le
+ * gabarit ne contrôle pas d'un navigateur à l'autre. */
+.a4-cv .cv-fait {
+  position: relative;
+  margin-top: 1mm;
+  padding-left: 4mm;
+  font-size: 9.5pt;
+}
+
+.a4-cv .cv-fait::before {
+  content: "";
+  position: absolute;
+  top: 1.7mm;
+  left: 0.8mm;
+  width: 1.2mm;
+  height: 1.2mm;
+  background: var(--pa);
+}
+
+.a4-cv .cv-serie {
+  font-size: 9.5pt;
+  line-height: var(--cv-inter);
+}
+
+/* — Notaire : sérif, tout centré, pour une administration. — */
+.a4-cv.notaire {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.a4-cv.notaire .cv-tete {
+  padding-bottom: 3mm;
+  border-bottom: 0.4mm solid var(--pa);
+  text-align: center;
+}
+
+.a4-cv.notaire .cv-section {
+  border-bottom: 0.2mm solid var(--trait);
+  padding-bottom: 1mm;
+  text-align: center;
+  letter-spacing: 0.14em;
+}
+
+.a4-cv.notaire .cv-serie {
+  text-align: center;
+}
+
+/* — Exécutif : grotesque, un filet de couleur, pour le privé. — */
+
+/*
+ * Le filet sort dans la marge : posé dans la colonne de texte, il décalait le
+ * nom de quatre millimètres vers la droite et l'entête ne s'alignait plus sur
+ * les titres de section en dessous.
+ */
+.a4-cv.executif .cv-tete {
+  /* 5 mm de retrait plus l'épaisseur du filet : sans elle, le nom reste décalé
+   * du filet lui-même et rate l'alignement d'un millimètre et demi. */
+  margin-left: -6.5mm;
+  border-left: 1.5mm solid var(--pa);
+  padding-left: 5mm;
+}
+
+.a4-cv.executif .cv-section {
+  border-bottom: 0.2mm solid var(--trait);
+  padding-bottom: 1mm;
+}
+
+/* — Éditorial : le nom en display, la date en marge, pour un métier créatif. — */
+.a4-cv.editorial .cv-nom {
+  font-size: 28pt;
+  font-weight: 300;
+  letter-spacing: -0.01em;
+}
+
+.a4-cv.editorial .cv-tete {
+  padding-bottom: 4mm;
+  border-bottom: 0.8mm solid var(--pa);
+}
+
+.a4-cv.editorial .cv-section {
+  color: var(--gris-clair);
+  letter-spacing: 0.18em;
+}
+
+/*
+ * `column-gap`, pas `gap` : chaque fait occupe sa propre rangée de la grille,
+ * et un `gap` de quatre millimètres les écartait tous les uns des autres —
+ * trois puces séparées comme trois paragraphes.
+ */
+.a4-cv.editorial .cv-item {
+  display: grid;
+  grid-template-columns: 28mm 1fr;
+  column-gap: 4mm;
+}
+
+.a4-cv.editorial .cv-marge {
+  grid-column: 1;
+  grid-row: 1;
+  color: var(--gris);
+  font-size: 9pt;
+  text-align: right;
+}
+
+.a4-cv.editorial .cv-quoi,
+.a4-cv.editorial .cv-ou,
+.a4-cv.editorial .cv-fait {
+  grid-column: 2;
+}
+
+/* — Bloc : une bande latérale porte le contact et les listes. — */
+
+/*
+ * La hauteur est celle de la zone de texte de la feuille : 297 mm moins les
+ * marges haute et basse. Sans elle, le filet de la bande s'arrête où le
+ * contenu s'arrête, et un CV court montre un trait qui meurt au milieu de la
+ * page — ce qui se lit comme un défaut de rendu, pas comme un parti pris.
+ */
+.a4-cv.bloc {
+  display: grid;
+  grid-template-columns: 58mm 1fr;
+  gap: 8mm;
+  min-height: calc(297mm - 15mm - 20mm);
+}
+
+/* Justifier une colonne de cent millimètres ouvre des rivières entre les mots. */
+.a4-cv.bloc .cv-profil {
+  text-align: left;
+}
+
+.a4-cv.bloc .cv-bande {
+  padding-right: 6mm;
+  border-right: 0.3mm solid var(--trait);
+}
+
+.a4-cv.bloc .cv-bande .cv-nom {
+  font-size: 16pt;
+}
+
+.a4-cv.bloc .cv-bande .cv-titre {
+  font-size: 10pt;
+}
+
+.a4-cv.bloc .cv-ligne {
+  margin-top: 1mm;
+  font-size: 9pt;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.a4-cv.bloc .cv-principal .cv-section:first-child {
+  margin-top: 0;
+}

@@ -638,3 +638,63 @@
   outline-offset: 2px;
   border-radius: var(--rond-s);
 }
+
+/* ─────────────────────── les réglages de forme du CV ───────────────────────
+ *
+ * Trois réglages qui ne touchent pas au contenu : gabarit, langue, densité.
+ * Ils vivent au-dessus de la feuille et non dans le formulaire, parce qu'on en
+ * juge en regardant la page. Changer de gabarit ne fait rien ressaisir.
+ */
+
+.cv-gabarits {
+  display: grid;
+  gap: var(--pas-2);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.cv-gabarit {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: var(--cible);
+  padding: var(--pas-2) var(--pas-3);
+  border: 1px solid var(--trait-champ);
+  border-radius: var(--rond-m);
+  background: var(--surface);
+  color: var(--encre);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--vitesse) var(--courbe),
+    border-color var(--vitesse) var(--courbe),
+    color var(--vitesse) var(--courbe);
+}
+
+.cv-gabarit small {
+  color: var(--encre-3);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.cv-gabarit[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-doux);
+  color: var(--accent);
+}
+
+.cv-gabarit[aria-pressed='true'] small {
+  color: var(--accent);
+}
+
+.cv-options {
+  display: flex;
+  gap: var(--pas-2);
+  align-items: center;
+}
+
+.cv-ecart {
+  flex: 1;
+}

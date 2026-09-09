@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import {
-  EXTRAIT_VIDE, attestation, caisse, clients, course, dette, devis, facture,
+  EXTRAIT_VIDE, attestation, caisse, clients, course, cv, dette, devis, facture,
   motivation, njangi, prix, recu, scolarite, stock, valider,
 } from '@a237/engine'
 import type { RenderContext, ShareSpec } from '@a237/engine'
@@ -63,7 +63,7 @@ describe('le registre des outils', () => {
   it('couvre les squelettes qui ont un écran, et le dit', () => {
     expect(Object.keys(CHARGEURS).sort()).toEqual([
       'attestation', 'caisse', 'clients', 'compose', 'compose-calcul', 'course',
-      'dette', 'devis', 'facture', 'motivation', 'njangi', 'prix', 'recu',
+      'cv', 'dette', 'devis', 'facture', 'motivation', 'njangi', 'prix', 'recu',
       'scolarite', 'stock',
     ])
     expect(outilDisponible('njangi')).toBe(true)
@@ -288,5 +288,100 @@ describe('les quatre actes et lettres', () => {
     const partage = onDiffuser.mock.calls[0]?.[0] as ShareSpec | undefined
     expect(partage?.card.kicker).toBe('REÇU')
     expect(partage?.relances).toEqual([])
+  })
+})
+
+describe('le curriculum vitæ', () => {
+  async function ouvrir(etat?: unknown): Promise<ModuleOutil> {
+    const module = await CHARGEURS.cv!()
+    const neuf = module.creer('cv', LE_9_SEPT, EXTRAIT_VIDE)
+    poser(module, outil('cv', etat ?? neuf.etat))
+    return module
+  }
+
+  function versDocument(): void {
+    act(() => hote.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="false"]')?.click())
+  }
+
+  it('s’ouvre sur son formulaire tant qu’il n’a pas de nom', async () => {
+    await ouvrir()
+    expect(hote.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Modifier')
+  })
+
+  it('s’ouvre sur la feuille dès qu’il porte un nom', async () => {
+    const module = await CHARGEURS.cv!()
+    const neuf = module.creer('cv', LE_9_SEPT, EXTRAIT_VIDE)
+    const nomme = { ...(neuf.etat as object), identite: { ...cv.defaults.identite, nom: 'Adèle' } }
+    poser(module, outil('cv', nomme))
+    expect(hote.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Document')
+  })
+
+  it('dit ce que coûte un CV incomplet, dans ses termes à lui', async () => {
+    await ouvrir()
+    versDocument()
+    const alerte = hote.querySelector('.alerte')?.textContent ?? ''
+    expect(alerte).toContain('recruteur')
+    // Ni TVA ni NIU : un CV ne passe aucun contrôle.
+    expect(alerte).not.toContain('déduire')
+    expect(alerte).not.toContain('NIU')
+  })
+
+  it('offre les quatre gabarits au-dessus de la feuille, pas dans le formulaire', async () => {
+    await ouvrir()
+    versDocument()
+    const boutons = [...hote.querySelectorAll('.cv-gabarit')].map((b) => b.textContent)
+    expect(boutons.length).toBe(4)
+    expect(boutons[0]).toContain('Notaire')
+    // Le formulaire ne redemande pas ce que ces boutons règlent.
+    act(() => hote.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="false"]')?.click())
+    expect(hote.textContent).not.toContain('Gabarit')
+  })
+
+  it('change de gabarit sans rien faire ressaisir', async () => {
+    const change = vi.fn()
+    const module = await CHARGEURS.cv!()
+    const etat = { ...cv.defaults, identite: { ...cv.defaults.identite, nom: 'Adèle' } }
+    act(() => {
+      monter(
+        <module.Outil
+          outil={outil('cv', etat)}
+          glyphe="◫"
+          ctx={CTX}
+          onChange={change}
+          onDiffuser={vi.fn()}
+        />,
+        hote,
+      )
+    })
+    const editorial = [...hote.querySelectorAll<HTMLButtonElement>('.cv-gabarit')].find(
+      (b) => b.textContent?.includes('Éditorial') === true,
+    )
+    act(() => editorial?.click())
+    expect(change).toHaveBeenCalledWith({ ...etat, gabarit: 'editorial' })
+  })
+
+  it('prévient quand le CV déborde d’une page, et propose le compact', async () => {
+    // Le débordement se fabrique avec des postes, pas avec un profil de trois
+    // mille signes : le schéma en plafonne un à six cents. C'est une carrière
+    // longue qui fait deux pages, pas un paragraphe.
+    const poste = {
+      intitule: 'Magasinière principale',
+      employeur: 'Quincaillerie Bépanda',
+      periode: '2022 – 2026',
+      points: Array.from({ length: 6 }, (_, i) => `${i} ${'x'.repeat(158)}`),
+    }
+    const long = {
+      ...cv.defaults,
+      identite: { ...cv.defaults.identite, nom: 'Adèle', titre: 'Magasinière', tel: '699' },
+      postes: [poste, poste, poste],
+    }
+    expect(valider(cv.schema, long)).toEqual([])
+    await ouvrir(long)
+    expect(hote.querySelector('.note')?.textContent).toContain('compact')
+  })
+
+  it('refuse de fabriquer autre chose qu’un CV', async () => {
+    const module = await CHARGEURS.cv!()
+    expect(() => module.creer('facture', LE_9_SEPT, EXTRAIT_VIDE)).toThrow('ne sait faire qu’un CV')
   })
 })

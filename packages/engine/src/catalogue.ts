@@ -77,6 +77,13 @@ export const CATALOGUE: readonly FicheSquelette[] = [
     keywords: ['lettre', 'motivation', 'lettre de motivation', 'demande d emploi', 'candidature', 'postuler', 'demande de stage'],
   },
   {
+    id: 'cv',
+    glyphe: '◫',
+    group: 'documents',
+    title: 'Curriculum vitæ',
+    keywords: ['cv', 'curriculum', 'curriculum vitae', 'mon parcours', 'chercher du travail', 'postuler', 'candidature', 'chercher un emploi'],
+  },
+  {
     id: 'njangi',
     glyphe: '◉',
     group: 'registres',

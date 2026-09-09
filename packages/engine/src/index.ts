@@ -54,6 +54,14 @@ export {
 export {
   attestationSchema, detteSchema, motivationSchema, recuSchema,
 } from './schema/actes.js'
+export type {
+  Diplome, EtatCv, Gabarit, IdentiteCv, LangueCv, ManqueCv, Poste,
+} from './compute/cv.js'
+export {
+  GABARITS, INTITULES, SIGNES_PAR_PAGE, controleCv, debordeUnePage, signesCv,
+} from './compute/cv.js'
+export { cv, cvCard, cvShare } from './skeletons/cv.js'
+export { cvSchema } from './schema/cv.js'
 export type { CalculDemande, EntreeDemandee } from './calcul.js'
 export { MAX_ENTREES, schemaCalcul, verifierCalcul } from './calcul.js'
 export type { ReponseModele } from './composition.js'

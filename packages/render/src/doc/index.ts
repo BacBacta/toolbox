@@ -5,6 +5,7 @@ export type { ZoneSignature } from './chrome.js'
 export {
   DocumentAttestation, DocumentDette, DocumentMotivation, DocumentRecu,
 } from './actes.js'
+export { DocumentCv } from './cv.js'
 export { DocumentDevis } from './devis.js'
 export { DocumentFacture } from './facture.js'
 export { BlocTotaux, TableauLignes } from './tableau.js'
