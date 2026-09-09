@@ -19,6 +19,15 @@ import type { OutilEnregistre } from './stockage.js'
 /** Les squelettes dont le moteur de rendu est écrit. */
 const DISPONIBLES = CATALOGUE.filter((f) => outilDisponible(f.id))
 
+/**
+ * Le signe d'un outil ouvert. Le losange sert de repli : un état enregistré par
+ * une version plus ancienne peut porter un identifiant que ce catalogue-ci ne
+ * connaît plus, et un écran sans pastille sauterait à l'œil.
+ */
+function glyphePour(skeleton: string): string {
+  return CATALOGUE.find((f) => f.id === skeleton)?.glyphe ?? '◇'
+}
+
 function Accueil(props: {
   readonly outils: readonly OutilEnregistre[]
   readonly onCreer: (skeleton: string) => void
@@ -35,7 +44,10 @@ function Accueil(props: {
 
   return (
     <>
-      <h1 class="titre-app">Atelier 237</h1>
+      <header class="app-entete">
+        <h1 class="titre-app">Atelier 237</h1>
+        <span class="app-baseline">hors ligne, sur ton téléphone</span>
+      </header>
 
       <label class="champ" for="recherche">
         <span class="champ-libelle">De quoi as-tu besoin ?</span>
@@ -57,8 +69,13 @@ function Accueil(props: {
         <div class="grille">
           {proposes.map((s) => (
             <button type="button" class="carte-squelette" key={s.id} onClick={() => props.onCreer(s.id)}>
-              <b>{s.title}</b>
-              <span>{s.group}</span>
+              <span class="marque" aria-hidden="true">
+                {s.glyphe}
+              </span>
+              <span class="texte">
+                <b>{s.title}</b>
+                <span>{s.group}</span>
+              </span>
             </button>
           ))}
         </div>
@@ -200,6 +217,7 @@ export function App(): JSX.Element {
       ) : (
         <module.Outil
           outil={ouvert}
+          glyphe={glyphePour(ouvert.skeleton)}
           ctx={ctx}
           onChange={(etat) => tenter(() => changer(etat), 'Enregistrement impossible')}
           onDiffuser={setPartage}

@@ -16,6 +16,13 @@ export interface Kpi {
 
 export function CoquilleOutil<O extends string>(props: {
   readonly titre: string
+  /**
+   * Le signe du catalogue. Il vient de la coquille, qui a déjà le catalogue en
+   * mémoire, et non des initiales du nom : l'utilisateur baptise ses outils
+   * comme il veut, et « Boutique Douala » comme « Boulangerie Deido » donnent
+   * « BD ». Le glyphe, lui, reste le même repère d'un écran à l'autre.
+   */
+  readonly glyphe: string
   readonly sousTitre: string
   readonly kpis: readonly Kpi[]
   readonly onglets: readonly O[]
@@ -28,11 +35,17 @@ export function CoquilleOutil<O extends string>(props: {
       <header class="outil-entete">
         <div class="outil-identite">
           <div class="outil-pastille" aria-hidden="true">
-            {initiales(props.titre)}
+            {props.glyphe}
           </div>
           <div class="outil-titre">
             <b>{props.titre}</b>
-            <span>{props.sousTitre}</span>
+            {/*
+              * Un outil qu'on vient de créer porte le nom de son type : afficher
+              * « Frais scolaires » sous « Frais scolaires » n'apprend rien.
+              */}
+            {props.sousTitre !== '' && props.sousTitre !== props.titre && (
+              <span>{props.sousTitre}</span>
+            )}
           </div>
         </div>
 
@@ -47,6 +60,11 @@ export function CoquilleOutil<O extends string>(props: {
           </div>
         )}
 
+        {/*
+          * Un seul onglet, ce n'est pas une barre d'onglets : c'est un titre
+          * redondant qui prend une ligne et un tour de lecture pour rien.
+          */}
+        {props.onglets.length > 1 && (
         <div class="outil-onglets" role="tablist">
           {props.onglets.map((o) => (
             <button
@@ -60,6 +78,7 @@ export function CoquilleOutil<O extends string>(props: {
             </button>
           ))}
         </div>
+        )}
       </header>
 
       <div class="outil-corps" role="tabpanel">
@@ -69,9 +88,19 @@ export function CoquilleOutil<O extends string>(props: {
   )
 }
 
-/** Barre d'avancement. `part` est bornée à 0–1 : une collecte ne dépasse pas. */
-export function Barre(props: { readonly part: number; readonly legende: string }): JSX.Element {
+/**
+ * Barre d'avancement. `part` est bornée à 0–1 : une collecte ne dépasse pas.
+ *
+ * `montrerPourcent` existe parce que certaines légendes portent déjà le
+ * pourcentage — « 40 % réglé » — et « 40 % · 40 % réglé » était du bégaiement.
+ */
+export function Barre(props: {
+  readonly part: number
+  readonly legende: string
+  readonly montrerPourcent?: boolean
+}): JSX.Element {
   const pourcent = Math.round(Math.max(0, Math.min(1, props.part)) * 100)
+  const montrerPourcent = props.montrerPourcent ?? true
   return (
     <div>
       <div
@@ -84,7 +113,9 @@ export function Barre(props: { readonly part: number; readonly legende: string }
         <i style={{ width: `${pourcent}%` }} />
       </div>
       <div class="outil-legende">
-        {pourcent} % · {props.legende}
+        {montrerPourcent && `${pourcent} %`}
+        {montrerPourcent && props.legende !== '' && ' · '}
+        {props.legende}
       </div>
     </div>
   )
@@ -98,16 +129,29 @@ export function Rangee(props: { readonly children: ComponentChildren }): JSX.Ele
   return <div class="outil-rangee">{props.children}</div>
 }
 
-/** Pastille d'initiales, nom, et la ligne de détail au-dessous. */
-export function Identite(props: { readonly nom: string; readonly detail: string }): JSX.Element {
+/**
+ * Nom, ligne de détail au-dessous, et la pastille d'initiales quand la ligne
+ * nomme quelqu'un.
+ *
+ * `avatar` est faux pour un article ou une écriture de caisse : trente-six
+ * pixels plus une gouttière, c'est un huitième de la largeur d'un téléphone
+ * d'entrée de gamme, pris au nom qui, lui, doit se lire en entier.
+ */
+export function Identite(props: {
+  readonly nom: string
+  readonly detail: string
+  readonly avatar?: boolean
+}): JSX.Element {
   return (
     <div class="identite">
-      <span class="ini" aria-hidden="true">
-        {initiales(props.nom)}
-      </span>
+      {props.avatar !== false && (
+        <span class="ini" aria-hidden="true">
+          {initiales(props.nom)}
+        </span>
+      )}
       <span class="nom">
         <span class="n1">{props.nom}</span>
-        <span class="n2">{props.detail}</span>
+        {props.detail !== '' && <span class="n2">{props.detail}</span>}
       </span>
     </div>
   )

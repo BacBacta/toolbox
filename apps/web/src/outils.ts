@@ -4,6 +4,14 @@ import type { OutilEnregistre } from './stockage.js'
 
 export interface ProprietesOutil {
   readonly outil: OutilEnregistre
+  /**
+   * Le signe du catalogue, transmis par la coquille.
+   *
+   * Il ne se lit pas depuis le fragment : le catalogue est déjà en mémoire dans
+   * la coquille, et l'importer ici le dupliquerait dans chacun des cinq
+   * fragments pour un caractère.
+   */
+  readonly glyphe: string
   readonly ctx: RenderContext
   readonly onChange: (etat: unknown) => void
   readonly onDiffuser: (partage: ShareSpec) => void

@@ -1,6 +1,6 @@
 import type { CardSpec } from '@a237/engine'
 import { limiterItems, texteReste } from '@a237/engine'
-import { COULEURS, COULEURS_CARTE } from '../jetons.js'
+import { COULEURS_CARTE } from '../jetons.js'
 
 /**
  * La carte partagée, en ordres de dessin.
@@ -162,11 +162,11 @@ export function composerCarte(spec: CardSpec, mesureur: Mesureur): {
   const W = LARGEUR_CARTE
   const p: Primitive[] = []
 
-  p.push({ type: 'fond', couleur: COULEURS.fond })
+  p.push({ type: 'fond', couleur: COULEURS_CARTE.fond })
 
   // ── bandeau de tête ──
-  p.push({ type: 'rect', x: 0, y: 0, l: W, h: HAUT_BANDEAU, couleur: COULEURS.accent })
-  p.push({ type: 'rect', x: 0, y: 0, l: 10, h: HAUT_BANDEAU, couleur: COULEURS.accentSombre })
+  p.push({ type: 'rect', x: 0, y: 0, l: W, h: HAUT_BANDEAU, couleur: COULEURS_CARTE.accent })
+  p.push({ type: 'rect', x: 0, y: 0, l: 10, h: HAUT_BANDEAU, couleur: COULEURS_CARTE.accentSombre })
 
   p.push({
     type: 'texte',
@@ -228,23 +228,32 @@ export function composerCarte(spec: CardSpec, mesureur: Mesureur): {
     y: 376,
     texte: spec.bigLabel,
     police: police(800, 22, SANS),
-    couleur: COULEURS.encre3,
+    couleur: COULEURS_CARTE.encre3,
     interlettre: 4.2,
   })
 
-  const tailleBig = ajusterTaille(mesureur, spec.big, W - M * 2, 112, MONO, 700)
+  /*
+   * Le montant de tête est en linéale, pas en chasse fixe.
+   *
+   * La chasse fixe sert à aligner une colonne de chiffres — c'est pour ça que
+   * les valeurs de lignes la gardent plus bas. Ici il n'y a qu'un nombre, seul
+   * et grand : la chasse fixe lui met des blancs entre les chiffres et lui
+   * donne l'air d'une sortie de terminal, à côté du serif du titre.
+   */
+  const tailleBig = ajusterTaille(mesureur, spec.big, W - M * 2, 112, SANS, 800)
   p.push({
     type: 'texte',
     x: M,
     y: 480,
     texte: spec.big,
-    police: police(700, tailleBig, MONO),
-    couleur: COULEURS.accent,
+    police: police(800, tailleBig, SANS),
+    couleur: COULEURS_CARTE.accent,
+    interlettre: -1.5,
   })
 
   if (spec.pct !== null) {
     const part = Math.max(0, Math.min(1, spec.pct))
-    p.push({ type: 'rect', x: M, y: 516, l: W - M * 2, h: 20, r: 10, couleur: COULEURS.trait })
+    p.push({ type: 'rect', x: M, y: 516, l: W - M * 2, h: 20, r: 10, couleur: COULEURS_CARTE.trait })
     p.push({
       type: 'rect',
       x: M,
@@ -253,7 +262,7 @@ export function composerCarte(spec: CardSpec, mesureur: Mesureur): {
       l: Math.max(20, (W - M * 2) * part),
       h: 20,
       r: 10,
-      couleur: COULEURS.accent,
+      couleur: COULEURS_CARTE.accent,
     })
   }
 
@@ -264,7 +273,7 @@ export function composerCarte(spec: CardSpec, mesureur: Mesureur): {
     y: 586,
     texte: tronquer(mesureur, spec.subline, W - M * 2, policeSousLigne),
     police: policeSousLigne,
-    couleur: COULEURS.encre2,
+    couleur: COULEURS_CARTE.encre2,
   })
 
   // ── la liste ──
@@ -275,7 +284,7 @@ export function composerCarte(spec: CardSpec, mesureur: Mesureur): {
     y,
     texte: spec.listTitle,
     police: police(800, 21, SANS),
-    couleur: COULEURS.encre3,
+    couleur: COULEURS_CARTE.encre3,
     interlettre: 4.2,
   })
   y += 26
@@ -288,7 +297,7 @@ export function composerCarte(spec: CardSpec, mesureur: Mesureur): {
         [M, y + 0.5],
         [W - M, y + 0.5],
       ],
-      couleur: COULEURS.trait,
+      couleur: COULEURS_CARTE.trait,
       epaisseur: 2,
     })
     y += HAUT_RANGEE - 8
@@ -296,7 +305,7 @@ export function composerCarte(spec: CardSpec, mesureur: Mesureur): {
     const cx = M + 17
     const cy = y - 16
     if (item.ok) {
-      p.push({ type: 'cercle', x: cx, y: cy, r: 15, couleur: COULEURS.accent, rempli: true })
+      p.push({ type: 'cercle', x: cx, y: cy, r: 15, couleur: COULEURS_CARTE.accent, rempli: true })
       p.push({
         type: 'trait',
         points: [
@@ -313,7 +322,7 @@ export function composerCarte(spec: CardSpec, mesureur: Mesureur): {
         x: cx,
         y: cy,
         r: 13,
-        couleur: item.warn ? COULEURS.alerte : COULEURS_CARTE.cercleVide,
+        couleur: item.warn ? COULEURS_CARTE.alerte : COULEURS_CARTE.cercleVide,
         rempli: false,
         epaisseur: 3.5,
       })
@@ -328,7 +337,7 @@ export function composerCarte(spec: CardSpec, mesureur: Mesureur): {
       y: y - 6,
       texte: tronquer(mesureur, item.n, W - M * 2 - 52 - largeurValeur, policeNom),
       police: policeNom,
-      couleur: item.ok ? COULEURS.encre : item.warn ? COULEURS.alerte : COULEURS.encre2,
+      couleur: item.ok ? COULEURS_CARTE.encre : item.warn ? COULEURS_CARTE.alerte : COULEURS_CARTE.encre2,
     })
 
     if (item.val !== null) {
@@ -338,7 +347,7 @@ export function composerCarte(spec: CardSpec, mesureur: Mesureur): {
         y: y - 6,
         texte: item.val,
         police: policeValeur,
-        couleur: item.ok ? COULEURS.accent : item.warn ? COULEURS.alerte : COULEURS.encre3,
+        couleur: item.ok ? COULEURS_CARTE.accent : item.warn ? COULEURS_CARTE.alerte : COULEURS_CARTE.encre3,
       })
     }
     y += 8
@@ -350,7 +359,7 @@ export function composerCarte(spec: CardSpec, mesureur: Mesureur): {
       [M, y + 0.5],
       [W - M, y + 0.5],
     ],
-    couleur: COULEURS.trait,
+    couleur: COULEURS_CARTE.trait,
     epaisseur: 2,
   })
 
@@ -363,13 +372,13 @@ export function composerCarte(spec: CardSpec, mesureur: Mesureur): {
       y: y - 8,
       texte: mentionReste,
       police: police(500, 26, SANS),
-      couleur: COULEURS.encre3,
+      couleur: COULEURS_CARTE.encre3,
     })
   }
 
   // ── pied ──
-  p.push({ type: 'rect', x: 0, y: H - HAUT_PIED, l: W, h: HAUT_PIED, couleur: COULEURS.bandeau })
-  p.push({ type: 'rect', x: 0, y: H - HAUT_PIED, l: W, h: 3, couleur: COULEURS.bandeauTrait })
+  p.push({ type: 'rect', x: 0, y: H - HAUT_PIED, l: W, h: HAUT_PIED, couleur: COULEURS_CARTE.bandeau })
+  p.push({ type: 'rect', x: 0, y: H - HAUT_PIED, l: W, h: 3, couleur: COULEURS_CARTE.bandeauTrait })
 
   // Un lien vide veut dire « pas encore publié ». On n'imprime pas une adresse
   // qui n'existe pas sur une image que quelqu'un va faire circuler.
@@ -381,7 +390,7 @@ export function composerCarte(spec: CardSpec, mesureur: Mesureur): {
       y: H - 84,
       texte: tronquer(mesureur, spec.link, W - M * 2 - 240, policeLien),
       police: policeLien,
-      couleur: COULEURS.accent,
+      couleur: COULEURS_CARTE.accent,
     })
   }
 
@@ -392,7 +401,7 @@ export function composerCarte(spec: CardSpec, mesureur: Mesureur): {
     y: H - 42,
     texte: tronquer(mesureur, spec.stamp, W - M * 2 - 240, policeHorodatage),
     police: policeHorodatage,
-    couleur: COULEURS.encre3,
+    couleur: COULEURS_CARTE.encre3,
   })
 
   const policeFiligrane = police(800, 20, SANS)

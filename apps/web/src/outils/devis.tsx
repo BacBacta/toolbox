@@ -5,14 +5,16 @@ import type { JSX } from 'preact'
 import { useState } from 'preact/hooks'
 import { ChampsSchema } from '../formulaire.js'
 import type { ProprietesOutil } from '../outils.js'
-import { CadreDocument, EtatInvalide, Manquements } from './commun.js'
+import { CadreDocument, EtatInvalide, Manquements, ongletDOuverture } from './commun.js'
 import type { OngletDocument } from './commun.js'
 
 /** Champs que l'utilisateur ne saisit pas : ils sont dérivés à la création. */
 const MASQUES = ['$.nom', '$.emisLe']
 
 export function Outil(props: ProprietesOutil): JSX.Element {
-  const [onglet, setOnglet] = useState<OngletDocument>('Document')
+  // Le crochet passe avant la sortie anticipée : un état qui redeviendrait
+  // valide changerait sinon le nombre de crochets d'un rendu à l'autre.
+  const [onglet, setOnglet] = useState<OngletDocument>(ongletDOuverture(props.outil.etat))
 
   const erreurs = valider(devis.schema, props.outil.etat)
   if (erreurs.length > 0) return <EtatInvalide erreurs={erreurs} />
@@ -21,6 +23,7 @@ export function Outil(props: ProprietesOutil): JSX.Element {
   return (
     <CadreDocument
       titre={props.outil.nom}
+      glyphe={props.glyphe}
       sousTitre={`Devis N° ${etat.numero}`}
       onglet={onglet}
       onOnglet={setOnglet}
@@ -28,7 +31,7 @@ export function Outil(props: ProprietesOutil): JSX.Element {
     >
       {onglet === 'Document' ? (
         <>
-          <Manquements manquements={controleLegal(etat)} />
+          <Manquements manquements={controleLegal(etat)} onCompleter={() => setOnglet('Modifier')} />
           <DocumentDevis etat={etat} />
         </>
       ) : (

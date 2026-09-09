@@ -25,9 +25,24 @@ export function ChampsSchema(props) {
     const schema = props.schema;
     if (schema.type === 'object') {
         const valeur = props.valeur;
-        return (_jsx(_Fragment, { children: Object.entries(schema.properties).map(([clef, sous]) => (_jsx(ChampsSchema, { schema: sous, chemin: `${chemin}.${clef}`, masques: masques, valeur: typeof valeur === 'object' && valeur !== null
-                    ? valeur[clef]
-                    : undefined, onChange: (v) => props.onChange(objetAvec(valeur, clef, v)) }, clef))) }));
+        const champs = Object.entries(schema.properties).map(([clef, sous]) => (_jsx(ChampsSchema, { schema: sous, chemin: `${chemin}.${clef}`, masques: masques, valeur: typeof valeur === 'object' && valeur !== null
+                ? valeur[clef]
+                : undefined, onChange: (v) => props.onChange(objetAvec(valeur, clef, v)) }, clef)));
+        /*
+         * Un objet imbriqué qui se nomme devient un bloc.
+         *
+         * Sans ça, un devis est un ruban de dix-sept champs où « Téléphone » —
+         * celui de l'entreprise — et « Téléphone du client » se ressemblent trop
+         * pour qu'on sache lequel on remplit. Le schéma porte déjà les noms des
+         * blocs (« Ton entreprise », « Le client ») : il n'y a rien à inventer.
+         *
+         * La racine, elle, reste à plat : un cadre autour de tout le formulaire
+         * n'entoure rien.
+         */
+        if (chemin !== '$' && schema.title !== undefined) {
+            return (_jsxs("fieldset", { class: "champ-groupe", children: [_jsx("legend", { children: schema.title }), champs] }));
+        }
+        return _jsx(_Fragment, { children: champs });
     }
     if (schema.type === 'array') {
         const liste = Array.isArray(props.valeur) ? props.valeur : [];

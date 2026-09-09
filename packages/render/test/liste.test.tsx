@@ -69,6 +69,7 @@ function poser(
   act(() => {
     monter(
       <RegistreListe
+        glyphe="≡"
         config={config}
         titre={squelette.title}
         etat={etat}

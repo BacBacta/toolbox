@@ -30,6 +30,7 @@ export function Outil(props: ProprietesOutil): JSX.Element {
 
   return (
     <RegistreListe
+      glyphe={props.glyphe}
       config={squelette.config}
       titre={squelette.title}
       etat={props.outil.etat as EtatListe}

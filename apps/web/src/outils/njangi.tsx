@@ -11,6 +11,7 @@ export function Outil(props: ProprietesOutil): JSX.Element {
 
   return (
     <RegistreNjangi
+      glyphe={props.glyphe}
       etat={props.outil.etat as EtatNjangi}
       ctx={props.ctx}
       onChange={props.onChange}

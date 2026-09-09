@@ -46,12 +46,18 @@ function etatMembre(m: MembreNjangi): string {
   return 'pas encore servi'
 }
 
+/**
+ * Vide pour un membre sans historique : le badge dit déjà « nouveau », et
+ * « nouveau — pas encore de tour vécu » à côté d'un badge « nouveau », c'est
+ * la même information trois fois sur une ligne de 360 px.
+ */
 function detailFiabilite(m: MembreNjangi): string {
-  if (m.tours === 0) return 'nouveau — pas encore de tour vécu'
+  if (m.tours === 0) return ''
   return `${m.versements} versements sur ${m.tours} tours`
 }
 
 export function RegistreNjangi(props: {
+  readonly glyphe: string
   readonly etat: EtatNjangi
   readonly ctx: RenderContext
   readonly onChange: (etat: EtatNjangi) => void
@@ -76,11 +82,12 @@ export function RegistreNjangi(props: {
   return (
     <CoquilleOutil
       titre={etat.nom}
+      glyphe={props.glyphe}
       sousTitre={`${NOM_PERIODE[etat.periode]} ${etat.tour} · cotisation ${montantF(etat.cotisation)}`}
       kpis={[
         { libelle: 'Collecté', valeur: montantF(c.collecte) },
         { libelle: 'Attendu', valeur: montantF(c.attendu) },
-        { libelle: 'En retard', valeur: String(c.retardataires.length) },
+        { libelle: 'Retard', valeur: String(c.retardataires.length) },
       ]}
       onglets={ONGLETS}
       ongletCourant={onglet}
@@ -97,12 +104,20 @@ export function RegistreNjangi(props: {
               {etat.membres.map((m, i) => (
                 <Rangee key={`${i}-${m.nom}`}>
                   <Identite nom={m.nom} detail={etatMembre(m)} />
+                  {/*
+                    * Trois cas exclusifs, et le troisième ne s'affiche pas.
+                    *
+                    * Celui qui est au tour porte son badge : un montant à côté
+                    * se lirait comme ce qu'il reçoit, alors que ce serait sa
+                    * cotisation. Celui qui a versé montre ce qu'il a versé. Et
+                    * celui qui doit ne montre rien : le bouton dit déjà
+                    * « doit », un « — » le redisait en moins clair et volait la
+                    * place au nom.
+                    */}
                   {m.estAuTour ? (
                     <Badge ton="tour">tour</Badge>
                   ) : (
-                    <Montant ton={m.aVerse ? 'regle' : 'retard'}>
-                      {m.aVerse ? montantF(etat.cotisation) : '—'}
-                    </Montant>
+                    m.aVerse && <Montant ton="regle">{montantF(etat.cotisation)}</Montant>
                   )}
                   <button
                     type="button"
@@ -149,9 +164,11 @@ export function RegistreNjangi(props: {
                 return (
                   <Rangee key={m.nom}>
                     <Identite nom={m.nom} detail={detailFiabilite(m)} />
-                    <Montant ton={fiable === false ? 'retard' : 'neutre'}>
-                      {taux === null ? '—' : `${Math.round(taux * 100)} %`}
-                    </Montant>
+                    {taux !== null && (
+                      <Montant ton={fiable === false ? 'retard' : 'neutre'}>
+                        {`${Math.round(taux * 100)} %`}
+                      </Montant>
+                    )}
                     {fiable === null ? (
                       <Badge ton="neutre">nouveau</Badge>
                     ) : (

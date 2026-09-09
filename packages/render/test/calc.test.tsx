@@ -30,6 +30,7 @@ function poser(
   act(() => {
     monter(
       <Calculatrice
+        glyphe="▲"
         config={squelette.config}
         titre={squelette.title}
         etat={etat}

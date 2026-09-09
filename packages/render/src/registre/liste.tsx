@@ -31,6 +31,7 @@ function valeurSaisie(brut: string, type: string): string | number | boolean {
 }
 
 export function RegistreListe(props: {
+  readonly glyphe: string
   readonly config: ConfigListe
   readonly titre: string
   readonly etat: EtatListe
@@ -83,6 +84,7 @@ export function RegistreListe(props: {
   return (
     <CoquilleOutil
       titre={etat.nom}
+      glyphe={props.glyphe}
       sousTitre={props.titre}
       kpis={kpis}
       onglets={ONGLETS}
@@ -110,6 +112,7 @@ export function RegistreListe(props: {
                     <Identite
                       nom={nom === '' ? '—' : nom}
                       detail={secondaires.map((c) => cellule(ligne, c)).join(' · ')}
+                      avatar={config.personnes === true}
                     />
                     {alertees.has(i) && config.alerte !== undefined && (
                       <Badge ton="non">{config.alerte.libelle}</Badge>

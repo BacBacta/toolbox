@@ -36,6 +36,7 @@ const VIDE: EtatNjangi = { ...CARNET, tour: 1, historique: [], membres: [] }
 function html(etat: EtatNjangi, onglet?: 'Cagnotte' | 'Membres' | 'Historique'): string {
   return enChaine(
     <RegistreNjangi
+      glyphe="◉"
       etat={etat}
       ctx={CTX}
       onChange={() => undefined}
@@ -58,7 +59,7 @@ describe('l’entête dit où en est la cagnotte', () => {
     expect(sortie).toContain(`10${E}000${E}F`)
     expect(sortie).toContain('Attendu')
     expect(sortie).toContain(`20${E}000${E}F`)
-    expect(sortie).toContain('En retard')
+    expect(sortie).toContain('Retard')
   })
 
   it('marque l’onglet courant pour les lecteurs d’écran', () => {
@@ -89,6 +90,14 @@ describe('l’onglet Cagnotte', () => {
   it('distingue celui qui a versé de celui qui doit', () => {
     expect(sortie).toContain('aria-label="Adèle : doit sa part"')
     expect(sortie).toContain('aria-label="Ernest : a versé"')
+  })
+
+  it('n’affiche le montant qu’une fois versé', () => {
+    // Le bouton dit déjà « doit ». Un « — » à côté ne l'aidait pas et prenait
+    // la place du nom, qui, lui, doit se lire en entier.
+    const versements = sortie.match(/class="outil-montant regle"/g) ?? []
+    expect(versements).toHaveLength(1)
+    expect(sortie).not.toContain('outil-montant retard')
   })
 
   it('dit qui reçoit, et combien', () => {
@@ -125,8 +134,12 @@ describe('l’onglet Membres', () => {
       { ...CARNET, membres: [{ nom: 'Rosalie', aVerse: false, aRecu: false, estAuTour: false, versements: 0, tours: 0 }] },
       'Membres',
     )
-    expect(neuf).toContain('nouveau — pas encore de tour vécu')
+    expect(neuf).toContain('nouveau')
     expect(neuf).not.toContain('fragile')
+    // Le badge dit « nouveau » : la ligne de détail et le pourcentage se
+    // taisent plutôt que de le redire deux fois de plus.
+    expect(neuf).not.toContain('class="n2"')
+    expect(neuf).not.toContain('outil-montant')
   })
 
   it('ouvre un formulaire d’ajout, avec le téléphone facultatif', () => {
@@ -168,7 +181,7 @@ describe('les gestes appellent le moteur, et rien d’autre', () => {
   function poser(etat: EtatNjangi, onChange: (e: EtatNjangi) => void, onDiffuser = () => undefined) {
     act(() => {
       monter(
-        <RegistreNjangi etat={etat} ctx={CTX} onChange={onChange} onDiffuser={onDiffuser} />,
+        <RegistreNjangi glyphe="◉" etat={etat} ctx={CTX} onChange={onChange} onDiffuser={onDiffuser} />,
         hote,
       )
     })

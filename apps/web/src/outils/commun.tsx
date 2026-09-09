@@ -30,8 +30,21 @@ export function EtatInvalide(props: { readonly erreurs: readonly ErreurValidatio
   )
 }
 
-/** Ce qui manque au document pour passer un contrôle. */
-export function Manquements(props: { readonly manquements: readonly Manquement[] }): JSX.Element | null {
+/**
+ * Ce qui manque au document pour passer un contrôle.
+ *
+ * Les mentions manquantes s'énumèrent au lieu de se lire en prose : sept
+ * mentions dans une phrase font cinq lignes de rouge dont on ne retient rien,
+ * alors qu'une liste se pointe du doigt et se coche des yeux.
+ *
+ * Et l'encart porte le geste qui le fait disparaître. Un écran qui dit « il
+ * manque ton NIU » sans emmener là où on le saisit laisse l'utilisateur
+ * chercher l'onglet lui-même.
+ */
+export function Manquements(props: {
+  readonly manquements: readonly Manquement[]
+  readonly onCompleter?: () => void
+}): JSX.Element | null {
   const bloquants = props.manquements.filter((m) => m.gravite === 'bloquant')
   const avertissements = props.manquements.filter((m) => m.gravite === 'avertissement')
   if (bloquants.length === 0 && avertissements.length === 0) return null
@@ -39,13 +52,25 @@ export function Manquements(props: { readonly manquements: readonly Manquement[]
   return (
     <div class={bloquants.length > 0 ? 'alerte' : 'note'}>
       {bloquants.length > 0 && (
-        <p>
-          Il manque {bloquants.map((m) => m.libelle).join(', ')}. Sans ces mentions, un client qui
-          veut déduire ne pourra pas s’en servir.
-        </p>
+        <>
+          <p>
+            Il manque {bloquants.length === 1 ? 'une mention' : `${bloquants.length} mentions`}.
+            Sans elles, un client qui veut déduire ne pourra pas s’en servir.
+          </p>
+          <ul>
+            {bloquants.map((m) => (
+              <li key={m.libelle}>{m.libelle}</li>
+            ))}
+          </ul>
+        </>
       )}
       {avertissements.length > 0 && (
         <p>À vérifier : {avertissements.map((m) => m.libelle).join(', ')}.</p>
+      )}
+      {props.onCompleter !== undefined && (
+        <button type="button" class="alerte-action" onClick={props.onCompleter}>
+          Compléter le document
+        </button>
       )}
     </div>
   )
@@ -53,8 +78,27 @@ export function Manquements(props: { readonly manquements: readonly Manquement[]
 
 export type OngletDocument = 'Document' | 'Modifier'
 
+/**
+ * L'onglet d'ouverture d'un document.
+ *
+ * Un document qu'on vient de créer s'ouvre sur le formulaire : l'onglet
+ * Document lui montrerait une page blanche surmontée de la liste des sept
+ * mentions qui manquent — un reproche avant le premier geste. Une fois
+ * l'entreprise saisie, il y a quelque chose à regarder, et c'est le document
+ * qui prend la main.
+ *
+ * L'état arrive brut, avant validation : ce choix se fait au premier rendu,
+ * donc avant qu'on sache s'il est conforme.
+ */
+export function ongletDOuverture(etat: unknown): OngletDocument {
+  const doc = etat as { emetteur?: { nom?: unknown } } | null
+  const nom = doc?.emetteur?.nom
+  return typeof nom === 'string' && nom.trim() !== '' ? 'Document' : 'Modifier'
+}
+
 export function CadreDocument(props: {
   readonly titre: string
+  readonly glyphe: string
   readonly sousTitre: string
   readonly onglet: OngletDocument
   readonly onOnglet: (o: OngletDocument) => void
@@ -65,6 +109,9 @@ export function CadreDocument(props: {
     <section class="outil">
       <header class="outil-entete">
         <div class="outil-identite">
+          <div class="outil-pastille" aria-hidden="true">
+            {props.glyphe}
+          </div>
           <div class="outil-titre">
             <b>{props.titre}</b>
             <span>{props.sousTitre}</span>

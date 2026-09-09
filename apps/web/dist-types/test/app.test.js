@@ -120,7 +120,9 @@ describe('créer et rouvrir un outil', () => {
         await reposer();
         cliquer('.lien-outil');
         await reposer();
-        expect(hote.textContent).toContain('Sous-total HT');
+        // Le numéro est figé à la création : le retrouver prouve que c'est bien
+        // l'état enregistré qui revient, et non un devis neuf.
+        expect(hote.textContent).toContain('DV-2026-0001');
     });
     it('supprime un outil depuis la liste', async () => {
         cliquerTexte('Facture');

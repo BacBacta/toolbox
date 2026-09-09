@@ -24,6 +24,7 @@ export function Outil(props: ProprietesOutil): JSX.Element {
 
   return (
     <Calculatrice
+      glyphe={props.glyphe}
       config={squelette.config}
       titre={squelette.title}
       etat={props.outil.etat as EtatCalc}

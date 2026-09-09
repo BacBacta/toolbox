@@ -12,7 +12,7 @@ export function Outil(props) {
     const erreurs = valider(squelette.schema, props.outil.etat);
     if (erreurs.length > 0)
         return _jsx(EtatInvalide, { erreurs: erreurs });
-    return (_jsx(Calculatrice, { config: squelette.config, titre: squelette.title, etat: props.outil.etat, ctx: props.ctx, onChange: props.onChange, onDiffuser: props.onDiffuser, partage: squelette.share }));
+    return (_jsx(Calculatrice, { glyphe: props.glyphe, config: squelette.config, titre: squelette.title, etat: props.outil.etat, ctx: props.ctx, onChange: props.onChange, onDiffuser: props.onDiffuser, partage: squelette.share }));
 }
 export function creer(skeleton, _maintenant) {
     const squelette = PAR_ID.get(skeleton);

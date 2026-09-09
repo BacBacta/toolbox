@@ -6,7 +6,7 @@ export function Outil(props) {
     const erreurs = valider(njangi.schema, props.outil.etat);
     if (erreurs.length > 0)
         return _jsx(EtatInvalide, { erreurs: erreurs });
-    return (_jsx(RegistreNjangi, { etat: props.outil.etat, ctx: props.ctx, onChange: props.onChange, onDiffuser: props.onDiffuser }));
+    return (_jsx(RegistreNjangi, { glyphe: props.glyphe, etat: props.outil.etat, ctx: props.ctx, onChange: props.onChange, onDiffuser: props.onDiffuser }));
 }
 export function creer(_skeleton, maintenant) {
     return {

@@ -47,7 +47,7 @@ function outil(skeleton: string, etat: unknown): OutilEnregistre {
 function poser(module: ModuleOutil, o: OutilEnregistre, onDiffuser = vi.fn()): typeof onDiffuser {
   act(() => {
     monter(
-      <module.Outil outil={o} ctx={CTX} onChange={() => undefined} onDiffuser={onDiffuser} />,
+      <module.Outil outil={o} glyphe="◉" ctx={CTX} onChange={() => undefined} onDiffuser={onDiffuser} />,
       hote,
     )
   })
@@ -103,28 +103,52 @@ describe.each([
   })
 })
 
+/** Le même état, avec une entreprise renseignée : le document n'est plus vierge. */
+function avecEmetteur(etat: unknown): unknown {
+  const doc = etat as { emetteur: Record<string, string> }
+  return { ...doc, emetteur: { ...doc.emetteur, nom: 'Ets Ngo Bassong' } }
+}
+
 describe('les documents ont un onglet d’édition', () => {
-  it.each(['devis', 'facture'] as const)('« %s » bascule vers le formulaire', async (id) => {
+  it.each(['devis', 'facture'] as const)('« %s » s’ouvre sur le formulaire tant qu’il est vierge', async (id) => {
     const module = await CHARGEURS[id]!()
     poser(module, outil(id, module.creer(id, LE_9_SEPT).etat))
-    expect(hote.textContent).toContain('Sous-total HT')
-
-    act(() => hote.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="false"]')?.click())
+    // Une page blanche surmontée de sept mentions manquantes n'apprend rien :
+    // un document neuf s'ouvre là où on le remplit.
     expect(hote.textContent).toContain('Raison sociale')
-    expect(hote.textContent).toContain('NIU')
+    expect(hote.textContent).not.toContain('Sous-total HT')
   })
 
-  it.each(['devis', 'facture'] as const)('« %s » signale les mentions qui manquent', async (id) => {
+  it.each(['devis', 'facture'] as const)('« %s » s’ouvre sur le document dès qu’il porte un nom', async (id) => {
+    const module = await CHARGEURS[id]!()
+    poser(module, outil(id, avecEmetteur(module.creer(id, LE_9_SEPT).etat)))
+    expect(hote.textContent).toContain('Sous-total HT')
+  })
+
+  it.each(['devis', 'facture'] as const)('« %s » bascule vers le document', async (id) => {
     const module = await CHARGEURS[id]!()
     poser(module, outil(id, module.creer(id, LE_9_SEPT).etat))
-    // Un document neuf n'a pas d'émetteur : le NIU et le RCCM manquent.
-    expect(hote.querySelector('.alerte')?.textContent).toContain('NIU')
+
+    act(() => hote.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="false"]')?.click())
+    expect(hote.textContent).toContain('Sous-total HT')
+  })
+
+  it.each(['devis', 'facture'] as const)('« %s » énumère les mentions qui manquent', async (id) => {
+    const module = await CHARGEURS[id]!()
+    poser(module, outil(id, avecEmetteur(module.creer(id, LE_9_SEPT).etat)))
+    // Un document sans NIU ni RCCM ne passe pas un contrôle : on le liste au
+    // lieu de l'écrire en prose, et on offre le geste qui le répare.
+    const alerte = hote.querySelector('.alerte')
+    expect(alerte?.textContent).toContain('NIU')
+    expect(alerte?.querySelectorAll('li').length).toBeGreaterThan(1)
+
+    act(() => alerte?.querySelector<HTMLButtonElement>('.alerte-action')?.click())
+    expect(hote.textContent).toContain('Raison sociale')
   })
 
   it('ne montre pas les champs dérivés à la création', async () => {
     const module = await CHARGEURS.devis!()
     poser(module, outil('devis', module.creer('devis', LE_9_SEPT).etat))
-    act(() => hote.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="false"]')?.click())
     expect(hote.textContent).toContain('Numéro')
     expect(hote.textContent).not.toContain('Date d’émission')
   })

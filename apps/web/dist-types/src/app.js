@@ -13,13 +13,21 @@ import { creerOutil, listerOutils, lireOutil, majEtat, supprimerOutil } from './
  */
 /** Les squelettes dont le moteur de rendu est écrit. */
 const DISPONIBLES = CATALOGUE.filter((f) => outilDisponible(f.id));
+/**
+ * Le signe d'un outil ouvert. Le losange sert de repli : un état enregistré par
+ * une version plus ancienne peut porter un identifiant que ce catalogue-ci ne
+ * connaît plus, et un écran sans pastille sauterait à l'œil.
+ */
+function glyphePour(skeleton) {
+    return CATALOGUE.find((f) => f.id === skeleton)?.glyphe ?? '◇';
+}
 function Accueil(props) {
     const [recherche, setRecherche] = useState('');
     // Étage 1 du moteur : correspondance de mots-clés, zéro jeton (§ 4).
     const proposes = recherche.trim() === ''
         ? DISPONIBLES
         : classer(recherche, DISPONIBLES).map((c) => c.squelette);
-    return (_jsxs(_Fragment, { children: [_jsx("h1", { class: "titre-app", children: "Atelier 237" }), _jsxs("label", { class: "champ", for: "recherche", children: [_jsx("span", { class: "champ-libelle", children: "De quoi as-tu besoin ?" }), _jsx("input", { id: "recherche", type: "search", value: recherche, placeholder: "il me faut un devis, noter le njangi\u2026", onInput: (e) => setRecherche(e.target.value) })] }), proposes.length === 0 ? (_jsx("p", { class: "note", children: "Rien ne correspond encore. Les autres outils du prototype arrivent ; en attendant, essaie \u00AB devis \u00BB, \u00AB facture \u00BB ou \u00AB njangi \u00BB." })) : (_jsx("div", { class: "grille", children: proposes.map((s) => (_jsxs("button", { type: "button", class: "carte-squelette", onClick: () => props.onCreer(s.id), children: [_jsx("b", { children: s.title }), _jsx("span", { children: s.group })] }, s.id))) })), _jsx("h2", { class: "outil-surtitre", children: "Mes outils" }), props.outils.length === 0 ? (_jsx("p", { class: "note", children: "Rien pour l\u2019instant. Choisis un outil ci-dessus." })) : (_jsx("div", { class: "outil-rangees", children: props.outils.map((o) => (_jsxs("div", { class: "outil-rangee", children: [_jsx("button", { type: "button", class: "identite lien-outil", onClick: () => props.onOuvrir(o.id), children: _jsxs("span", { class: "nom", children: [_jsx("span", { class: "n1", children: o.nom }), _jsx("span", { class: "n2", children: o.skeleton })] }) }), _jsx("button", { type: "button", class: "outil-retirer", "aria-label": `Supprimer ${o.nom}`, onClick: () => props.onSupprimer(o.id), children: "\u00D7" })] }, o.id))) }))] }));
+    return (_jsxs(_Fragment, { children: [_jsxs("header", { class: "app-entete", children: [_jsx("h1", { class: "titre-app", children: "Atelier 237" }), _jsx("span", { class: "app-baseline", children: "hors ligne, sur ton t\u00E9l\u00E9phone" })] }), _jsxs("label", { class: "champ", for: "recherche", children: [_jsx("span", { class: "champ-libelle", children: "De quoi as-tu besoin ?" }), _jsx("input", { id: "recherche", type: "search", value: recherche, placeholder: "il me faut un devis, noter le njangi\u2026", onInput: (e) => setRecherche(e.target.value) })] }), proposes.length === 0 ? (_jsx("p", { class: "note", children: "Rien ne correspond encore. Les autres outils du prototype arrivent ; en attendant, essaie \u00AB devis \u00BB, \u00AB facture \u00BB ou \u00AB njangi \u00BB." })) : (_jsx("div", { class: "grille", children: proposes.map((s) => (_jsxs("button", { type: "button", class: "carte-squelette", onClick: () => props.onCreer(s.id), children: [_jsx("span", { class: "marque", "aria-hidden": "true", children: s.glyphe }), _jsxs("span", { class: "texte", children: [_jsx("b", { children: s.title }), _jsx("span", { children: s.group })] })] }, s.id))) })), _jsx("h2", { class: "outil-surtitre", children: "Mes outils" }), props.outils.length === 0 ? (_jsx("p", { class: "note", children: "Rien pour l\u2019instant. Choisis un outil ci-dessus." })) : (_jsx("div", { class: "outil-rangees", children: props.outils.map((o) => (_jsxs("div", { class: "outil-rangee", children: [_jsx("button", { type: "button", class: "identite lien-outil", onClick: () => props.onOuvrir(o.id), children: _jsxs("span", { class: "nom", children: [_jsx("span", { class: "n1", children: o.nom }), _jsx("span", { class: "n2", children: o.skeleton })] }) }), _jsx("button", { type: "button", class: "outil-retirer", "aria-label": `Supprimer ${o.nom}`, onClick: () => props.onSupprimer(o.id), children: "\u00D7" })] }, o.id))) }))] }));
 }
 export function App() {
     const [outils, setOutils] = useState([]);
@@ -91,5 +99,5 @@ export function App() {
     return (_jsxs("main", { class: "app", children: [_jsx("button", { type: "button", class: "retour", onClick: () => {
                     setOuvert(null);
                     setErreur('');
-                }, children: "\u2190 Mes outils" }), erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), module === null ? (_jsx("p", { class: "note", children: "Chargement de l\u2019outil\u2026" })) : (_jsx(module.Outil, { outil: ouvert, ctx: ctx, onChange: (etat) => tenter(() => changer(etat), 'Enregistrement impossible'), onDiffuser: setPartage })), partage !== null && _jsx(Diffusion, { partage: partage, onFermer: () => setPartage(null) })] }));
+                }, children: "\u2190 Mes outils" }), erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), module === null ? (_jsx("p", { class: "note", children: "Chargement de l\u2019outil\u2026" })) : (_jsx(module.Outil, { outil: ouvert, glyphe: glyphePour(ouvert.skeleton), ctx: ctx, onChange: (etat) => tenter(() => changer(etat), 'Enregistrement impossible'), onDiffuser: setPartage })), partage !== null && _jsx(Diffusion, { partage: partage, onFermer: () => setPartage(null) })] }));
 }

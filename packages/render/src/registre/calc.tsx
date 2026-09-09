@@ -18,6 +18,7 @@ function afficher(valeur: number, unite: 'F' | ''): string {
 }
 
 export function Calculatrice(props: {
+  readonly glyphe: string
   readonly config: ConfigCalc
   readonly titre: string
   readonly etat: EtatCalc
@@ -40,8 +41,11 @@ export function Calculatrice(props: {
   return (
     <CoquilleOutil
       titre={etat.nom}
+      glyphe={props.glyphe}
       sousTitre={props.titre}
-      kpis={[{ libelle: config.sortie.libelle, valeur: afficher(resultat, config.sortie.unite) }]}
+      // Aucun indicateur : le résultat est déjà le sujet de l'écran, et le
+      // répéter dans l'entête le dilue au lieu de l'appuyer.
+      kpis={[]}
       onglets={['Calcul'] as const}
       ongletCourant="Calcul"
       onOnglet={() => undefined}
@@ -51,7 +55,9 @@ export function Calculatrice(props: {
         <span class="calc-valeur">{afficher(resultat, config.sortie.unite)}</span>
       </div>
 
-      {part !== null && <Barre part={part} legende={precision ?? ''} />}
+      {part !== null && (
+        <Barre part={part} legende={precision ?? ''} montrerPourcent={precision === null} />
+      )}
       {part === null && precision !== null && <p class="outil-legende">{precision}</p>}
 
       {config.entrees.map((e) => (

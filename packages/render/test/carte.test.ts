@@ -9,7 +9,7 @@ import {
   largeurInterlettree, LARGEUR_CARTE, tronquer,
 } from '../src/carte/geometrie.js'
 import type { Mesureur, Primitive } from '../src/carte/geometrie.js'
-import { COULEURS, COULEURS_CARTE } from '../src/jetons.js'
+import { COULEURS_CARTE } from '../src/jetons.js'
 
 /**
  * Un mesureur déterministe : chaque lettre fait la moitié de la taille de la
@@ -148,7 +148,7 @@ describe('composerCarte', () => {
   })
 
   it('pose le fond avant tout le reste', () => {
-    expect(primitives[0]).toEqual({ type: 'fond', couleur: COULEURS.fond })
+    expect(primitives[0]).toEqual({ type: 'fond', couleur: COULEURS_CARTE.fond })
   })
 
   it('écrit tous les textes de la spécification', () => {
@@ -167,11 +167,11 @@ describe('composerCarte', () => {
   it('coche ce qui est versé et cercle ce qui manque', () => {
     const cercles = primitives.filter(estCercle)
     expect(cercles.filter((c) => c.rempli)).toHaveLength(2)
-    expect(cercles.filter((c) => !c.rempli && c.couleur === COULEURS.alerte)).toHaveLength(2)
+    expect(cercles.filter((c) => !c.rempli && c.couleur === COULEURS_CARTE.alerte)).toHaveLength(2)
   })
 
   it('colore le nom d’un retardataire en alerte', () => {
-    expect(texteDit(primitives, 'Adèle').couleur).toBe(COULEURS.alerte)
+    expect(texteDit(primitives, 'Adèle').couleur).toBe(COULEURS_CARTE.alerte)
   })
 
   it('aligne la valeur à droite de la marge', () => {
