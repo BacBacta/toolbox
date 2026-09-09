@@ -169,17 +169,22 @@ export interface Skeleton<E = unknown, C extends ComputeMap = ComputeMap> {
  * il est validé par un validateur écrit à la main d'une centaine de lignes
  * (`valider.ts`), ce qui évite d'embarquer une bibliothèque dans un budget de
  * 120 Ko et rend la surface de la sortie du modèle facile à raisonner.
+ *
+ * `title` porte le libellé français du champ. Il sert deux fois : à guider le
+ * modèle en phase 4, et à dresser le formulaire d'édition sans table de
+ * traduction à part, qui dériverait du schéma dès le deuxième oubli.
  */
 export type JsonSchema =
-  | { readonly type: 'string'; readonly enum?: readonly string[]; readonly minLength?: number; readonly maxLength?: number; readonly description?: string }
-  | { readonly type: 'number' | 'integer'; readonly minimum?: number; readonly maximum?: number; readonly description?: string }
-  | { readonly type: 'boolean'; readonly description?: string }
-  | { readonly type: 'array'; readonly items: JsonSchema; readonly minItems?: number; readonly maxItems?: number; readonly description?: string }
+  | { readonly type: 'string'; readonly enum?: readonly string[]; readonly minLength?: number; readonly maxLength?: number; readonly title?: string; readonly description?: string }
+  | { readonly type: 'number' | 'integer'; readonly minimum?: number; readonly maximum?: number; readonly title?: string; readonly description?: string }
+  | { readonly type: 'boolean'; readonly title?: string; readonly description?: string }
+  | { readonly type: 'array'; readonly items: JsonSchema; readonly minItems?: number; readonly maxItems?: number; readonly title?: string; readonly description?: string }
   | {
       readonly type: 'object'
       readonly properties: Readonly<Record<string, JsonSchema>>
       readonly required?: readonly string[]
       readonly additionalProperties?: false
+      readonly title?: string
       readonly description?: string
     }
 

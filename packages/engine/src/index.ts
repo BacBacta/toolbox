@@ -1,6 +1,13 @@
+export { CATALOGUE, ficheParId } from './catalogue.js'
+export type { FicheSquelette } from './catalogue.js'
 export { limiterItems, MAX_ITEMS_CARTE, texteReste } from './cardspec.js'
 export type { ItemsCarte } from './cardspec.js'
 
+export type { Client, Emetteur, Gravite, Manquement } from '@a237/legal-cm'
+export {
+  estNiuBienForme, estRccmBienForme, LIBELLE_TVA_CM, mentionsManquantes, piedLegal,
+  TAUX_TVA_CM, tvaSur,
+} from '@a237/legal-cm'
 export type { Date0, Parties } from './compute/document.js'
 export { controleLegal, dateEmission, dateIso } from './compute/document.js'
 export type { ChiffrageDevis, EtatDevis } from './compute/devis.js'

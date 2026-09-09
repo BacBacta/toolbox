@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { EtatNjangi } from '../src/compute/njangi.js'
+import { CATALOGUE, ficheParId } from '../src/catalogue.js'
 import { classer, trouverSquelette } from '../src/match.js'
 import { devis, njangi, SQUELETTES, squeletteParId } from '../src/skeletons/index.js'
 import { njangiCard, njangiShare } from '../src/skeletons/njangi.js'
 import { ESPACE_INSECABLE } from '../src/format.js'
-import type { RenderContext } from '../src/types.js'
+import type { JsonSchema, RenderContext } from '../src/types.js'
 import { estValide, messageErreurs, valider } from '../src/valider.js'
 
 const CTX: RenderContext = {
@@ -198,5 +199,64 @@ describe('étage 1 — la correspondance de mots-clés, à zéro jeton', () => {
     expect(trouverSquelette('DEVIS', SQUELETTES)?.id).toBe('devis')
     expect(trouverSquelette('une estimatiön, vite !', SQUELETTES)?.id).toBe('devis')
     expect(trouverSquelette('un carnet de NJÀNGI', SQUELETTES)?.id).toBe('njangi')
+  })
+})
+
+describe('les schémas se décrivent en français', () => {
+  /** Parcourt un schéma et rend chaque nœud avec son chemin. */
+  function noeuds(schema: JsonSchema, chemin = '$'): (readonly [string, JsonSchema])[] {
+    const soi: (readonly [string, JsonSchema])[] = [[chemin, schema]]
+    if (schema.type === 'object') {
+      return soi.concat(
+        Object.entries(schema.properties).flatMap(([clef, sous]) =>
+          noeuds(sous, `${chemin}.${clef}`),
+        ),
+      )
+    }
+    if (schema.type === 'array') return soi.concat(noeuds(schema.items, `${chemin}[]`))
+    return soi
+  }
+
+  it.each(SQUELETTES.map((s) => [s.id, s] as const))(
+    '« %s » : chaque champ porte un libellé, sinon le formulaire afficherait sa clef',
+    (_id, squelette) => {
+      const sansTitre = noeuds(squelette.schema)
+        .filter(([chemin, n]) => chemin !== '$' && n.type !== 'object' && n.type !== 'array')
+        .filter(([, n]) => n.title === undefined)
+        .map(([chemin]) => chemin)
+      expect(sansTitre).toEqual([])
+    },
+  )
+
+  it('n’emploie pas de libellé en anglais', () => {
+    const titres = SQUELETTES.flatMap((s) => noeuds(s.schema))
+      .map(([, n]) => n.title)
+      .filter((t): t is string => t !== undefined)
+    expect(titres.length).toBeGreaterThan(20)
+    expect(titres.filter((t) => /^(name|amount|date|total|price)$/i.test(t))).toEqual([])
+  })
+})
+
+describe('le catalogue ne contredit pas les squelettes', () => {
+  it('couvre exactement les mêmes identifiants', () => {
+    expect(CATALOGUE.map((f) => f.id).sort()).toEqual(SQUELETTES.map((s) => s.id).sort())
+  })
+
+  it.each(CATALOGUE.map((f) => [f.id, f] as const))('« %s » dit la même chose', (id, fiche) => {
+    const squelette = squeletteParId(id)
+    expect(squelette).not.toBeNull()
+    expect(fiche.title).toBe(squelette?.title)
+    expect(fiche.group).toBe(squelette?.group)
+    expect(fiche.keywords).toEqual(squelette?.keywords)
+  })
+
+  it('se retrouve par identifiant', () => {
+    expect(ficheParId('njangi')?.title).toBe('Carnet de njangi')
+    expect(ficheParId('grimoire')).toBeNull()
+  })
+
+  it('sert l’étage 1 aussi bien que les squelettes complets', () => {
+    expect(trouverSquelette('il me faut un devis', CATALOGUE)?.id).toBe('devis')
+    expect(trouverSquelette('noter le njangi', CATALOGUE)?.id).toBe('njangi')
   })
 })
