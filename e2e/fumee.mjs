@@ -173,6 +173,40 @@ await essaie("un outil s'ouvre hors ligne", async () => {
   return true
 })
 
+// ── un registre décrit par ses colonnes, pour éprouver l'autre moteur ──
+await contexte.setOffline(false)
+await page.goto(BASE, { waitUntil: 'networkidle' })
+await page.fill('#recherche', 'liste de prix de la boutique')
+await page.waitForTimeout(120)
+await page.locator('.carte-squelette').first().click()
+await page.waitForSelector('text=Aucun article', { timeout: 20000 })
+dit('un registre de liste s’ouvre', true)
+
+await page.getByText('Ajouter un article', { exact: true }).first().click()
+await page.fill('[aria-label="Article"]', 'Sac de riz 25 kg')
+await page.fill('[aria-label="Prix (F CFA)"]', '18 500')
+await page.locator('[aria-label="Disponible"]').check()
+await page.getByText('Ajouter un article', { exact: true }).first().click()
+await page.waitForTimeout(200)
+dit('la ligne est enregistrée', await page.getByText('Sac de riz 25 kg').isVisible())
+dit('le montant est mis en forme', (await page.locator('.n2').first().textContent())?.includes('18'))
+dit('la barre suit la disponibilité',
+  (await page.locator('[role="progressbar"]').getAttribute('aria-valuenow')) === '100')
+
+await page.locator('[aria-label="Sac de riz 25 kg : disponible"]').click()
+await page.waitForTimeout(200)
+dit('la bascule répond',
+  (await page.locator('[role="progressbar"]').getAttribute('aria-valuenow')) === '0')
+
+await page.getByText('Diffuser', { exact: true }).click()
+await page.waitForSelector('canvas', { timeout: 20000 })
+await page.waitForTimeout(400)
+const carteListe = await page.evaluate(() => {
+  const c = document.querySelector('canvas')
+  return c ? { l: c.width, h: c.height } : null
+})
+dit('sa carte se dessine aussi', carteListe?.l === 1080, `${carteListe?.l}×${carteListe?.h}`)
+
 dit('aucune erreur de page', erreurs.length === 0, erreurs.slice(0, 3).join(' | '))
 
 await navigateur.close()

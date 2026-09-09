@@ -71,6 +71,40 @@ for (const c of fragments) {
   }
 }
 
+/**
+ * Aucun outil ne doit se retrouver dans la coquille.
+ *
+ * Ces marqueurs sont des chaînes qui n'existent que dans un squelette ou un
+ * moteur de rendu précis. Les voir dans le fragment de départ signifie que
+ * l'arbre secoue mal, et que la coquille paie pour des outils que personne n'a
+ * ouverts. C'est arrivé : sans `"sideEffects": false` dans les paquets de
+ * l'espace de travail, Rollup ne pouvait pas prouver que construire un
+ * squelette au chargement était sans conséquence, et gardait tout — sept
+ * kilo-octets pour rien.
+ */
+const MARQUEURS_OUTILS = [
+  ['CARNET DE NJANGI', 'squelette njangi'],
+  ['LIVRE DE CAISSE', 'squelette caisse'],
+  ['RESTE À PAYER', 'squelette scolarité'],
+  ['Sous-total HT', 'rendu des documents A4'],
+  ['quatre-vingt', 'montant en toutes lettres'],
+  ['Bon pour accord', 'rendu du devis'],
+]
+
+const codeCoquille = cheminsCoquille
+  .filter((c) => c.endsWith('.js'))
+  .map((c) => readFileSync(c, 'utf8'))
+  .join('')
+
+for (const [marqueur, quoi] of MARQUEURS_OUTILS) {
+  if (codeCoquille.includes(marqueur)) {
+    echecs.push(
+      `« ${marqueur} » (${quoi}) est dans la coquille : le fragment de départ ` +
+        'embarque un outil qu’on n’a pas encore ouvert',
+    )
+  }
+}
+
 // Le mode avion dépend de ces deux fichiers : sans eux, rien n'est mis en cache.
 for (const requis of ['precache.json', 'sw.js']) {
   try {
