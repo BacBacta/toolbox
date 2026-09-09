@@ -160,9 +160,11 @@ chaîne complète passe, mode avion compris.
 ## Ce qui reste à vérifier à la main
 
 Le navigateur de l'environnement de développement ne peut pas atteindre
-l'internet public : le proxy de session coupe toutes ses connexions, pour
-n'importe quel hôte. La production a donc été vérifiée par ses en-têtes et par
-le contenu de son paquet, pas en la pilotant depuis un navigateur d'ici.
+l'internet public : le proxy de session coupe ses connexions, pour n'importe
+quel hôte. Les scénarios de `e2e/` tournent donc contre un serveur local — le
+vrai Worker et son KV, mais servi ici. La production, elle, se vérifie par
+requêtes : ses en-têtes, le contenu de son paquet, et la chaîne de publication
+jouée de bout en bout par `fetch` — dépôt, lecture, refus.
 
 Ce qui reste, et qui compte plus que tout le reste :
 
@@ -172,8 +174,9 @@ Ce qui reste, et qui compte plus que tout le reste :
 2. **Vérifier que `navigator.share({files})` ouvre bien WhatsApp** — la
    section 6 du brief insiste : sur les téléphones que les utilisateurs ont
    vraiment, pas seulement sur le tien.
-3. Se rappeler que **la publication n'existe pas encore** : la carte se partage,
-   mais le lien viendra avec la phase 2.
+3. **Recevoir un lien dans WhatsApp et l'ouvrir**, dans le navigateur intégré
+   de WhatsApp et non dans Chrome : c'est là que la page publiée sera lue, et
+   c'est le seul endroit qui dira si l'aperçu s'affiche vraiment.
 
 ## La publication
 
@@ -200,6 +203,76 @@ La page de lecture rend **le vrai document** pour les sept écrits A4 — c'est
 tout l'intérêt du lien, ouvrir un devis plutôt que recevoir une image qu'on ne
 peut ni chercher ni copier. Les registres rendent leur carte : on ne rejoue pas
 un écran à boutons en lecture seule.
+
+Un **outil composé par le modèle** n'a pas de squelette : sa configuration
+voyage avec lui, dans l'instantané, et c'est elle qui dit comment le dessiner.
+Les deux fabriques qui la remontent en squelette vivent dans le moteur
+(`squeletteDeRegistre`, `squeletteDeCalcul`), d'où l'écran et le serveur les
+tirent toutes les deux. Tant qu'elles n'étaient que du côté de l'écran, le
+serveur ne trouvait rien à dessiner et la page répondait 200 avec « Ce lien ne
+mène à rien » : **l'outil payé était le seul qu'on ne pouvait pas partager.**
+
+### Ce que le dépôt refuse
+
+`/api/publier` est une adresse publique : ce qui écrit dedans n'est pas
+seulement le client d'aujourd'hui, mais aussi une version plus ancienne, une
+file d'attente qui rejoue, ou n'importe qui avec `curl`. Chaque refus a sa
+raison, que l'écran peut afficher.
+
+| | | |
+|---|---|---|
+| 400 | `lien-invalide` | la forme du lien, avant de toucher au stockage |
+| 400 | `instantane-absent` | le corps n'est pas un dépôt |
+| 400 | `squelette-inconnu` | publié par une version que ce serveur ne connaît pas |
+| 400 | `instantane-illisible` | l'état ne se dessine pas — voir plus bas |
+| 403 | `non-publiable` | l'ardoise et le call-box, avec le pourquoi |
+| 409 | `version-perimee` | le serveur détient plus récent, **et le dit** |
+
+`version-perimee` porte `versionServeur` : sans elle, un téléphone dont la
+file rejoue une vieille publication perd son travail en silence. Et **zéro est
+une version** — un outil qu'on vient de créer est en version 0, ce qui est le
+cas le plus courant puisqu'on diffuse souvent juste après avoir créé.
+
+`instantane-illisible` est le dernier contrôle, et il coûte un rendu : le
+serveur **essaie de dessiner** avant d'accepter. C'est la seule vérification
+qui ne puisse pas diverger du rendu, puisque c'est le rendu ; un schéma recopié
+côté serveur finirait par ne plus dire la même chose que l'écran. Le refus
+appartient à la publication parce que l'envoyeur est là pour l'entendre — sans
+lui, le rendu jetait à la lecture et c'est le destinataire qui découvrait la
+page d'erreur de l'hébergeur, devant un lien qu'on lui avait donné.
+
+Le contrôle ferme la porte devant ; il ne réécrit pas ce qui est déjà dans KV.
+La page de lecture ne jette donc plus non plus : un dépôt qu'elle ne sait pas
+dessiner donne une page qui le dit, **distincte de l'introuvable** — le lien
+est bon, ce n'est pas la peine d'aller le revérifier.
+
+### Le poids de la page
+
+La feuille de style est **inlinée** — une feuille séparée serait une requête de
+plus sur une connexion qui hoquette — mais sans ses commentaires : ils faisaient
+vingt-neuf pour cent de la page, six kilo-octets que le destinataire d'un devis
+télécharge sans jamais les lire. Une page de devis fait **quinze kilo-octets,
+moins de quatre comprimée**. Rien à charger après le premier octet : la page est
+finie quand elle arrive.
+
+### La file d'attente
+
+Le réseau ne sert qu'à publier, payer et appeler le modèle — trois choses qui
+peuvent attendre (§ 2.7). « Diffuser » sans réseau dépose donc la demande dans
+une file, et la carte part quand même, sans adresse : l'écran dit pourquoi.
+
+`viderLaFile` la vide **au lancement et au retour du réseau**, sans rien
+afficher : la publication est une conséquence de « Diffuser », pas une tâche
+que l'utilisateur suit. Ce qui change, c'est que l'outil a désormais son
+adresse.
+
+Elle rejoue **l'état d'aujourd'hui**, et non celui du jour où la publication a
+été mise en attente : quelqu'un qui a continué de travailler hors ligne veut
+voir partir son carnet tel qu'il est. L'entrée de file ne dit donc qu'une
+chose — cet outil attend d'être publié. Un verrou empêche les deux
+déclencheurs de se marcher dessus, les entrées d'un même outil sont regroupées,
+et un refus ou un conflit retire l'entrée au lieu de la rejouer sans fin :
+réessayer n'y changerait rien.
 
 ### La carte et l'aperçu
 
