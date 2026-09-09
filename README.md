@@ -30,10 +30,10 @@ commencé, conformément au point 4 de la section 11 du brief.
 plafond de 120. Deux dépendances tierces de production : `preact` et
 `idb-keyval`.
 
-En ligne sur **https://atelier237.vercel.app**, et **vérifié sur un vrai
-téléphone** — la cible, pas un émulateur. Restent à confirmer sur ce même
-téléphone : le mode avion, et l'ouverture de WhatsApp depuis « Partager la
-carte » (§ 6 du brief).
+En ligne sur **https://atelier237.vercel.app**, et vérifié sur un vrai
+téléphone : l'application s'ouvre **données coupées**, et « Partager la carte »
+**ouvre WhatsApp avec l'image**. Cette dernière était le préalable posé par la
+section 6 du brief.
 
 ```bash
 pnpm install

@@ -123,15 +123,24 @@ production** à ce stade, `preact` — cinq étaient autorisées. La question de
 
 ## Vérifié sur le terrain
 
-| Quoi | Où | Quand |
+| Quoi | Résultat | Quand |
 |---|---|---|
-| Les trois outils écrits fonctionnent sur un vrai téléphone | https://atelier237.vercel.app | 9 septembre 2026 |
+| Les trois outils écrits fonctionnent sur un vrai téléphone | oui | 9 septembre 2026 |
+| L'application s'ouvre données coupées | **oui** | 9 septembre 2026 |
+| « Partager la carte » ouvre WhatsApp avec l'image | **oui** | 9 septembre 2026 |
 
-C'est la première fois que le produit tourne sur sa cible et non sur une machine
-de développement. Deux choses restent à confirmer **sur ce même téléphone**, et
-elles ne se déduisent pas de la première : que l'application s'ouvre données
-coupées, et que « Partager la carte » ouvre bien WhatsApp — la section 6 du
-brief insiste, « pas seulement sur le tien ».
+Sur https://atelier237.vercel.app, sur la cible et non sur une machine de
+développement.
+
+La troisième ligne est celle qui comptait le plus : la section 6 du brief la
+posait comme préalable — « vérifie que `navigator.share({files})` ouvre bien
+WhatsApp sur les téléphones que tes utilisateurs ont vraiment, pas seulement sur
+le tien » — et toute la couche de diffusion en dépendait. Le repli du prototype
+(copier le texte, appui long sur l'image) reste en place pour les appareils qui
+ne savent pas partager de fichier, mais il n'est plus le chemin principal.
+
+La deuxième valide l'invariant § 2.7 sur la cible, et coche un des quatre
+critères d'arrêt de la phase 1.
 
 ## Reportées, et à quel moment il faudra trancher
 
