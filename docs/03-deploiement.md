@@ -78,6 +78,37 @@ Trois fichiers, et pas une décision.
   fichier qui part en ligne**. Deux copies d'une même règle divergent toujours,
   et celle qui compte est celle du serveur.
 
+### La branche de production décide de tout, y compris des variables
+
+Un projet Pages en envoi direct attache chaque déploiement à un **nom de
+branche**, et n'en promeut qu'un en production : celui dont la branche est la
+`production_branch` du projet. Les autres sont des préversions.
+
+Ça compte parce que **les variables d'environnement sont posées par
+environnement**. Une clef posée en production n'existe pas dans une préversion,
+et la fonction y répond « pas encore ouvert » — exactement comme si la clef
+n'avait jamais été posée. On cherche alors un problème de secret là où il n'y
+en a pas.
+
+C'est arrivé : `--production-branch main` à la création n'a pas tenu, la
+`production_branch` valait la branche de travail, et trois déploiements
+`--branch main` sont partis en préversion sans que rien ne le dise. La commande
+répondait « Deployment complete », le domaine servait bien l'application — mais
+c'était un déploiement plus ancien.
+
+À vérifier d'un coup d'œil quand quelque chose ne prend pas :
+
+```bash
+curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+  "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/atelier237" \
+| node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const p=JSON.parse(d).result;
+    console.log('branche de production :', p.production_branch);
+    console.log('dernier déploiement   :', p.latest_deployment.environment);});"
+```
+
+`environment: preview` sur le dernier déploiement veut dire que le domaine sert
+autre chose que ce qu'on vient d'envoyer.
+
 ### Deux embûches, dont une qui a cassé le mode avion
 
 **Pages redirige `/index.html` vers `/` en 308.** Le service worker le
