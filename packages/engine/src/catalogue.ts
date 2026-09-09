@@ -91,6 +91,13 @@ export const CATALOGUE: readonly FicheSquelette[] = [
     keywords: ['ardoise', 'dette', 'credit', 'doit', 'creance', 'impaye', 'on me doit', 'qui me doit', 'carnet de dettes', 'recouvrement'],
   },
   {
+    id: 'presence',
+    glyphe: '◰',
+    group: 'registres',
+    title: 'Feuille de présence',
+    keywords: ['presence', 'appel', 'absence', 'assiduite', 'qui est venu', 'liste de presence', 'emargement', 'reunion', 'seance', 'cours'],
+  },
+  {
     id: 'njangi',
     glyphe: '◉',
     group: 'registres',

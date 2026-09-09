@@ -68,6 +68,13 @@ export {
 } from './compute/ardoise.js'
 export { AVERTISSEMENT_ARDOISE, ardoise, ardoiseCard, ardoiseShare } from './skeletons/ardoise.js'
 export { ardoiseSchema } from './schema/ardoise.js'
+export type { AppelSeance, Assiduite, EtatPresence, Seance } from './compute/presence.js'
+export {
+  MAX_NOMS, MAX_SEANCES, SEUIL_ASSIDUITE, ajouterNom, appel, assiduites,
+  basculerPresence, decroche, estPresent, nomSeance, nouvelleSeance, retirerNom,
+} from './compute/presence.js'
+export { derniereSeance, presence, presenceCard, presenceShare } from './skeletons/presence.js'
+export { presenceSchema } from './schema/presence.js'
 export { cvSchema } from './schema/cv.js'
 export type { CalculDemande, EntreeDemandee } from './calcul.js'
 export { MAX_ENTREES, schemaCalcul, verifierCalcul } from './calcul.js'

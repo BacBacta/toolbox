@@ -698,3 +698,22 @@
 .cv-ecart {
   flex: 1;
 }
+
+/*
+ * Le sélecteur de séance de la feuille de présence.
+ *
+ * Il défile à l'horizontale : une association qui se réunit chaque semaine a
+ * trente séances au bout d'un semestre, et les empiler en hauteur pousserait
+ * l'appel — la seule chose qu'on vient faire — sous la ligne de flottaison.
+ */
+.presence-seances {
+  display: flex;
+  gap: var(--pas-2);
+  overflow-x: auto;
+  padding-bottom: var(--pas-1);
+  scrollbar-width: thin;
+}
+
+.presence-seances > button {
+  flex: none;
+}

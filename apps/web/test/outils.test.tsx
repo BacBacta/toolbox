@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import {
   EXTRAIT_VIDE, ardoise, attestation, caisse, clients, course, cv, dette, devis,
-  facture, motivation, njangi, prix, recu, scolarite, stock, valider,
+  facture, motivation, njangi, presence, prix, recu, scolarite, stock, valider,
 } from '@a237/engine'
 import type { RenderContext, ShareSpec } from '@a237/engine'
 import { render as monter } from 'preact'
@@ -63,8 +63,8 @@ describe('le registre des outils', () => {
   it('couvre les squelettes qui ont un écran, et le dit', () => {
     expect(Object.keys(CHARGEURS).sort()).toEqual([
       'ardoise', 'attestation', 'caisse', 'clients', 'compose', 'compose-calcul',
-      'course', 'cv', 'dette', 'devis', 'facture', 'motivation', 'njangi', 'prix',
-      'recu', 'scolarite', 'stock',
+      'course', 'cv', 'dette', 'devis', 'facture', 'motivation', 'njangi',
+      'presence', 'prix', 'recu', 'scolarite', 'stock',
     ])
     expect(outilDisponible('njangi')).toBe(true)
     expect(outilDisponible('callbox')).toBe(false)
@@ -411,5 +411,21 @@ describe('l’ardoise', () => {
     act(() => hote.querySelector<HTMLButtonElement>('.outil-action.principale')?.click())
     const partage = onDiffuser.mock.calls[0]?.[0] as ShareSpec | undefined
     expect(partage?.warn).toContain('pour toi, pas pour un groupe')
+  })
+})
+
+describe('la feuille de présence', () => {
+  it('s’ouvre vide et dit par quoi commencer', async () => {
+    const module = await CHARGEURS.presence!()
+    const neuf = module.creer('presence', LE_9_SEPT, EXTRAIT_VIDE)
+    expect(valider(presence.schema, neuf.etat)).toEqual([])
+    poser(module, outil('presence', neuf.etat))
+    expect(hote.textContent).toContain('Personne sur la feuille')
+  })
+
+  it('refuse de dessiner un état qui n’est pas une feuille', async () => {
+    const module = await CHARGEURS.presence!()
+    poser(module, outil('presence', { nom: 'Bancal' }))
+    expect(hote.querySelector('.etat-invalide')).not.toBeNull()
   })
 })
