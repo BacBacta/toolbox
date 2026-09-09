@@ -24,3 +24,14 @@ export const COULEURS = {
 } as const
 
 export type NomCouleur = keyof typeof COULEURS
+
+/**
+ * Deux teintes que seul le canvas emploie : le cercle d'une case non cochée et
+ * le filigrane « ATELIER 237 » du pied de carte. Elles ne sont pas dans
+ * `COULEURS` parce qu'aucune feuille de style ne les déclare, et que le test de
+ * divergence exige une correspondance exacte des deux côtés.
+ */
+export const COULEURS_CARTE = {
+  cercleVide: '#C3CCBF',
+  filigrane: '#A9B5A6',
+} as const

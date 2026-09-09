@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./doc": "./src/doc/index.ts",
-    "./registre": "./src/registre/index.ts"
+    "./registre": "./src/registre/index.ts",
+    "./carte": "./src/carte/index.ts"
   },
   "dependencies": {
     "@a237/engine": "workspace:*",
