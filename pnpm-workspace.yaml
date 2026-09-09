@@ -1,0 +1,6 @@
+packages:
+  - "packages/*"
+  - "apps/*"
+  - "workers/*"
+  - "services/*"
+  - "e2e"

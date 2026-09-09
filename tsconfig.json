@@ -1,0 +1,7 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/legal-cm" },
+    { "path": "./packages/engine" }
+  ]
+}
