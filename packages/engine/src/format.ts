@@ -132,3 +132,22 @@ export function normaliser(s: string): string {
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
 }
+
+/** Minuit du jour civil de Douala qui contient `d`, en millisecondes. */
+function minuitWAT(d: Date): number {
+  const t = d.getTime()
+  if (!Number.isFinite(t)) throw new RangeError('date invalide')
+  const wat = new Date(t + DECALAGE_WAT_MS)
+  return Date.UTC(wat.getUTCFullYear(), wat.getUTCMonth(), wat.getUTCDate())
+}
+
+/**
+ * Nombre de jours civils entre deux dates, comptés sur le calendrier de Douala.
+ *
+ * Compté en jours et non en millisecondes : une facture échue hier est en
+ * retard d'un jour, qu'il soit 1 h du matin ou 23 h. Négatif si `fin` précède
+ * `debut`.
+ */
+export function joursEntre(debut: Date, fin: Date): number {
+  return Math.round((minuitWAT(fin) - minuitWAT(debut)) / 86_400_000)
+}
