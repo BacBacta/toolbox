@@ -40,9 +40,16 @@ export function EtatInvalide(props: { readonly erreurs: readonly ErreurValidatio
  * Et l'encart porte le geste qui le fait disparaître. Un écran qui dit « il
  * manque ton NIU » sans emmener là où on le saisit laisse l'utilisateur
  * chercher l'onglet lui-même.
+ *
+ * `consequence` n'a pas de valeur par défaut, et c'est délibéré : ce qu'on
+ * risque à laisser une mention vide n'est pas le même sur une facture, sur une
+ * attestation et sur un acte entre deux personnes. Une phrase par défaut a
+ * déjà fait dire à une reconnaissance de dette qu'« un client qui veut
+ * déduire » ne pourrait pas s'en servir, alors qu'il n'y a ni client ni TVA.
  */
 export function Manquements(props: {
   readonly manquements: readonly Manquement[]
+  readonly consequence: string
   readonly onCompleter?: () => void
 }): JSX.Element | null {
   const bloquants = props.manquements.filter((m) => m.gravite === 'bloquant')
@@ -54,8 +61,8 @@ export function Manquements(props: {
       {bloquants.length > 0 && (
         <>
           <p>
-            Il manque {bloquants.length === 1 ? 'une mention' : `${bloquants.length} mentions`}.
-            Sans elles, un client qui veut déduire ne pourra pas s’en servir.
+            Il manque {bloquants.length === 1 ? 'une mention' : `${bloquants.length} mentions`}.{' '}
+            {props.consequence}
           </p>
           <ul>
             {bloquants.map((m) => (

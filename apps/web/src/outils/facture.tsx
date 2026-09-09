@@ -31,7 +31,11 @@ export function Outil(props: ProprietesOutil): JSX.Element {
     >
       {onglet === 'Document' ? (
         <>
-          <Manquements manquements={controleLegal(etat)} onCompleter={() => setOnglet('Modifier')} />
+          <Manquements
+            manquements={controleLegal(etat)}
+            consequence="Sans elles, un client qui veut déduire ne pourra pas s’en servir."
+            onCompleter={() => setOnglet('Modifier')}
+          />
           <DocumentFacture etat={etat} maintenant={props.ctx.maintenant} />
         </>
       ) : (
