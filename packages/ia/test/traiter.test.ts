@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { couter } from '../src/cout.js'
 import type { DemandeModele, Fournisseur } from '../src/fournisseur.js'
 import { traiter } from '../src/traiter.js'
@@ -21,6 +21,8 @@ const BON = JSON.stringify({
   libelleAjout: 'Ajouter une livraison',
   relancesVides: 'Un suivi se consulte, il ne se relance pas.',
 })
+
+afterEach(() => vi.unstubAllGlobals())
 
 const MAUVAIS = JSON.stringify({ ...JSON.parse(BON), total: { type: 'somme', clef: 'inconnue', libelle: 'Total', unite: 'F' } })
 
@@ -128,5 +130,30 @@ describe('le modèle a le droit de dire non', () => {
   it('compte quand même ce que le refus a coûté', async () => {
     const r = await traiter('un logo', faux([JSON.stringify({ impossible: 'Un logo se dessine.' })]), 600)
     expect(r.cout.fcfa).toBeGreaterThan(0)
+  })
+})
+
+describe('les pannes de fournisseur se nomment', () => {
+  it('reconnaît un crédit épuisé chez le routeur', async () => {
+    const { openrouter, ErreurFournisseur } = await import('../src/index.js')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 402, json: () => Promise.resolve({}) }))
+    await expect(openrouter('x').appeler({ invite: 'x' })).rejects.toMatchObject({
+      sorte: 'credit-epuise',
+    })
+    expect(ErreurFournisseur).toBeDefined()
+  })
+
+  it('distingue une clef refusée d’une panne', async () => {
+    const { openrouter } = await import('../src/index.js')
+    for (const [statut, sorte] of [[401, 'refuse'], [500, 'panne']] as const) {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: statut, json: () => Promise.resolve({}) }))
+      await expect(openrouter('x').appeler({ invite: 'x' })).rejects.toMatchObject({ sorte })
+    }
+  })
+
+  it('reconnaît aussi le quota chez Gemini en direct', async () => {
+    const { gemini } = await import('../src/index.js')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 429, json: () => Promise.resolve({}) }))
+    await expect(gemini('x').appeler({ invite: 'x' })).rejects.toMatchObject({ sorte: 'credit-epuise' })
   })
 })

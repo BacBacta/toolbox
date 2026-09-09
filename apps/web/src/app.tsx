@@ -1,5 +1,5 @@
 import type { RenderContext, ShareSpec } from '@a237/engine'
-import { CATALOGUE, EXTRAIT_VIDE } from '@a237/engine'
+import { CATALOGUE, EXTRAIT_VIDE, montantF } from '@a237/engine'
 import type { Extrait } from '@a237/engine'
 import type { JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
@@ -36,7 +36,12 @@ function glyphePour(skeleton: string): string {
 
 function Accueil(props: {
   readonly outils: readonly OutilEnregistre[]
-  readonly onCreer: (skeleton: string, extrait: Extrait, compose?: Compose) => void
+  readonly onCreer: (
+    skeleton: string,
+    extrait: Extrait,
+    compose?: Compose,
+    fcfa?: number,
+  ) => void
   readonly onOuvrir: (id: string) => void
   readonly onSupprimer: (id: string) => void
 }): JSX.Element {
@@ -102,6 +107,7 @@ export function App(): JSX.Element {
   const [outils, setOutils] = useState<readonly OutilEnregistre[]>([])
   const [ouvert, setOuvert] = useState<OutilEnregistre | null>(null)
   const [module, setModule] = useState<ModuleOutil | null>(null)
+  const [coutDernier, setCoutDernier] = useState<number | null>(null)
   const [partage, setPartage] = useState<ShareSpec | null>(null)
   const [erreur, setErreur] = useState('')
 
@@ -139,6 +145,7 @@ export function App(): JSX.Element {
     skeleton: string,
     extrait: Extrait,
     compose?: Compose,
+    fcfa?: number,
   ): Promise<void> {
     const chargeur = CHARGEURS[skeleton]
     if (chargeur === undefined) throw new Error(`aucun écran pour « ${skeleton} »`)
@@ -147,6 +154,14 @@ export function App(): JSX.Element {
     const outil = await creerOutil(skeleton, neuf.nom, neuf.etat, maintenant, compose)
     setOutils(await listerOutils())
     setOuvert(outil)
+    /*
+     * Ce que la composition a coûté, dit une fois.
+     *
+     * La consommation se paie à l'appel : une dépense qu'on ne voit pas est
+     * une dépense qu'on découvre à la fin du mois. Elle s'affiche sur l'outil
+     * qu'elle vient d'ouvrir, puis disparaît au suivant.
+     */
+    setCoutDernier(fcfa ?? null)
   }
 
   async function changer(etat: unknown): Promise<void> {
@@ -162,6 +177,9 @@ export function App(): JSX.Element {
   }
 
   async function ouvrir(id: string): Promise<void> {
+    // Le coût affiché appartient à la composition qui vient d'avoir lieu, pas
+    // à l'outil qu'on rouvre : il s'efface dès qu'on passe à autre chose.
+    setCoutDernier(null)
     setOuvert(await lireOutil(id))
   }
 
@@ -171,8 +189,8 @@ export function App(): JSX.Element {
         {erreur !== '' && <div class="alerte">{erreur}</div>}
         <Accueil
           outils={outils}
-          onCreer={(s, extrait, compose) =>
-            tenter(() => creer(s, extrait, compose), 'Création impossible')
+          onCreer={(s, extrait, compose, fcfa) =>
+            tenter(() => creer(s, extrait, compose, fcfa), 'Création impossible')
           }
           onOuvrir={(id) => tenter(() => ouvrir(id), 'Ouverture impossible')}
           onSupprimer={(id) => tenter(() => supprimer(id), 'Suppression impossible')}
@@ -205,6 +223,12 @@ export function App(): JSX.Element {
       </button>
 
       {erreur !== '' && <div class="alerte">{erreur}</div>}
+
+      {coutDernier !== null && (
+        <p class="note cout-compose">
+          Composé par le modèle pour {montantF(coutDernier)}.
+        </p>
+      )}
 
       {module === null ? (
         <p class="note">Chargement de l’outil…</p>

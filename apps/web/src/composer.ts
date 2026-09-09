@@ -26,6 +26,11 @@ export type Composition =
   | { readonly sorte: 'hors-sujet'; readonly pourquoi: string }
   /** Le proxy existe mais n'est pas ouvert. On le dit, on ne fait pas semblant. */
   | { readonly sorte: 'pas-ouvert' }
+  /**
+   * Le compte n'a plus de crédit. Ce n'est pas une panne, et proposer de
+   * réessayer ferait tourner quelqu'un en rond sur un mur.
+   */
+  | { readonly sorte: 'sans-credit' }
   | { readonly sorte: 'echoue'; readonly pourquoi: string }
 
 export async function composer(demande: string, signal?: AbortSignal): Promise<Composition> {
@@ -43,6 +48,7 @@ export async function composer(demande: string, signal?: AbortSignal): Promise<C
   }
 
   if (reponse.status === 503) return { sorte: 'pas-ouvert' }
+  if (reponse.status === 402) return { sorte: 'sans-credit' }
 
   if (!reponse.ok) {
     return {

@@ -28,7 +28,17 @@ import type { Compose } from './outils.js'
 
 export interface ProprietesAtelier {
   readonly fiches: readonly FicheSquelette[]
-  readonly onCreer: (skeleton: string, extrait: Extrait, compose?: Compose) => void
+  /**
+   * `fcfa` est ce que la composition a coûté. Il ne sert pas à décorer : la
+   * consommation se paie à l'appel, et une dépense qu'on ne voit pas est une
+   * dépense qu'on découvre à la fin du mois.
+   */
+  readonly onCreer: (
+    skeleton: string,
+    extrait: Extrait,
+    compose?: Compose,
+    fcfa?: number,
+  ) => void
 }
 
 /** Les identifiants des outils qui n'ont pas de squelette. Voir `outils/`. */
@@ -39,6 +49,7 @@ type Composition =
   | 'repos'
   | 'en-cours'
   | 'pas-ouvert'
+  | 'sans-credit'
   | { readonly echoue: string }
   | { readonly horsSujet: string }
 
@@ -75,21 +86,25 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
    * l'argent (§ 8, moins d'un franc la génération), et lancer une génération à
    * chaque frappe brûlerait un budget pour des phrases inachevées.
    */
+  function reussi(): void {
+    setComposition('repos')
+    setDemande('')
+    setReponse(null)
+  }
+
   function faireComposer(): void {
     setComposition('en-cours')
     void composer(demande).then((r) => {
       if (r.sorte === 'compose') {
-        setComposition('repos')
-        setDemande('')
-        setReponse(null)
-        props.onCreer(ID_COMPOSE_REGISTRE, EXTRAIT_VIDE, { registre: r.registre })
+        reussi()
+        props.onCreer(ID_COMPOSE_REGISTRE, EXTRAIT_VIDE, { registre: r.registre }, r.fcfa)
       } else if (r.sorte === 'calcule') {
-        setComposition('repos')
-        setDemande('')
-        setReponse(null)
-        props.onCreer(ID_COMPOSE_CALCUL, EXTRAIT_VIDE, { calcul: r.calcul })
+        reussi()
+        props.onCreer(ID_COMPOSE_CALCUL, EXTRAIT_VIDE, { calcul: r.calcul }, r.fcfa)
       } else if (r.sorte === 'pas-ouvert') {
         setComposition('pas-ouvert')
+      } else if (r.sorte === 'sans-credit') {
+        setComposition('sans-credit')
       } else if (r.sorte === 'hors-sujet') {
         setComposition({ horsSujet: r.pourquoi })
       } else {
@@ -181,6 +196,13 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
           )}
 
           {composition === 'en-cours' && <p class="note">Je compose…</p>}
+
+          {composition === 'sans-credit' && (
+            <p class="note">
+              Il n’y a plus de crédit pour composer. Les outils que tu as déjà continuent
+              de marcher, et ceux de la liste ci-dessous s’ouvrent sans rien coûter.
+            </p>
+          )}
 
           {composition === 'pas-ouvert' && (
             <p class="note">

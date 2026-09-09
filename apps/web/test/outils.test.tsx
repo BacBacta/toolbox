@@ -155,3 +155,52 @@ describe('les documents ont un onglet d’édition', () => {
     expect(hote.textContent).not.toContain('Date d’émission')
   })
 })
+
+describe('les outils composés par le modèle', () => {
+  const CALCUL = {
+    titre: 'Marge',
+    kicker: 'MARGE',
+    titreNom: 'Nom du produit',
+    entrees: [
+      { clef: 'prixAchat', titre: 'Prix d’achat', defaut: 0, unite: 'F' as const },
+      { clef: 'prixVente', titre: 'Prix de vente', defaut: 0, unite: 'F' as const },
+    ],
+    sortie: {
+      libelle: 'Marge',
+      unite: 'F' as const,
+      formule: { op: 'moins' as const, gauche: { ref: 'prixVente' }, droite: { ref: 'prixAchat' } },
+    },
+  }
+
+  const REGISTRE = {
+    titre: 'Suivi des livraisons',
+    kicker: 'SUIVI DES LIVRAISONS',
+    titreNom: 'Nom du dépôt',
+    colonnes: [
+      { clef: 'client', titre: 'Client', type: 'texte' as const },
+      { clef: 'montant', titre: 'Montant (F CFA)', type: 'montant' as const },
+    ],
+    libelleVide: 'Aucune livraison pour l’instant.',
+    libelleAjout: 'Ajouter une livraison',
+    relancesVides: 'Un suivi se consulte, il ne se relance pas.',
+  }
+
+  it('ouvre une calculatrice composée, et sa formule calcule', async () => {
+    const module = await CHARGEURS['compose-calcul']!()
+    const neuf = module.creer('compose-calcul', LE_9_SEPT, EXTRAIT_VIDE, { calcul: CALCUL })
+    expect(neuf.nom).toBe('Marge')
+
+    const etat = { ...(neuf.etat as { nom: string; valeurs: Record<string, number> }) }
+    poser(module, { ...outil('compose-calcul', { ...etat, valeurs: { prixAchat: 18_000, prixVente: 25_000 } }), calcul: CALCUL })
+    // 25 000 moins 18 000 : l'arbre déclaré passe par l'interprète.
+    expect(hote.textContent?.replace(/\s/g, ' ')).toContain('7 000 F')
+  })
+
+  it('ouvre un registre composé', async () => {
+    const module = await CHARGEURS.compose!()
+    const neuf = module.creer('compose', LE_9_SEPT, EXTRAIT_VIDE, { registre: REGISTRE })
+    expect(neuf.nom).toBe('Suivi des livraisons')
+    poser(module, { ...outil('compose', neuf.etat), registre: REGISTRE })
+    expect(hote.textContent).toContain('Aucune livraison')
+  })
+})

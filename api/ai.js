@@ -1,5 +1,22 @@
 //#region src/fournisseur.ts
 /**
+* Une panne de fournisseur, nommée.
+*
+* Une seule distinction compte vraiment : **le crédit épuisé n'est pas une
+* panne**. C'est un compte à recharger, et le dire « le modèle n'a pas
+* répondu » envoie l'utilisateur chercher un problème qui n'existe pas
+* pendant que la vraie cause tient en une phrase. Le brief en fait un critère
+* d'arrêt : « le chemin plus de crédits est propre » (§ 8).
+*/
+var ErreurFournisseur = class extends Error {
+	sorte;
+	constructor(sorte, message) {
+		super(message);
+		this.sorte = sorte;
+		this.name = "ErreurFournisseur";
+	}
+};
+/**
 * Gemini 2.5 Flash-Lite, le choix par défaut du brief.
 *
 * `responseMimeType: application/json` fait produire du JSON par construction
@@ -44,7 +61,7 @@ function gemini(clef, modele = "gemini-2.5-flash-lite") {
 					}
 				})
 			});
-			if (!reponse.ok) throw new Error(`le modèle a répondu ${reponse.status}`);
+			if (!reponse.ok) throw new ErreurFournisseur(reponse.status === 429 ? "credit-epuise" : reponse.status === 403 ? "refuse" : "panne", `le modèle a répondu ${reponse.status}`);
 			const corps = await reponse.json();
 			return {
 				texte: corps.candidates?.[0]?.content?.parts?.[0]?.text ?? "",
@@ -110,7 +127,7 @@ function openrouter(clef, modele = "google/gemini-2.5-flash-lite", prix = {
 				response_format: { type: "json_object" }
 			});
 			if (reponse.status >= 400 && reponse.status < 500 && reponse.status !== 401) reponse = await envoyer(clef, base);
-			if (!reponse.ok) throw new Error(`le modèle a répondu ${reponse.status}`);
+			if (!reponse.ok) throw new ErreurFournisseur(reponse.status === 402 ? "credit-epuise" : reponse.status === 401 ? "refuse" : "panne", `le routeur a répondu ${reponse.status}`);
 			const corps = await reponse.json();
 			const dollars = corps.usage?.cost;
 			return {
@@ -901,6 +918,10 @@ async function handler(req, res) {
 		});
 	} catch (cause) {
 		console.error("appel_ia_echoue", cause);
+		if (cause instanceof ErreurFournisseur && cause.sorte === "credit-epuise") {
+			res.status(402).json({ erreur: "plus de crédit pour composer" });
+			return;
+		}
 		res.status(502).json({ erreur: "le modèle n’a pas répondu" });
 	}
 }

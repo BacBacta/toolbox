@@ -31,6 +31,25 @@ export interface ReponseModele {
   readonly dollars?: number
 }
 
+/**
+ * Une panne de fournisseur, nommée.
+ *
+ * Une seule distinction compte vraiment : **le crédit épuisé n'est pas une
+ * panne**. C'est un compte à recharger, et le dire « le modèle n'a pas
+ * répondu » envoie l'utilisateur chercher un problème qui n'existe pas
+ * pendant que la vraie cause tient en une phrase. Le brief en fait un critère
+ * d'arrêt : « le chemin plus de crédits est propre » (§ 8).
+ */
+export class ErreurFournisseur extends Error {
+  constructor(
+    readonly sorte: 'credit-epuise' | 'refuse' | 'panne',
+    message: string,
+  ) {
+    super(message)
+    this.name = 'ErreurFournisseur'
+  }
+}
+
 export interface Fournisseur {
   readonly nom: string
   /** Prix par million de jetons, en dollars. Sert au journal des coûts. */
@@ -76,7 +95,10 @@ export function gemini(clef: string, modele = 'gemini-2.5-flash-lite'): Fourniss
 
       if (!reponse.ok) {
         // Le corps peut contenir la clef en écho : on ne le propage pas.
-        throw new Error(`le modèle a répondu ${reponse.status}`)
+        throw new ErreurFournisseur(
+          reponse.status === 429 ? 'credit-epuise' : reponse.status === 403 ? 'refuse' : 'panne',
+          `le modèle a répondu ${reponse.status}`,
+        )
       }
 
       const corps = (await reponse.json()) as {
@@ -149,7 +171,10 @@ export function openrouter(
 
       if (!reponse.ok) {
         // Le corps peut renvoyer la clef en écho : il ne remonte pas.
-        throw new Error(`le modèle a répondu ${reponse.status}`)
+        throw new ErreurFournisseur(
+          reponse.status === 402 ? 'credit-epuise' : reponse.status === 401 ? 'refuse' : 'panne',
+          `le routeur a répondu ${reponse.status}`,
+        )
       }
 
       const corps = (await reponse.json()) as {

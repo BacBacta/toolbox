@@ -15,6 +15,8 @@ export async function composer(demande, signal) {
     }
     if (reponse.status === 503)
         return { sorte: 'pas-ouvert' };
+    if (reponse.status === 402)
+        return { sorte: 'sans-credit' };
     if (!reponse.ok) {
         return {
             sorte: 'echoue',

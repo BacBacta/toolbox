@@ -323,6 +323,12 @@ body {
   cursor: not-allowed;
 }
 
+/* Ce qu'une composition a coûté. Discret : c'est une information, pas une alerte. */
+.cout-compose {
+  margin: 0 0 var(--pas-3);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ───────────────────────────── messages ───────────────────────────── */
 
 .alerte {

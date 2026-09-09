@@ -1,5 +1,5 @@
 import { Fragment as _Fragment, jsx as _jsx, jsxs as _jsxs } from "preact/jsx-runtime";
-import { CATALOGUE, EXTRAIT_VIDE } from '@a237/engine';
+import { CATALOGUE, EXTRAIT_VIDE, montantF } from '@a237/engine';
 import { useEffect, useState } from 'preact/hooks';
 import { Diffusion } from './diffusion.js';
 import { CHARGEURS, outilDisponible } from './outils.js';
@@ -34,6 +34,7 @@ export function App() {
     const [outils, setOutils] = useState([]);
     const [ouvert, setOuvert] = useState(null);
     const [module, setModule] = useState(null);
+    const [coutDernier, setCoutDernier] = useState(null);
     const [partage, setPartage] = useState(null);
     const [erreur, setErreur] = useState('');
     useEffect(() => {
@@ -61,7 +62,7 @@ export function App() {
             setErreur(`${quoi} : ${cause instanceof Error ? cause.message : String(cause)}`);
         });
     }
-    async function creer(skeleton, extrait, compose) {
+    async function creer(skeleton, extrait, compose, fcfa) {
         const chargeur = CHARGEURS[skeleton];
         if (chargeur === undefined)
             throw new Error(`aucun écran pour « ${skeleton} »`);
@@ -70,6 +71,14 @@ export function App() {
         const outil = await creerOutil(skeleton, neuf.nom, neuf.etat, maintenant, compose);
         setOutils(await listerOutils());
         setOuvert(outil);
+        /*
+         * Ce que la composition a coûté, dit une fois.
+         *
+         * La consommation se paie à l'appel : une dépense qu'on ne voit pas est
+         * une dépense qu'on découvre à la fin du mois. Elle s'affiche sur l'outil
+         * qu'elle vient d'ouvrir, puis disparaît au suivant.
+         */
+        setCoutDernier(fcfa ?? null);
     }
     async function changer(etat) {
         if (ouvert === null)
@@ -83,10 +92,13 @@ export function App() {
         setOutils(await listerOutils());
     }
     async function ouvrir(id) {
+        // Le coût affiché appartient à la composition qui vient d'avoir lieu, pas
+        // à l'outil qu'on rouvre : il s'efface dès qu'on passe à autre chose.
+        setCoutDernier(null);
         setOuvert(await lireOutil(id));
     }
     if (ouvert === null) {
-        return (_jsxs("main", { class: "app", children: [erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), _jsx(Accueil, { outils: outils, onCreer: (s, extrait, compose) => tenter(() => creer(s, extrait, compose), 'Création impossible'), onOuvrir: (id) => tenter(() => ouvrir(id), 'Ouverture impossible'), onSupprimer: (id) => tenter(() => supprimer(id), 'Suppression impossible') })] }));
+        return (_jsxs("main", { class: "app", children: [erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), _jsx(Accueil, { outils: outils, onCreer: (s, extrait, compose, fcfa) => tenter(() => creer(s, extrait, compose, fcfa), 'Création impossible'), onOuvrir: (id) => tenter(() => ouvrir(id), 'Ouverture impossible'), onSupprimer: (id) => tenter(() => supprimer(id), 'Suppression impossible') })] }));
     }
     /**
      * Le lien est vide tant que la publication n'existe pas.
@@ -100,5 +112,5 @@ export function App() {
     return (_jsxs("main", { class: "app", children: [_jsx("button", { type: "button", class: "retour", onClick: () => {
                     setOuvert(null);
                     setErreur('');
-                }, children: "\u2190 Mes outils" }), erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), module === null ? (_jsx("p", { class: "note", children: "Chargement de l\u2019outil\u2026" })) : (_jsx(module.Outil, { outil: ouvert, glyphe: glyphePour(ouvert.skeleton), ctx: ctx, onChange: (etat) => tenter(() => changer(etat), 'Enregistrement impossible'), onDiffuser: setPartage })), partage !== null && _jsx(Diffusion, { partage: partage, onFermer: () => setPartage(null) })] }));
+                }, children: "\u2190 Mes outils" }), erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), coutDernier !== null && (_jsxs("p", { class: "note cout-compose", children: ["Compos\u00E9 par le mod\u00E8le pour ", montantF(coutDernier), "."] })), module === null ? (_jsx("p", { class: "note", children: "Chargement de l\u2019outil\u2026" })) : (_jsx(module.Outil, { outil: ouvert, glyphe: glyphePour(ouvert.skeleton), ctx: ctx, onChange: (etat) => tenter(() => changer(etat), 'Enregistrement impossible'), onDiffuser: setPartage })), partage !== null && _jsx(Diffusion, { partage: partage, onFermer: () => setPartage(null) })] }));
 }

@@ -33,6 +33,13 @@ export type Composition = {
 /** Le proxy existe mais n'est pas ouvert. On le dit, on ne fait pas semblant. */
  | {
     readonly sorte: 'pas-ouvert';
+}
+/**
+ * Le compte n'a plus de crédit. Ce n'est pas une panne, et proposer de
+ * réessayer ferait tourner quelqu'un en rond sur un mur.
+ */
+ | {
+    readonly sorte: 'sans-credit';
 } | {
     readonly sorte: 'echoue';
     readonly pourquoi: string;

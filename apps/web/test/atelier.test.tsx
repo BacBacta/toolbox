@@ -186,3 +186,25 @@ describe('l’autre forme composable : une calculatrice', () => {
     expect(hote.textContent).toContain('ne décrit pas un outil valide')
   })
 })
+
+describe('le crédit épuisé n’est pas une panne', () => {
+  it('dit de recharger, sans proposer de réessayer', async () => {
+    // « Le modèle n'a pas répondu » enverrait quelqu'un chercher un problème
+    // qui n'existe pas pendant que la vraie cause tient en une phrase.
+    repond(402, { erreur: 'plus de crédit pour composer' })
+    demander('ma marge sur chaque vente de telephone')
+    cliquer('Compose-le pour moi')
+    await attendre()
+    expect(hote.textContent).toContain('plus de crédit')
+    expect(hote.textContent).not.toContain('Réessaie')
+    expect(creations).toHaveLength(0)
+  })
+
+  it('rappelle que le reste continue de marcher', async () => {
+    repond(402, {})
+    demander('ma marge sur chaque vente de telephone')
+    cliquer('Compose-le pour moi')
+    await attendre()
+    expect(hote.textContent).toContain('continuent de marcher')
+  })
+})

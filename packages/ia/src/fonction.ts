@@ -1,6 +1,6 @@
 import type { RegistreDemande } from '@a237/engine'
 import type { Fournisseur } from './fournisseur.js'
-import { gemini, openrouter } from './fournisseur.js'
+import { ErreurFournisseur, gemini, openrouter } from './fournisseur.js'
 import { traiter } from './traiter.js'
 
 /**
@@ -140,6 +140,17 @@ export default async function handler(req: RequeteEntrante, res: ReponseSortante
     // Le message d'un fournisseur peut contenir la clef en écho : on ne le
     // propage pas au client, on le garde côté serveur.
     console.error('appel_ia_echoue', cause)
+
+    if (cause instanceof ErreurFournisseur && cause.sorte === 'credit-epuise') {
+      /*
+       * 402, comme le brief le prévoit (§ 3). Ce n'est pas une panne : le
+       * compte est à recharger, et le dire autrement enverrait quelqu'un
+       * chercher un problème qui n'existe pas.
+       */
+      res.status(402).json({ erreur: 'plus de crédit pour composer' })
+      return
+    }
+
     res.status(502).json({ erreur: 'le modèle n’a pas répondu' })
   }
 }

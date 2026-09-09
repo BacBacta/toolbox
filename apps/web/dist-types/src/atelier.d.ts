@@ -23,6 +23,11 @@ import type { Compose } from './outils.js';
  */
 export interface ProprietesAtelier {
     readonly fiches: readonly FicheSquelette[];
-    readonly onCreer: (skeleton: string, extrait: Extrait, compose?: Compose) => void;
+    /**
+     * `fcfa` est ce que la composition a coûté. Il ne sert pas à décorer : la
+     * consommation se paie à l'appel, et une dépense qu'on ne voit pas est une
+     * dépense qu'on découvre à la fin du mois.
+     */
+    readonly onCreer: (skeleton: string, extrait: Extrait, compose?: Compose, fcfa?: number) => void;
 }
 export declare function Atelier(props: ProprietesAtelier): JSX.Element;

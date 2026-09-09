@@ -217,3 +217,37 @@ describe('le fournisseur se choisit sans redéployer', () => {
     expect((appels.mock.calls[0] as [string])[0]).toContain('generativelanguage.googleapis.com')
   })
 })
+
+describe('le crédit épuisé se dit proprement', () => {
+  beforeEach(() => {
+    process.env.A237_CLEF_IA = 'une-clef'
+    process.env.A237_IA_OUVERTE = '1'
+  })
+
+  it('traduit le 402 du routeur en 402, pas en panne', async () => {
+    // Le brief en fait un critère d'arrêt : « le chemin plus de crédits est
+    // propre » (§ 8). Un 502 enverrait chercher une panne inexistante.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false, status: 402, json: () => Promise.resolve({ error: { message: 'insufficient credits' } }),
+    }))
+    const r = await appeler({ method: 'POST', body: { demande: 'un registre' } })
+    expect(r.statut).toBe(402)
+    expect(String(r.corps.erreur)).toContain('crédit')
+  })
+
+  it('garde 502 pour une vraie panne', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false, status: 500, json: () => Promise.resolve({}),
+    }))
+    expect((await appeler({ method: 'POST', body: { demande: 'un registre' } })).statut).toBe(502)
+  })
+
+  it('ne laisse pas fuiter la clef dans le message de crédit épuisé', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false, status: 402,
+      json: () => Promise.resolve({ error: { message: 'key une-clef has no credit' } }),
+    }))
+    const r = await appeler({ method: 'POST', body: { demande: 'un registre' } })
+    expect(JSON.stringify(r.corps)).not.toContain('une-clef')
+  })
+})
