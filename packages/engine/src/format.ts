@@ -114,6 +114,19 @@ export function heureCourte(d: Date): string {
   return `${pad2(p.heures)}h${pad2(p.minutes)}`
 }
 
+/**
+ * Le jour civil de Douala, `2026-09-09`.
+ *
+ * Sert de clef de regroupement, pas d'affichage : deux opérations du même
+ * après-midi doivent tomber dans le même seau, et un `toISOString()` les
+ * séparerait dès que l'heure locale passe minuit UTC — c'est-à-dire à 1 h du
+ * matin à Douala.
+ */
+export function jourWAT(d: Date): string {
+  const p = partsWAT(d)
+  return `${p.annee}-${pad2(p.mois + 1)}-${pad2(p.jour)}`
+}
+
 /** L'horodatage imprimé en pied de carte : `Arrêté le 9 septembre 2026 à 08h45`. */
 export function arreteLe(d: Date): string {
   return `Arrêté le ${dateLongue(d)} à ${heureCourte(d)}`

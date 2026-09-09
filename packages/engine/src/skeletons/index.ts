@@ -1,6 +1,7 @@
 import type { SkeletonAnonyme } from '../types.js'
 import { attestation, dette, motivation, recu } from './actes.js'
 import { ardoise } from './ardoise.js'
+import { callbox } from './callbox.js'
 import { cv } from './cv.js'
 import { devis } from './devis.js'
 import { facture } from './facture.js'
@@ -12,7 +13,7 @@ import { caisse, clients, prix, stock } from './registres.js'
 /**
  * Le registre des squelettes.
  *
- * Seize écrits sur dix-sept. Six d'entre eux ne portent aucune logique propre :
+ * Dix-sept écrits sur dix-sept — le catalogue du brief est complet. Six d'entre eux ne portent aucune logique propre :
  * prix, caisse, stock et clients sont de la configuration posée sur la fabrique
  * de listes ; scolarité et course, sur celle des calculatrices. Les quatre
  * actes — attestation, reçu, reconnaissance de dette, lettre de motivation —
@@ -26,7 +27,7 @@ import { caisse, clients, prix, stock } from './registres.js'
 export const SQUELETTES: readonly SkeletonAnonyme[] = [
   devis, facture, attestation, recu, dette, motivation, cv,
   njangi, prix, caisse, stock, clients, ardoise, presence,
-  scolarite, course,
+  scolarite, course, callbox,
 ]
 
 export function squeletteParId(id: string): SkeletonAnonyme | null {
@@ -34,6 +35,6 @@ export function squeletteParId(id: string): SkeletonAnonyme | null {
 }
 
 export {
-  ardoise, attestation, caisse, clients, course, cv, dette, devis, facture,
-  motivation, njangi, presence, prix, recu, scolarite, stock,
+  ardoise, attestation, caisse, callbox, clients, course, cv, dette, devis,
+  facture, motivation, njangi, presence, prix, recu, scolarite, stock,
 }

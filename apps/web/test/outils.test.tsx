@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import {
-  EXTRAIT_VIDE, ardoise, attestation, caisse, clients, course, cv, dette, devis,
-  facture, motivation, njangi, presence, prix, recu, scolarite, stock, valider,
+  EXTRAIT_VIDE, ardoise, attestation, caisse, callbox, clients, course, cv, dette,
+  devis, facture, motivation, njangi, presence, prix, recu, scolarite, stock,
+  valider,
 } from '@a237/engine'
 import type { RenderContext, ShareSpec } from '@a237/engine'
 import { render as monter } from 'preact'
@@ -62,12 +63,12 @@ function poser(module: ModuleOutil, o: OutilEnregistre, onDiffuser = vi.fn()): t
 describe('le registre des outils', () => {
   it('couvre les squelettes qui ont un écran, et le dit', () => {
     expect(Object.keys(CHARGEURS).sort()).toEqual([
-      'ardoise', 'attestation', 'caisse', 'clients', 'compose', 'compose-calcul',
-      'course', 'cv', 'dette', 'devis', 'facture', 'motivation', 'njangi',
-      'presence', 'prix', 'recu', 'scolarite', 'stock',
+      'ardoise', 'attestation', 'caisse', 'callbox', 'clients', 'compose',
+      'compose-calcul', 'course', 'cv', 'dette', 'devis', 'facture', 'motivation',
+      'njangi', 'presence', 'prix', 'recu', 'scolarite', 'stock',
     ])
     expect(outilDisponible('njangi')).toBe(true)
-    expect(outilDisponible('callbox')).toBe(false)
+    expect(outilDisponible('callbox')).toBe(true)
   })
 
   it('ne se laisse pas interroger sur une clef héritée du prototype d’Object', () => {
@@ -426,6 +427,23 @@ describe('la feuille de présence', () => {
   it('refuse de dessiner un état qui n’est pas une feuille', async () => {
     const module = await CHARGEURS.presence!()
     poser(module, outil('presence', { nom: 'Bancal' }))
+    expect(hote.querySelector('.etat-invalide')).not.toBeNull()
+  })
+})
+
+describe('le call-box', () => {
+  it('s’ouvre sur la caisse, avec une grille utilisable', async () => {
+    const module = await CHARGEURS.callbox!()
+    const neuf = module.creer('callbox', LE_9_SEPT, EXTRAIT_VIDE)
+    expect(valider(callbox.schema, neuf.etat)).toEqual([])
+    poser(module, outil('callbox', neuf.etat))
+    expect(hote.textContent).toContain('Tu gardes')
+    expect(hote.textContent).toContain('Grille de commission')
+  })
+
+  it('refuse de dessiner un état qui n’est pas un call-box', async () => {
+    const module = await CHARGEURS.callbox!()
+    poser(module, outil('callbox', { nom: 'Bancal' }))
     expect(hote.querySelector('.etat-invalide')).not.toBeNull()
   })
 })

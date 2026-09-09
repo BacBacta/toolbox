@@ -98,6 +98,13 @@ export const CATALOGUE: readonly FicheSquelette[] = [
     keywords: ['presence', 'appel', 'absence', 'assiduite', 'qui est venu', 'liste de presence', 'emargement', 'reunion', 'seance', 'cours'],
   },
   {
+    id: 'callbox',
+    glyphe: '▧',
+    group: 'calculs',
+    title: 'Call-box',
+    keywords: ['call box', 'callbox', 'transfert', 'momo', 'mobile money', 'commission', 'orange money', 'depot retrait', 'je transfere', 'cabine'],
+  },
+  {
     id: 'njangi',
     glyphe: '◉',
     group: 'registres',

@@ -146,6 +146,24 @@ var CATALOGUE = [
 		]
 	},
 	{
+		id: "callbox",
+		glyphe: "▧",
+		group: "calculs",
+		title: "Call-box",
+		keywords: [
+			"call box",
+			"callbox",
+			"transfert",
+			"momo",
+			"mobile money",
+			"commission",
+			"orange money",
+			"depot retrait",
+			"je transfere",
+			"cabine"
+		]
+	},
+	{
 		id: "njangi",
 		glyphe: "◉",
 		group: "registres",

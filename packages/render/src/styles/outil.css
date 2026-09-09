@@ -717,3 +717,54 @@
 .presence-seances > button {
   flex: none;
 }
+
+/*
+ * La grille de commission du call-box.
+ *
+ * Le tarif se corrige dans la rangée, pas dans un formulaire à part : c'est en
+ * lisant « tu gardes 200 F » qu'on se rappelle qu'on est passé à 250.
+ */
+.callbox-tarif {
+  display: flex;
+  align-items: center;
+  gap: var(--pas-2);
+  flex: none;
+}
+
+.callbox-tarif .unite {
+  color: var(--encre-3);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.callbox-tarif input {
+  width: 80px;
+  min-height: var(--cible);
+  padding: 0 var(--pas-3);
+  border: 1px solid var(--trait-champ);
+  border-radius: var(--rond-m);
+  background: var(--surface);
+  color: var(--encre);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  text-align: right;
+}
+
+/*
+ * Une étiquette que seul un lecteur d'écran lit.
+ *
+ * Quatre champs qui se suivent avec « jusqu'à 5 000 F » écrit à côté ne disent
+ * rien à qui ne voit pas la rangée : chacun a besoin de son propre libellé.
+ */
+.visuellement-cache {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}

@@ -22,6 +22,7 @@ export const CHARGEURS = {
     cv: () => import('./outils/cv.js'),
     ardoise: () => import('./outils/ardoise.js'),
     presence: () => import('./outils/presence.js'),
+    callbox: () => import('./outils/callbox.js'),
     njangi: () => import('./outils/njangi.js'),
     // Un seul fragment pour les quatre registres décrits par leurs colonnes, et
     // un pour les deux calculatrices : ils partagent leur écran et leur moteur.
