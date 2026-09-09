@@ -162,6 +162,36 @@ ne savent pas partager de fichier, mais il n'est plus le chemin principal.
 La deuxième valide l'invariant § 2.7 sur la cible, et coche un des quatre
 critères d'arrêt de la phase 1.
 
+## Où vit le proxy IA — tranché le 9 septembre 2026
+
+Le brief le place dans le Worker Cloudflare, au même endroit que le webhook de
+paiement et la page de lecture (§ 3.1). Il part d'abord en **fonction Vercel**,
+parce que l'application y est déjà déployée : l'étage 2 est joignable
+aujourd'hui plutôt qu'après une phase 2 complète.
+
+L'écart est contenu par construction. Tout ce qui décide vit dans `@a237/ia` et
+`packages/engine/src/registre.ts`, purs et testés sans réseau ; le fichier
+déposé dans `api/` n'est que de la plomberie. Le déménagement vers Cloudflare
+déplacera un fichier, pas une couche.
+
+Le taux USD → XAF est déjà en configuration (`A237_TAUX_FCFA`) et non en
+constante, comme la ligne reportée ci-dessous l'exigeait.
+
+## Ce qui manque encore au proxy, et pourquoi il reste fermé
+
+Le brief exige un quota par compte — `credits > 0`, sinon 402 — et un journal
+dans `ai_calls`. Les comptes vivent dans D1, qui n'existe pas avant la phase 2.
+
+Un proxy ouvert sans quota est un robinet payant offert à qui passe. La
+fonction refuse donc de servir tant que `A237_IA_OUVERTE` ne vaut pas `1` :
+**poser la clef ne suffit pas**. Deux gestes, pas un. C'est grossier et
+délibérément visible — un garde-fou qu'on remarque est un garde-fou qu'on
+remplace, là où un plafond discret se serait fait oublier.
+
+Le coût réel part dans le journal du serveur en attendant sa table, parce que
+« moins d'un franc par génération » (§ 8) est un critère de réussite, et qu'un
+critère qu'on ne mesure pas est une croyance.
+
 ## Reportées, et à quel moment il faudra trancher
 
 | Sujet | Quand | Ce qui est déjà prêt |
