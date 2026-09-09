@@ -19,7 +19,9 @@ export {
   chiffrerFacture, dateEcheance, joursDeRetard, LIBELLE_MOYEN, LIBELLE_STATUT,
   statutFacture,
 } from './compute/facture.js'
-export { prochainNumero, trouverAnomalies } from './compute/numerotation.js'
+export {
+  PREFIXES_NUMERO, prefixeDe, prochainNumero, trouverAnomalies,
+} from './compute/numerotation.js'
 export type { Collecte, EtatNjangi, MembreNjangi, Periode } from './compute/njangi.js'
 export {
   ajouterMembre, basculerVersement, beneficiaireDuTour, changerCotisation,

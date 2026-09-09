@@ -4,13 +4,13 @@ import {
   LIBELLE_MOYEN, LIBELLE_STATUT, statutFacture,
 } from '../compute/facture.js'
 import type { EtatFacture } from '../compute/facture.js'
-import { prochainNumero } from '../compute/numerotation.js'
+import { PREFIXES_NUMERO, prochainNumero } from '../compute/numerotation.js'
 import { arreteLe, dateLongue, montantF, nf } from '../format.js'
 import { factureSchema } from '../schema/facture.js'
 import type { CardSpec, RenderContext, ShareSpec, Skeleton } from '../types.js'
 
 /** Préfixe de numérotation de la facture. Le devis prend `DV`. */
-export const PREFIXE_FACTURE = 'FA'
+export const PREFIXE_FACTURE = PREFIXES_NUMERO.facture!
 
 const TAG: Readonly<Record<string, string>> = {
   soldee: 'SOLDÉE',

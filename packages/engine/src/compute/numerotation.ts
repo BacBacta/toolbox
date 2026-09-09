@@ -32,4 +32,25 @@ export function prochainNumero(
   return formatNumero(numeroSuivant(dernier, annee, prefixe))
 }
 
+/**
+ * Le préfixe de série de chaque squelette qui numérote.
+ *
+ * Quatre documents portent un numéro ; les autres n'en ont pas besoin. La table
+ * est ici et non dans chaque squelette parce que l'atelier doit savoir, **sans
+ * charger un squelette**, si l'outil qu'on ouvre a une série à tenir — et
+ * charger un squelette pour lire deux lettres coûterait un fragment.
+ */
+export const PREFIXES_NUMERO: Readonly<Record<string, string>> = {
+  devis: 'DV',
+  facture: 'FA',
+  attestation: 'AT',
+  recu: 'RE',
+}
+
+export function prefixeDe(skeleton: string): string | null {
+  return Object.hasOwn(PREFIXES_NUMERO, skeleton)
+    ? (PREFIXES_NUMERO[skeleton] ?? null)
+    : null
+}
+
 export { trouverAnomalies }

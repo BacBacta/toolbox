@@ -6,7 +6,7 @@ import type {
   EtatAttestation, EtatDette, EtatMotivation, EtatRecu,
 } from '../compute/actes.js'
 import { dateEmission } from '../compute/document.js'
-import { prochainNumero } from '../compute/numerotation.js'
+import { PREFIXES_NUMERO, prochainNumero } from '../compute/numerotation.js'
 import { arreteLe, dateLongue, montantF } from '../format.js'
 import { montantEnLettres } from '../lettres.js'
 import {
@@ -37,7 +37,7 @@ const LE_1ER_JANVIER = '2026-01-01T00:00:00.000Z'
 
 // ────────────────────────────── attestation ──────────────────────────────
 
-export const PREFIXE_ATTESTATION = 'AT'
+export const PREFIXE_ATTESTATION = PREFIXES_NUMERO.attestation!
 
 const attestationDefaults: EtatAttestation = {
   nom: 'Attestation',
@@ -133,7 +133,7 @@ export const attestation: Skeleton<EtatAttestation> = {
 
 // ───────────────────────────────── reçu ─────────────────────────────────
 
-export const PREFIXE_RECU = 'RE'
+export const PREFIXE_RECU = PREFIXES_NUMERO.recu!
 
 const recuDefaults: EtatRecu = {
   nom: 'Reçu',

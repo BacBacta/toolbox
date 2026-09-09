@@ -1,6 +1,6 @@
 import { piedLegal } from '@a237/legal-cm'
 import { chiffrer, controleLegal, dateEmission } from '../compute/devis.js'
-import { prochainNumero } from '../compute/numerotation.js'
+import { PREFIXES_NUMERO, prochainNumero } from '../compute/numerotation.js'
 import type { EtatDevis } from '../compute/devis.js'
 import { arreteLe, dateLongue, montantF, nf } from '../format.js'
 import { devisSchema } from '../schema/devis.js'
@@ -8,7 +8,7 @@ import type { CardSpec, RenderContext, ShareSpec, Skeleton } from '../types.js'
 import type { Extrait } from '../extraire.js'
 
 /** Préfixe de numérotation du devis. La facture prendra `FA`. */
-export const PREFIXE_DEVIS = 'DV'
+export const PREFIXE_DEVIS = PREFIXES_NUMERO.devis!
 
 /**
  * État de remplissage d'un devis neuf.

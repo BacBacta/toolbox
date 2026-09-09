@@ -6,6 +6,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { Diffusion } from './diffusion.js'
 import { CHARGEURS, outilDisponible } from './outils.js'
 import type { Compose, ModuleOutil } from './outils.js'
+import { numeroter } from './numeros.js'
 import { creerOutil, listerOutils, lireOutil, majEtat, supprimerOutil } from './stockage.js'
 import type { OutilEnregistre } from './stockage.js'
 import { Atelier } from './atelier.js'
@@ -151,7 +152,14 @@ export function App(): JSX.Element {
     if (chargeur === undefined) throw new Error(`aucun écran pour « ${skeleton} »`)
     const maintenant = new Date()
     const neuf = (await chargeur()).creer(skeleton, maintenant, extrait, compose)
-    const outil = await creerOutil(skeleton, neuf.nom, neuf.etat, maintenant, compose)
+    /*
+     * Le squelette a posé un numéro de gabarit : il connaît son préfixe et
+     * l'année, pas ce que ce compte a déjà émis. Celui qui compte se réserve
+     * ici, sur un registre qu'une suppression ne fait pas reculer — sans quoi
+     * effacer la dernière facture réattribuerait son numéro à la suivante.
+     */
+    const etat = await numeroter(skeleton, neuf.etat, maintenant)
+    const outil = await creerOutil(skeleton, neuf.nom, etat, maintenant, compose)
     setOutils(await listerOutils())
     setOuvert(outil)
     /*
