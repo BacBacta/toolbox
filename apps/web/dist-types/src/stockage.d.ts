@@ -1,3 +1,4 @@
+import type { RegistreDemande } from '@a237/engine';
 /** Un outil tel qu'il est rangé sur le téléphone. */
 export interface OutilEnregistre {
     readonly id: string;
@@ -6,6 +7,18 @@ export interface OutilEnregistre {
     readonly nom: string;
     /** L'état, conforme au schéma du squelette. Validé avant d'être rendu. */
     readonly etat: unknown;
+    /**
+     * La configuration d'un registre composé par le modèle, quand il n'y a pas de
+     * squelette derrière.
+     *
+     * C'est ce qui rend l'étage 2 durable : le registre composé n'est pas une
+     * vue jetable, il vit sur le téléphone comme les autres, s'ouvre hors ligne,
+     * et se partage pareil. `skeleton` vaut alors `'compose'` — aucun squelette
+     * ne porte ce nom, et le fragment de liste sait le reconnaître.
+     *
+     * Absent pour les outils bâtis sur un squelette, qui sont la règle.
+     */
+    readonly registre?: RegistreDemande;
     /**
      * Version monotone. Le serveur refusera une publication dont la version est
      * inférieure ou égale à celle qu'il détient : un vieux téléphone n'écrase pas
@@ -43,7 +56,7 @@ export declare function majEtat(outil: OutilEnregistre, etat: unknown, maintenan
  * stockage ne connaît aucun squelette, et la coquille ne tire donc pas les
  * dix-sept schémas dans son fragment de départ pour créer un devis.
  */
-export declare function creerOutil(skeletonId: string, nom: string, etat: unknown, maintenant: Date): Promise<OutilEnregistre>;
+export declare function creerOutil(skeletonId: string, nom: string, etat: unknown, maintenant: Date, registre?: RegistreDemande): Promise<OutilEnregistre>;
 /**
  * Met une publication en file d'attente.
  *

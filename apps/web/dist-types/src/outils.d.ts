@@ -1,4 +1,4 @@
-import type { Extrait, RenderContext, ShareSpec } from '@a237/engine';
+import type { Extrait, RegistreDemande, RenderContext, ShareSpec } from '@a237/engine';
 import type { JSX } from 'preact';
 import type { OutilEnregistre } from './stockage.js';
 export interface ProprietesOutil {
@@ -34,7 +34,7 @@ export interface ModuleOutil {
      * mois ». Le squelette en prend ce qu'il sait interpréter sans risque, et
      * ignore le reste.
      */
-    readonly creer: (skeleton: string, maintenant: Date, extrait: Extrait) => EtatNeuf;
+    readonly creer: (skeleton: string, maintenant: Date, extrait: Extrait, registre?: RegistreDemande) => EtatNeuf;
 }
 /**
  * Un import dynamique par squelette.

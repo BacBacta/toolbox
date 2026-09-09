@@ -7,6 +7,9 @@
  * quand même, dès la première visite.
  */
 export const CHARGEURS = {
+    // Un registre composé par le modèle : même écran, même moteur, sa
+    // configuration voyage simplement avec l'outil au lieu d'un squelette.
+    compose: () => import('./outils/liste.js'),
     devis: () => import('./outils/devis.js'),
     facture: () => import('./outils/facture.js'),
     njangi: () => import('./outils/njangi.js'),

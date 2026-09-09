@@ -1,6 +1,6 @@
 import type { RenderContext, ShareSpec } from '@a237/engine'
 import { CATALOGUE, EXTRAIT_VIDE } from '@a237/engine'
-import type { Extrait } from '@a237/engine'
+import type { Extrait, RegistreDemande } from '@a237/engine'
 import type { JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
 import { Diffusion } from './diffusion.js'
@@ -32,7 +32,7 @@ function glyphePour(skeleton: string): string {
 
 function Accueil(props: {
   readonly outils: readonly OutilEnregistre[]
-  readonly onCreer: (skeleton: string, extrait: Extrait) => void
+  readonly onCreer: (skeleton: string, extrait: Extrait, registre?: RegistreDemande) => void
   readonly onOuvrir: (id: string) => void
   readonly onSupprimer: (id: string) => void
 }): JSX.Element {
@@ -131,12 +131,16 @@ export function App(): JSX.Element {
     })
   }
 
-  async function creer(skeleton: string, extrait: Extrait): Promise<void> {
+  async function creer(
+    skeleton: string,
+    extrait: Extrait,
+    registre?: RegistreDemande,
+  ): Promise<void> {
     const chargeur = CHARGEURS[skeleton]
     if (chargeur === undefined) throw new Error(`aucun écran pour « ${skeleton} »`)
     const maintenant = new Date()
-    const neuf = (await chargeur()).creer(skeleton, maintenant, extrait)
-    const outil = await creerOutil(skeleton, neuf.nom, neuf.etat, maintenant)
+    const neuf = (await chargeur()).creer(skeleton, maintenant, extrait, registre)
+    const outil = await creerOutil(skeleton, neuf.nom, neuf.etat, maintenant, registre)
     setOutils(await listerOutils())
     setOuvert(outil)
   }
@@ -163,7 +167,9 @@ export function App(): JSX.Element {
         {erreur !== '' && <div class="alerte">{erreur}</div>}
         <Accueil
           outils={outils}
-          onCreer={(s, extrait) => tenter(() => creer(s, extrait), 'Création impossible')}
+          onCreer={(s, extrait, registre) =>
+            tenter(() => creer(s, extrait, registre), 'Création impossible')
+          }
           onOuvrir={(id) => tenter(() => ouvrir(id), 'Ouverture impossible')}
           onSupprimer={(id) => tenter(() => supprimer(id), 'Suppression impossible')}
         />

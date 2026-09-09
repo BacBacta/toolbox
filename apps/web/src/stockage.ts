@@ -1,3 +1,4 @@
+import type { RegistreDemande } from '@a237/engine'
 import { createStore, del, entries, get, set } from 'idb-keyval'
 
 /**
@@ -24,6 +25,18 @@ export interface OutilEnregistre {
   readonly nom: string
   /** L'état, conforme au schéma du squelette. Validé avant d'être rendu. */
   readonly etat: unknown
+  /**
+   * La configuration d'un registre composé par le modèle, quand il n'y a pas de
+   * squelette derrière.
+   *
+   * C'est ce qui rend l'étage 2 durable : le registre composé n'est pas une
+   * vue jetable, il vit sur le téléphone comme les autres, s'ouvre hors ligne,
+   * et se partage pareil. `skeleton` vaut alors `'compose'` — aucun squelette
+   * ne porte ce nom, et le fragment de liste sait le reconnaître.
+   *
+   * Absent pour les outils bâtis sur un squelette, qui sont la règle.
+   */
+  readonly registre?: RegistreDemande
   /**
    * Version monotone. Le serveur refusera une publication dont la version est
    * inférieure ou égale à celle qu'il détient : un vieux téléphone n'écrase pas
@@ -98,12 +111,14 @@ export async function creerOutil(
   nom: string,
   etat: unknown,
   maintenant: Date,
+  registre?: RegistreDemande,
 ): Promise<OutilEnregistre> {
   const outil: OutilEnregistre = {
     id: nouvelIdentifiant(),
     skeleton: skeletonId,
     nom,
     etat,
+    ...(registre !== undefined ? { registre } : {}),
     version: 0,
     creeLe: maintenant.getTime(),
     majLe: maintenant.getTime(),

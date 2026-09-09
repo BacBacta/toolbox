@@ -110,9 +110,11 @@ describe('l’atelier comprend la demande, sans appeler personne', () => {
     expect(hote.textContent).toContain('Lequel veux-tu ?')
   })
 
-  it('le dit quand c’est hors de sa portée, sans faire semblant', () => {
+  it('le dit quand c’est hors de sa portée, et propose de composer', () => {
     demander('il me faut un contrat de bail')
-    expect(hote.textContent).toContain('Je ne sais pas encore faire ça')
+    expect(hote.textContent).toContain('Aucun de mes outils ne correspond')
+    // La composition part sur un geste, jamais en tapant : chaque appel coûte.
+    expect(hote.textContent).toContain('Compose-le pour moi')
   })
 
   it('garde la grille complète sous la main', () => {

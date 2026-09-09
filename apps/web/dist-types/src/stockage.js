@@ -54,12 +54,13 @@ export async function majEtat(outil, etat, maintenant) {
  * stockage ne connaît aucun squelette, et la coquille ne tire donc pas les
  * dix-sept schémas dans son fragment de départ pour créer un devis.
  */
-export async function creerOutil(skeletonId, nom, etat, maintenant) {
+export async function creerOutil(skeletonId, nom, etat, maintenant, registre) {
     const outil = {
         id: nouvelIdentifiant(),
         skeleton: skeletonId,
         nom,
         etat,
+        ...(registre !== undefined ? { registre } : {}),
         version: 0,
         creeLe: maintenant.getTime(),
         majLe: maintenant.getTime(),

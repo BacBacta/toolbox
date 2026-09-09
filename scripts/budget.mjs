@@ -92,6 +92,44 @@ const MARQUEURS_OUTILS = [
   ['Bon pour accord', 'rendu du devis'],
 ]
 
+/**
+ * Rien du proxy IA ne doit atteindre le navigateur.
+ *
+ * C'est l'invariant § 2.8 rendu structurel : **aucune clef d'API dans le
+ * client, jamais**. `@a237/ia` vit côté serveur, appelle le fournisseur et lit
+ * la clef dans son environnement ; un import égaré depuis `apps/web` tirerait
+ * cette mécanique dans le paquet que tout le monde télécharge — et le jour où
+ * quelqu'un y ajouterait une valeur de repli, la clef partirait avec.
+ *
+ * On ne cherche pas la clef, qui n'est nulle part dans le code : on cherche
+ * ce qui n'a de sens que côté serveur. Ces marqueurs-là sont introuvables
+ * ailleurs.
+ */
+const MARQUEURS_SERVEUR = [
+  ['generativelanguage.googleapis.com', 'appel au fournisseur de modèle'],
+  ['x-goog-api-key', 'entête d’authentification du modèle'],
+  ['A237_CLEF_IA', 'nom de la variable qui porte la clef'],
+  ['Tu configures un registre', 'invite envoyée au modèle'],
+]
+
+/*
+ * Toute l'application, pas seulement la coquille : un fragment chargé à la
+ * demande est téléchargé par le navigateur comme le reste.
+ */
+const codeClient = readdirSync(join(DIST, 'assets'))
+  .filter((f) => f.endsWith('.js'))
+  .map((f) => readFileSync(join(DIST, 'assets', f), 'utf8'))
+  .join('')
+
+for (const [marqueur, quoi] of MARQUEURS_SERVEUR) {
+  if (codeClient.includes(marqueur)) {
+    echecs.push(
+      `« ${marqueur} » (${quoi}) est dans le paquet client : le proxy IA doit ` +
+        'rester côté serveur (invariant § 2.8, aucune clef d’API dans le client)',
+    )
+  }
+}
+
 const codeCoquille = cheminsCoquille
   .filter((c) => c.endsWith('.js'))
   .map((c) => readFileSync(c, 'utf8'))

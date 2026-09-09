@@ -1,4 +1,4 @@
-import type { Extrait, RenderContext, ShareSpec } from '@a237/engine'
+import type { Extrait, RegistreDemande, RenderContext, ShareSpec } from '@a237/engine'
 import type { JSX } from 'preact'
 import type { OutilEnregistre } from './stockage.js'
 
@@ -37,7 +37,12 @@ export interface ModuleOutil {
    * mois ». Le squelette en prend ce qu'il sait interpréter sans risque, et
    * ignore le reste.
    */
-  readonly creer: (skeleton: string, maintenant: Date, extrait: Extrait) => EtatNeuf
+  readonly creer: (
+    skeleton: string,
+    maintenant: Date,
+    extrait: Extrait,
+    registre?: RegistreDemande,
+  ) => EtatNeuf
 }
 
 /**
@@ -49,6 +54,9 @@ export interface ModuleOutil {
  * quand même, dès la première visite.
  */
 export const CHARGEURS: Readonly<Record<string, () => Promise<ModuleOutil>>> = {
+  // Un registre composé par le modèle : même écran, même moteur, sa
+  // configuration voyage simplement avec l'outil au lieu d'un squelette.
+  compose: () => import('./outils/liste.js'),
   devis: () => import('./outils/devis.js'),
   facture: () => import('./outils/facture.js'),
   njangi: () => import('./outils/njangi.js'),

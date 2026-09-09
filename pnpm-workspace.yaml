@@ -3,4 +3,5 @@ packages:
   - "apps/*"
   - "workers/*"
   - "services/*"
+  - "api"
   - "e2e"

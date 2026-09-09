@@ -10,6 +10,7 @@ export default defineConfig({
       'packages/*/test/**/*.test.tsx',
       'apps/*/test/**/*.test.ts',
       'apps/*/test/**/*.test.tsx',
+      'api/test/**/*.test.ts',
     ],
     coverage: {
       provider: 'v8',
@@ -17,7 +18,9 @@ export default defineConfig({
         'packages/engine/src/**',
         'packages/legal-cm/src/**',
         'packages/render/src/**',
+        'packages/ia/src/**',
         'apps/web/src/**',
+        'api/**.ts',
       ],
       // Le service worker s'exécute dans une portée que Vitest ne fournit pas ;
       // sa logique de cache est testée à part, dans sw-strategie.ts.

@@ -1,7 +1,8 @@
-import type { Comprehension, Extrait, FicheSquelette } from '@a237/engine'
-import { comprendre, montantF } from '@a237/engine'
+import type { Comprehension, Extrait, FicheSquelette, RegistreDemande } from '@a237/engine'
+import { EXTRAIT_VIDE, comprendre, montantF } from '@a237/engine'
 import type { JSX } from 'preact'
 import { useState } from 'preact/hooks'
+import { composer } from './composer.js'
 
 /**
  * L'atelier : on dit ce dont on a besoin, l'outil s'ouvre.
@@ -26,8 +27,13 @@ import { useState } from 'preact/hooks'
 
 export interface ProprietesAtelier {
   readonly fiches: readonly FicheSquelette[]
-  readonly onCreer: (skeleton: string, extrait: Extrait) => void
+  readonly onCreer: (skeleton: string, extrait: Extrait, registre?: RegistreDemande) => void
 }
+
+/** L'identifiant d'un registre qui n'a pas de squelette. Voir `outils/liste.tsx`. */
+const ID_COMPOSE = 'compose'
+
+type Composition = 'repos' | 'en-cours' | 'pas-ouvert' | { readonly echoue: string }
 
 /**
  * Des exemples qui montrent ce qu'une phrase peut porter, pas seulement le nom
@@ -47,10 +53,35 @@ const EXEMPLES: readonly string[] = [
 export function Atelier(props: ProprietesAtelier): JSX.Element {
   const [demande, setDemande] = useState('')
   const [reponse, setReponse] = useState<Comprehension | null>(null)
+  const [composition, setComposition] = useState<Composition>('repos')
 
   function repondre(texte: string): void {
     setDemande(texte)
+    setComposition('repos')
     setReponse(texte.trim() === '' ? null : comprendre(texte, props.fiches))
+  }
+
+  /**
+   * L'étage 2 : le modèle compose un registre que l'étage 1 ne connaissait pas.
+   *
+   * Il ne part que sur un geste — jamais en tapant. Chaque appel coûte de
+   * l'argent (§ 8, moins d'un franc la génération), et lancer une génération à
+   * chaque frappe brûlerait un budget pour des phrases inachevées.
+   */
+  function faireComposer(): void {
+    setComposition('en-cours')
+    void composer(demande).then((r) => {
+      if (r.sorte === 'compose') {
+        setComposition('repos')
+        setDemande('')
+        setReponse(null)
+        props.onCreer(ID_COMPOSE, EXTRAIT_VIDE, r.registre)
+      } else if (r.sorte === 'pas-ouvert') {
+        setComposition('pas-ouvert')
+      } else {
+        setComposition({ echoue: r.pourquoi })
+      }
+    })
   }
 
   function ouvrir(fiche: FicheSquelette, extrait: Extrait): void {
@@ -121,9 +152,32 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
       {reponse?.sorte === 'hors-portee' && (
         <div class="atelier-reponse">
           <p class="atelier-dit">
-            Je ne sais pas encore faire ça. Voilà ce que je sais faire — ou décris-le
-            autrement.
+            Aucun de mes outils ne correspond. Je peux essayer d’en composer un — un
+            registre avec les colonnes que tu décris.
           </p>
+
+          {composition === 'repos' && (
+            <button type="button" class="atelier-option principale" onClick={faireComposer}>
+              <span class="marque" aria-hidden="true">✳</span>
+              <span class="texte">
+                <b>Compose-le pour moi</b>
+                <span>demande le réseau</span>
+              </span>
+            </button>
+          )}
+
+          {composition === 'en-cours' && <p class="note">Je compose…</p>}
+
+          {composition === 'pas-ouvert' && (
+            <p class="note">
+              La composition n’est pas encore ouverte. En attendant, prends l’outil le plus
+              proche dans la liste ci-dessous.
+            </p>
+          )}
+
+          {typeof composition === 'object' && (
+            <p class="note">Je n’ai pas pu composer — {composition.echoue}. Réessaie ?</p>
+          )}
         </div>
       )}
     </section>
