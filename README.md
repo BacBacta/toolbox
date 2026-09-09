@@ -21,15 +21,23 @@ commencé, conformément au point 4 de la section 11 du brief.
 |---|---|
 | `packages/engine` | montant en toutes lettres, TVA ligne par ligne, mise en forme, validateur de schéma, numérotation continue, étage 1, trois squelettes (`devis`, `facture`, `njangi`) |
 | `packages/legal-cm` | TVA 19,25 %, mentions obligatoires, formes NIU et RCCM, numérotation |
-| `packages/render` | feuille A4 réelle, documents `devis` et `facture`. Le registre njangi et la carte canvas restent à faire |
+| `packages/render` | feuille A4 réelle, documents `devis` et `facture`, registre njangi, carte partagée en canvas |
 | `packages/outils-test` | scanners partagés par les tests de pureté |
-| `apps/web` | pas commencée |
+| `apps/web` | la PWA : accueil, stockage IndexedDB, formulaire dressé à partir du schéma, diffusion, service worker |
+| `e2e` | une vérification dans un vrai navigateur, mode avion compris |
 
-419 tests, couverture à 97 %. Une seule dépendance de production : `preact`.
+688 tests, couverture à 95 %. Coquille initiale : **18,6 Ko gzip** pour un
+plafond de 120. Deux dépendances tierces de production : `preact` et
+`idb-keyval`.
 
 ```bash
 pnpm install
-pnpm verif        # typecheck + tests + couverture, comme la CI
+pnpm dev          # l'application, en développement
+pnpm verif        # typecheck + tests + couverture + construction + budgets
 ```
+
+Les budgets de la section 8 du brief ne se surveillent pas à l'œil : ils font
+échouer la CI. Voir [`e2e/README.md`](e2e/README.md) pour la vérification dans
+un vrai navigateur.
 
 Les arbitrages sont journalisés dans [`docs/02-decisions.md`](docs/02-decisions.md).
