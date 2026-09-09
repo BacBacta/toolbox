@@ -120,17 +120,41 @@ Ce qui reste, et qui compte plus que tout le reste :
 3. Se rappeler que **la publication n'existe pas encore** : la carte se partage,
    mais le lien viendra avec la phase 2.
 
+## Où poser les variables — deux familles à ne pas confondre
+
+Il y a deux sortes de variables, elles ne vivent pas au même endroit, et les
+mélanger est la façon la plus simple de mettre une clef dans un dépôt.
+
+**Les identifiants de mise en ligne** — `CLOUDFLARE_API_TOKEN`,
+`CLOUDFLARE_ACCOUNT_ID`. Elles ne servent qu'à *déployer* ; l'application ne
+les lit jamais et Cloudflare ne les stocke pas pour elle. Elles vivent là où la
+commande de déploiement s'exécute, et nulle part ailleurs.
+
+| D'où tu déploies | Ce qu'il faut |
+|---|---|
+| Ton ordinateur | **Rien.** `npx wrangler login` ouvre un navigateur et retient l'autorisation. C'est le chemin le plus simple, et aucun jeton ne circule. |
+| Une machine sans navigateur | Les deux variables, exportées dans le terminal le temps de la commande. |
+| GitHub Actions | Les deux, en *secrets du dépôt* — jamais dans un fichier du dépôt. |
+
+**Les réglages de l'application** — les `A237_*`. Elles se posent dans le
+projet Pages, et c'est délibéré : `A237_MODELE` doit pouvoir changer **sans
+redéployer**, le jour où les prix bougent ou qu'un modèle plus fidèle au schéma
+apparaît. Les mettre dans `wrangler.toml` les figerait dans une construction.
+
+Dans le tableau de bord : *Workers & Pages* → le projet `atelier237` →
+*Settings* → les variables d'environnement. Deux détails qui se paient cher :
+
+- **Production et Preview sont deux jeux séparés.** Une variable posée pour la
+  production ne s'applique pas aux déploiements de préversion, et le proxy y
+  répondra « pas encore ouvert » sans que rien ne semble cassé.
+- **`A237_CLEF_IA` se pose comme secret**, pas comme variable : un secret ne se
+  relit pas dans l'interface une fois posé. En ligne de commande :
+  `npx wrangler pages secret put A237_CLEF_IA --project-name atelier237`.
+
 ## Ouvrir la composition par le modèle
 
-Cinq variables d'environnement, à poser dans le projet Pages — jamais dans le
-dépôt. La clef est un secret et se pose comme tel :
-
-```bash
-wrangler pages secret put A237_CLEF_IA
-```
-
-Les quatre autres sont de la configuration, pas des secrets : elles se règlent
-dans les variables d'environnement du projet.
+Cinq variables, posées comme la section précédente le dit : la clef en secret,
+les quatre autres en variables du projet.
 
 | Variable | Rôle | Défaut |
 |---|---|---|
