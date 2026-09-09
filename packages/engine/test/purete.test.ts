@@ -53,9 +53,87 @@ function fichiers(dossier: string): string[] {
   })
 }
 
-/** Retire commentaires de bloc et de ligne, en épargnant les `https://`. */
-function sansCommentaires(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+/**
+ * Ne garde que le code : commentaires retirés, texte des chaînes retiré, mais
+ * **expressions d'interpolation conservées** — `${etat.nom}` est du code.
+ *
+ * Sans ça le scanner criait sur le mot « document » écrit en français dans une
+ * description de schéma. Un garde-fou qui hurle à tort finit par être désactivé.
+ * Il est lui-même testé plus bas : un scanner devenu aveugle ne se voit pas.
+ */
+export function codeSeul(source: string): string {
+  let out = ''
+  let i = 0
+  const n = source.length
+
+  while (i < n) {
+    const c = source.charAt(i)
+    const suivant = source.charAt(i + 1)
+
+    if (c === '/' && suivant === '*') {
+      const fin = source.indexOf('*/', i + 2)
+      i = fin === -1 ? n : fin + 2
+      out += ' '
+      continue
+    }
+
+    if (c === '/' && suivant === '/') {
+      const fin = source.indexOf('\n', i + 2)
+      i = fin === -1 ? n : fin
+      out += ' '
+      continue
+    }
+
+    if (c === "'" || c === '"') {
+      i += 1
+      while (i < n) {
+        const d = source.charAt(i)
+        if (d === '\\') {
+          i += 2
+          continue
+        }
+        i += 1
+        if (d === c || d === '\n') break
+      }
+      out += ' "" '
+      continue
+    }
+
+    if (c === '`') {
+      i += 1
+      while (i < n) {
+        const d = source.charAt(i)
+        if (d === '\\') {
+          i += 2
+          continue
+        }
+        if (d === '`') {
+          i += 1
+          break
+        }
+        if (d === '$' && source.charAt(i + 1) === '{') {
+          i += 2
+          const debut = i
+          let profondeur = 1
+          while (i < n && profondeur > 0) {
+            const e = source.charAt(i)
+            if (e === '{') profondeur += 1
+            else if (e === '}') profondeur -= 1
+            i += 1
+          }
+          out += ` ${source.slice(debut, Math.max(debut, i - 1))} `
+          continue
+        }
+        i += 1
+      }
+      continue
+    }
+
+    out += c
+    i += 1
+  }
+
+  return out
 }
 
 const FICHIERS = SOURCES.flatMap(fichiers)
@@ -68,7 +146,7 @@ describe('le moteur reste pur', () => {
   it.each(FICHIERS.map((f) => [relative(RACINE, f), f] as const))(
     '%s n’utilise ni API navigateur, ni horloge, ni hasard',
     (_nom, chemin) => {
-      const code = sansCommentaires(readFileSync(chemin, 'utf8'))
+      const code = codeSeul(readFileSync(chemin, 'utf8'))
       const trouves = INTERDITS.filter(([motif]) => motif.test(code)).map(([, quoi]) => quoi)
       expect(trouves).toEqual([])
     },
@@ -85,4 +163,34 @@ describe('le moteur reste pur', () => {
       expect(externes).toEqual([])
     },
   )
+})
+
+describe('le scanner lui-même', () => {
+  it('retire les commentaires de ligne et de bloc', () => {
+    expect(codeSeul('const a = 1 // document.title')).not.toContain('document')
+    expect(codeSeul('/* window.alert */ const a = 1')).not.toContain('window')
+  })
+
+  it('retire le texte des chaînes, y compris en français', () => {
+    expect(codeSeul("const d = 'Les lignes du document.'")).not.toContain('document')
+    expect(codeSeul('const d = "fenêtre : window"')).not.toContain('window')
+  })
+
+  it('survit à une apostrophe échappée', () => {
+    const code = codeSeul("const a = 'l\\'appelant'\nconst b = 2")
+    expect(code).toContain('const b')
+  })
+
+  it('garde les expressions interpolées : c’est du code', () => {
+    expect(codeSeul('const t = `bonjour ${document.title} !`')).toContain('document')
+    expect(codeSeul('const t = `${a} et ${b}`')).toContain('a')
+  })
+
+  it('retire le texte autour des interpolations', () => {
+    expect(codeSeul('const t = `le document dit ${x}`')).not.toContain('document dit')
+  })
+
+  it('laisse passer le code ordinaire', () => {
+    expect(codeSeul('const somme = a / b + 1')).toContain('a / b')
+  })
 })
