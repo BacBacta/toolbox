@@ -3,6 +3,7 @@ import { squeletteParId } from '@a237/engine'
 import { render as enChaine } from 'preact-render-to-string'
 import a4Css from '@a237/render/styles/a4.css?raw'
 import lectureCss from './lecture.css?raw'
+import { sansCommentaires } from './feuille.js'
 import { PageIllisible, PageIntrouvable, PiedLecture } from './page.js'
 import type { MetaPage } from './page.js'
 import { VueCarte, carteDe, documentDe } from './rendu.js'
@@ -11,10 +12,14 @@ import { VueCarte, carteDe, documentDe } from './rendu.js'
  * La page complète, en une chaîne.
  *
  * Le CSS est **inliné** : une feuille séparée serait une requête de plus sur
- * une connexion qui hoquette, pour trois kilo-octets. Il n'y a aucun script,
- * donc rien à charger après le premier octet — la page est finie quand elle
- * arrive.
+ * une connexion qui hoquette. Il n'y a aucun script, donc rien à charger après
+ * le premier octet — la page est finie quand elle arrive. Ses commentaires,
+ * eux, n'ont rien à y faire : voir `sansCommentaires`.
  */
+
+/** Les deux feuilles, allégées une fois pour toutes au chargement du module. */
+const CSS_A4 = sansCommentaires(a4Css)
+const CSS_LECTURE = sansCommentaires(lectureCss)
 
 /** Échappe ce qui part dans un attribut de métadonnée. */
 function attr(valeur: string): string {
@@ -117,7 +122,7 @@ export function pageIllisible(): string {
       description: 'Ce document ne peut pas être affiché.',
       lien: '',
     },
-    lectureCss,
+    CSS_LECTURE,
     enChaine(<PageIllisible />),
   )
 }
@@ -149,7 +154,7 @@ function dessiner(
     // aurait reçu imprimé.
     return envelopper(
       meta,
-      a4Css + lectureCss,
+      CSS_A4 + CSS_LECTURE,
       `<main class="lecture">${enChaine(document)}</main>${enChaine(<PiedLecture instantane={instantane} />)}`,
     )
   }
@@ -159,7 +164,7 @@ function dessiner(
 
   return envelopper(
     meta,
-    lectureCss,
+    CSS_LECTURE,
     `<main class="lecture">${enChaine(<VueCarte carte={carte} />)}</main>${enChaine(<PiedLecture instantane={instantane} />)}`,
   )
 }
@@ -167,7 +172,7 @@ function dessiner(
 export function pageIntrouvable(): string {
   return envelopper(
     { titre: 'Lien introuvable — Atelier 237', description: 'Ce document n’est plus publié.', lien: '' },
-    lectureCss,
+    CSS_LECTURE,
     enChaine(<PageIntrouvable />),
   )
 }

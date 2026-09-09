@@ -4812,6 +4812,62 @@ var a4_default = "/*\n * Feuille A4 réelle, en millimètres.\n *\n * Le prototy
 //#region src/lecture.css?raw
 var lecture_default = "/*\n * La page de lecture. Inlinée dans le HTML : une feuille séparée serait une\n * requête de plus sur une connexion qui hoquette, pour deux kilo-octets.\n */\n:root {\n  --encre: #121710;\n  --encre-2: #414b3f;\n  --encre-3: #5e6a5c;\n  --fond: #fafbf7;\n  --surface: #fff;\n  --trait: #dfe5d9;\n  --accent: #1b5e43;\n  --alerte: #9c2717;\n}\n* { box-sizing: border-box; }\nbody {\n  margin: 0;\n  padding: 16px;\n  background: var(--fond);\n  color: var(--encre);\n  font: 15px/1.5 system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n  font-variant-numeric: tabular-nums;\n}\n.lecture { max-width: 760px; margin: 0 auto; }\n.lecture-carte {\n  max-width: 560px;\n  margin: 0 auto;\n  padding: 20px;\n  border: 1px solid var(--trait);\n  border-radius: 18px;\n  background: var(--surface);\n}\n.lecture-carte .kicker {\n  margin: 0;\n  color: var(--accent);\n  font-size: 11px;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n}\n.lecture-carte h1 { margin: 4px 0 0; font-size: 22px; line-height: 1.2; }\n.lecture-carte .sous { margin: 2px 0 0; color: var(--encre-3); font-size: 13px; }\n.lecture-carte .grand { margin-top: 20px; }\n.lecture-carte .etiquette {\n  margin: 0;\n  color: var(--encre-3);\n  font-size: 11px;\n  font-weight: 700;\n  letter-spacing: 0.09em;\n  text-transform: uppercase;\n}\n.lecture-carte .chiffre {\n  margin: 2px 0 0;\n  color: var(--accent);\n  font-size: 34px;\n  font-weight: 700;\n  line-height: 1.1;\n}\n.lecture-carte .barre {\n  height: 10px;\n  margin-top: 10px;\n  border-radius: 999px;\n  background: #edf1e9;\n  overflow: hidden;\n}\n.lecture-carte .barre i { display: block; height: 100%; background: var(--accent); }\n.lecture-carte .ligne { margin: 8px 0 0; color: var(--encre-2); font-size: 13px; }\n.lecture-carte .detail { margin-top: 20px; }\n.lecture-carte ul { margin: 8px 0 0; padding: 0; list-style: none; }\n.lecture-carte li {\n  display: flex;\n  justify-content: space-between;\n  gap: 12px;\n  padding: 7px 0;\n  border-top: 1px solid var(--trait);\n  font-size: 14px;\n}\n.lecture-carte li.alerte .combien { color: var(--alerte); font-weight: 700; }\n.lecture-carte li.fait .combien { color: var(--accent); }\n.lecture-carte .combien { white-space: nowrap; }\n/*\n * Le pied s'efface derrière le document.\n *\n * À 12 px sous une feuille mise à l'échelle, il était plus gros que le texte du\n * devis lui-même — la mention de l'atelier se lisait mieux que le montant.\n */\n.lecture-pied {\n  max-width: 560px;\n  margin: 14px auto 0;\n  color: var(--encre-3);\n  font-size: 11px;\n  text-align: center;\n}\n.lecture-pied p { margin: 2px 0; }\n.lecture-marque { font-weight: 700; letter-spacing: 0.08em; opacity: 0.75; }\n.lecture-vide { max-width: 460px; margin: 12vh auto; text-align: center; }\n.lecture-vide h1 { font-size: 20px; }\n.lecture-vide p { color: var(--encre-2); }\n\n/*\n * La feuille A4 occupe exactement la largeur disponible.\n *\n * Par paliers — 0,44 puis 0,66 puis 0,86 — elle ne la remplissait presque\n * jamais : sur un écran de 500 px elle restait dessinée pour 390, et son texte\n * finissait plus petit que celui du pied de page. Or c'est le document qu'on\n * vient lire. Le calcul le met à la largeur juste à chaque taille d'écran, et\n * s'arrête à 1 : un devis agrandi au-delà de sa taille réelle n'apprend rien de\n * plus et se met à baver.\n *\n * 210 mm valent 793,7 px à 96 ppp ; les 32 px sont les marges du corps. Le\n * diviseur porte son unité : diviser une longueur par un nombre rend une\n * longueur, et `min(1, 0.41px)` mélange un nombre et une longueur — déclaration\n * invalide, silencieusement ignorée. L'échelle retombait alors à 1 et le\n * document sortait à sa taille réelle, coupé par le cadre sur un téléphone.\n */\n.a4-cadre {\n  --echelle: min(1, calc((100vw - 32px) / 793.7px));\n  margin: 0 auto;\n}\n@media print {\n  body { padding: 0; background: #fff; }\n  .lecture-pied { display: none; }\n}\n";
 //#endregion
+//#region src/feuille.ts
+/**
+* La feuille de style, allégée de ce qui ne sert qu'à la relire.
+*
+* Le CSS est inliné dans la page publiée — une feuille séparée serait une
+* requête de plus sur une connexion qui hoquette. Inlinée telle quelle, elle
+* emportait aussi ses commentaires : **vingt-neuf pour cent de la page**, six
+* kilo-octets qui expliquent au prochain lecteur du code pourquoi la feuille
+* A4 fait ses millimètres. Le destinataire d'un devis, lui, les télécharge
+* sans jamais les lire. Six mille octets de moins font deux mille trois cents
+* octets de moins une fois comprimés, sur la seule page que le produit envoie
+* à des gens qui ne l'ont pas demandée.
+*
+* Un lecteur caractère par caractère et non une expression régulière : `/*`
+* dans une chaîne CSS — `content: "/*"` — est du texte, et une expression
+* régulière qui ne compte pas les guillemets couperait la règle en deux. Le
+* cas ne se présente pas aujourd'hui dans ces deux feuilles ; c'est justement
+* pour qu'il puisse se présenter demain sans casser la page.
+*/
+function sansCommentaires(css) {
+	let sortie = "";
+	let i = 0;
+	/** Le guillemet ouvrant en cours, ou '' hors chaîne. */
+	let chaine = "";
+	while (i < css.length) {
+		const c = css[i] ?? "";
+		if (chaine !== "") {
+			sortie += c;
+			if (c === "\\" && i + 1 < css.length) {
+				sortie += css[i + 1];
+				i += 2;
+				continue;
+			}
+			if (c === chaine) chaine = "";
+			i += 1;
+			continue;
+		}
+		if (c === "\"" || c === "'") {
+			chaine = c;
+			sortie += c;
+			i += 1;
+			continue;
+		}
+		if (c === "/" && css[i + 1] === "*") {
+			const fin = css.indexOf("*/", i + 2);
+			if (fin === -1) break;
+			i = fin + 2;
+			if (css[i] === "\n" && /(^|\n)[ \t]*$/.test(sortie)) i += 1;
+			continue;
+		}
+		sortie += c;
+		i += 1;
+	}
+	return sortie;
+}
+//#endregion
 //#region ../../node_modules/.pnpm/preact@10.29.8_preact-render-to-string@6.7.0/node_modules/preact/jsx-runtime/dist/jsxRuntime.module.js
 var f = 0;
 Array.isArray;
@@ -5064,8 +5120,25 @@ function Paragraphes(props) {
 * doit pouvoir recalculer chaque ligne au stylo et retomber sur le total — d'où
 * aussi la règle d'arrondi du moteur, qui arrondit à la ligne avant de sommer.
 */
+/**
+* Une ligne qui ne dit rien : ni désignation, ni montant.
+*
+* « Ajouter une ligne » en insère une vide, et c'est voulu — on la remplit
+* ensuite. Reste qu'on peut être interrompu et diffuser sans y revenir : le
+* client recevait alors un devis portant une rangée de cinq zéros sans
+* désignation. La retirer ne change aucun total, une ligne à zéro n'apportant
+* rien à la somme ; elle reste bien visible dans l'outil, où elle attend d'être
+* remplie, et c'est le document qui ne l'imprime pas.
+*
+* Le montant compte autant que le nom : « Livraison offerte » à zéro franc dit
+* quelque chose, et s'imprime.
+*/
+function neDitRien(ligne) {
+	return ligne.designation.trim() === "" && ligne.montantTTC === 0;
+}
 function TableauLignes(props) {
-	if (props.totaux.lignes.length === 0) return /* @__PURE__ */ u("div", {
+	const lignes = props.totaux.lignes.filter((l) => !neDitRien(l));
+	if (lignes.length === 0) return /* @__PURE__ */ u("div", {
 		class: "a4-vide",
 		children: "Aucune ligne pour l’instant."
 	});
@@ -5093,7 +5166,7 @@ function TableauLignes(props) {
 				class: "nombre",
 				children: "Montant TTC"
 			})
-		] }) }), /* @__PURE__ */ u("tbody", { children: props.totaux.lignes.map((l, i) => /* @__PURE__ */ u("tr", { children: [
+		] }) }), /* @__PURE__ */ u("tbody", { children: lignes.map((l, i) => /* @__PURE__ */ u("tr", { children: [
 			/* @__PURE__ */ u("td", { children: l.designation }),
 			/* @__PURE__ */ u("td", {
 				class: "nombre",
@@ -5186,6 +5259,7 @@ function villeDe(adresse) {
 function DocumentRecu(props) {
 	const etat = props.etat;
 	const t = totauxRecu(etat);
+	const lignes = etat.lignes.filter((l) => l.designation.trim() !== "" || l.montant !== 0);
 	return /* @__PURE__ */ u(PageA4, {
 		encre: etat.encre,
 		children: [
@@ -5201,7 +5275,7 @@ function DocumentRecu(props) {
 					children: "Reçu de"
 				}), /* @__PURE__ */ u("div", { children: /* @__PURE__ */ u("strong", { children: etat.recuDe }) })]
 			}),
-			etat.lignes.length === 0 ? /* @__PURE__ */ u("div", {
+			lignes.length === 0 ? /* @__PURE__ */ u("div", {
 				class: "a4-vide",
 				children: "Aucune ligne pour l’instant."
 			}) : /* @__PURE__ */ u("table", {
@@ -5209,7 +5283,7 @@ function DocumentRecu(props) {
 				children: [/* @__PURE__ */ u("thead", { children: /* @__PURE__ */ u("tr", { children: [/* @__PURE__ */ u("th", { children: "Désignation" }), /* @__PURE__ */ u("th", {
 					class: "nombre",
 					children: "Montant"
-				})] }) }), /* @__PURE__ */ u("tbody", { children: etat.lignes.map((l, i) => /* @__PURE__ */ u("tr", { children: [/* @__PURE__ */ u("td", { children: l.designation }), /* @__PURE__ */ u("td", {
+				})] }) }), /* @__PURE__ */ u("tbody", { children: lignes.map((l, i) => /* @__PURE__ */ u("tr", { children: [/* @__PURE__ */ u("td", { children: l.designation }), /* @__PURE__ */ u("td", {
 					class: "nombre",
 					children: nf(l.montant)
 				})] }, `${i}-${l.designation}`)) })]
@@ -5959,10 +6033,13 @@ function VueCarte(props) {
 * La page complète, en une chaîne.
 *
 * Le CSS est **inliné** : une feuille séparée serait une requête de plus sur
-* une connexion qui hoquette, pour trois kilo-octets. Il n'y a aucun script,
-* donc rien à charger après le premier octet — la page est finie quand elle
-* arrive.
+* une connexion qui hoquette. Il n'y a aucun script, donc rien à charger après
+* le premier octet — la page est finie quand elle arrive. Ses commentaires,
+* eux, n'ont rien à y faire : voir `sansCommentaires`.
 */
+/** Les deux feuilles, allégées une fois pour toutes au chargement du module. */
+var CSS_A4 = sansCommentaires(a4_default);
+var CSS_LECTURE = sansCommentaires(lecture_default);
 /** Échappe ce qui part dans un attribut de métadonnée. */
 function attr(valeur) {
 	return valeur.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -6021,7 +6098,7 @@ function pageIllisible() {
 		titre: "Document illisible — Atelier 237",
 		description: "Ce document ne peut pas être affiché.",
 		lien: ""
-	}, lecture_default, K(/* @__PURE__ */ u(PageIllisible, {})));
+	}, CSS_LECTURE, K(/* @__PURE__ */ u(PageIllisible, {})));
 }
 function pageDeLecture(instantane, ctx, lien, image) {
 	try {
@@ -6033,17 +6110,17 @@ function pageDeLecture(instantane, ctx, lien, image) {
 function dessiner(instantane, ctx, lien, image) {
 	const meta = metaDe(instantane, ctx, lien, image);
 	const document = documentDe(instantane, ctx);
-	if (document !== null) return envelopper(meta, a4_default + lecture_default, `<main class="lecture">${K(document)}</main>${K(/* @__PURE__ */ u(PiedLecture, { instantane }))}`);
+	if (document !== null) return envelopper(meta, CSS_A4 + CSS_LECTURE, `<main class="lecture">${K(document)}</main>${K(/* @__PURE__ */ u(PiedLecture, { instantane }))}`);
 	const carte = carteDe(instantane, ctx);
 	if (carte === null) return pageIntrouvable();
-	return envelopper(meta, lecture_default, `<main class="lecture">${K(/* @__PURE__ */ u(VueCarte, { carte }))}</main>${K(/* @__PURE__ */ u(PiedLecture, { instantane }))}`);
+	return envelopper(meta, CSS_LECTURE, `<main class="lecture">${K(/* @__PURE__ */ u(VueCarte, { carte }))}</main>${K(/* @__PURE__ */ u(PiedLecture, { instantane }))}`);
 }
 function pageIntrouvable() {
 	return envelopper({
 		titre: "Lien introuvable — Atelier 237",
 		description: "Ce document n’est plus publié.",
 		lien: ""
-	}, lecture_default, K(/* @__PURE__ */ u(PageIntrouvable, {})));
+	}, CSS_LECTURE, K(/* @__PURE__ */ u(PageIntrouvable, {})));
 }
 //#endregion
 //#region src/worker-lire.ts
