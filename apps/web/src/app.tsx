@@ -4,7 +4,7 @@ import type { Extrait } from '@a237/engine'
 import type { JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
 import { Diffusion } from './diffusion.js'
-import { publier } from './publier.js'
+import { publier, televerserCarte } from './publier.js'
 import { CHARGEURS, outilDisponible } from './outils.js'
 import type { Compose, ModuleOutil } from './outils.js'
 import { numeroter } from './numeros.js'
@@ -320,6 +320,14 @@ export function App(): JSX.Element {
         <Diffusion
           partage={partage}
           mot={motPublication}
+          /*
+           * La carte suit le dépôt, elle ne le précède pas. Ce qui rate ici ne
+           * se dit pas : sans image, l'aperçu WhatsApp porte le titre et la
+           * description, ce qui est moins bien et n'est pas une panne.
+           */
+          onCarte={(png) => {
+            if (ouvert.lien !== undefined) void televerserCarte(ouvert.lien, png)
+          }}
           onFermer={() => setPartage(null)}
         />
       )}

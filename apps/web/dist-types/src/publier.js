@@ -30,6 +30,31 @@ export function tirerLien() {
         lien += ALPHABET_LIEN[o % ALPHABET_LIEN.length];
     return lien;
 }
+/**
+ * Téléverse la carte, sans jamais faire échouer la publication.
+ *
+ * Elle est **dessinée sur le téléphone** — le brief l'exige (§ 1, point 6), et
+ * c'est le bon découpage : le serveur n'a ni police ni canvas. Elle part après
+ * le dépôt, et non avec lui : une image en base64 dans du JSON coûte un tiers
+ * de sa taille en plus, et la page de lecture fonctionne sans elle.
+ *
+ * Ce qui rate ici ne se dit pas à l'utilisateur. Sans carte, l'aperçu WhatsApp
+ * porte le titre et la description au lieu de l'image — c'est moins bien, ce
+ * n'est pas une panne, et le lien marche.
+ */
+export async function televerserCarte(lien, png) {
+    try {
+        const reponse = await fetch(`/c/${lien}.png`, {
+            method: 'PUT',
+            headers: { 'content-type': 'image/png' },
+            body: png,
+        });
+        return reponse.ok;
+    }
+    catch {
+        return false;
+    }
+}
 function instantaneDe(outil, quand) {
     return {
         skeleton: outil.skeleton,

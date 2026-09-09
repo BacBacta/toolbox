@@ -197,15 +197,20 @@ try {
  * fichier sortait `_lien_.js` — qui ne répond qu'à `/d/_lien_`. Toutes les
  * pages de lecture auraient rendu 404, et la construction aurait réussi.
  */
+// `onRequest` peut voisiner avec ce que les tests importent : on cherche le nom
+// dans la liste d'exports, pas une liste d'exports précise.
+const EXPORTE_ONREQUEST = /export \{[^}]*\bonRequest\b[^}]*\}/
 for (const [chemin, marqueur, quoi] of [
-  ['functions/api/publier.js', 'export { onRequest }', 'l’export nommé que Pages appelle'],
-  ['functions/d/[lien].js', 'export { onRequest }', 'l’export nommé que Pages appelle'],
+  ['functions/api/publier.js', EXPORTE_ONREQUEST, 'l’export nommé que Pages appelle'],
+  ['functions/d/[lien].js', EXPORTE_ONREQUEST, 'l’export nommé que Pages appelle'],
   ['functions/d/[lien].js', '<!doctype html>', 'la page de lecture, preuve que le rendu est inclus'],
+  ['functions/c/[lien].js', EXPORTE_ONREQUEST, 'l’export nommé que Pages appelle'],
+  ['functions/c/[lien].js', 'image/png', 'le service des cartes'],
 ]) {
   try {
-    if (!readFileSync(chemin, 'utf8').includes(marqueur)) {
-      echecs.push(`${chemin} n'a pas ${quoi}`)
-    }
+    const source = readFileSync(chemin, 'utf8')
+    const present = marqueur instanceof RegExp ? marqueur.test(source) : source.includes(marqueur)
+    if (!present) echecs.push(`${chemin} n'a pas ${quoi}`)
   } catch {
     echecs.push(`${chemin} manquant : la publication ne serait pas déployée`)
   }
@@ -219,7 +224,10 @@ for (const [chemin, marqueur, quoi] of [
  * l'application. Chaque fonction porte donc tout ce dont elle a besoin.
  */
 {
-  const attendus = new Set(['functions/api/ai.js', 'functions/api/publier.js', 'functions/d/[lien].js'])
+  const attendus = new Set([
+    'functions/api/ai.js', 'functions/api/publier.js',
+    'functions/d/[lien].js', 'functions/c/[lien].js',
+  ])
   const vus = []
   const parcourir = (dossier) => {
     for (const e of readdirSync(dossier, { withFileTypes: true })) {

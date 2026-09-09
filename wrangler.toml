@@ -18,3 +18,10 @@ pages_build_output_dir = "apps/web/dist"
 [[kv_namespaces]]
 binding = "INSTANTANES"
 id = "5e3c4fb72fd541f3ac31cfd40f9d2618"
+
+# La carte PNG, dessinée sur le téléphone et téléversée au dépôt.
+# R2 est retenu pour une raison chiffrable : pas de frais de sortie. C'est ce
+# qu'on sert le plus, puisque l'aperçu WhatsApp est le tableau de bord.
+[[r2_buckets]]
+binding = "CARTES"
+bucket_name = "atelier237-cartes"

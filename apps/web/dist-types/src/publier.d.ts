@@ -23,6 +23,19 @@ import type { OutilEnregistre } from './stockage.js';
  * la fréquence d'un caractère, pas sur la devinabilité d'un lien de douze.
  */
 export declare function tirerLien(): string;
+/**
+ * Téléverse la carte, sans jamais faire échouer la publication.
+ *
+ * Elle est **dessinée sur le téléphone** — le brief l'exige (§ 1, point 6), et
+ * c'est le bon découpage : le serveur n'a ni police ni canvas. Elle part après
+ * le dépôt, et non avec lui : une image en base64 dans du JSON coûte un tiers
+ * de sa taille en plus, et la page de lecture fonctionne sans elle.
+ *
+ * Ce qui rate ici ne se dit pas à l'utilisateur. Sans carte, l'aperçu WhatsApp
+ * porte le titre et la description au lieu de l'image — c'est moins bien, ce
+ * n'est pas une panne, et le lien marche.
+ */
+export declare function televerserCarte(lien: string, png: Blob): Promise<boolean>;
 export type Issue = {
     readonly sorte: 'publie';
     readonly lien: string;

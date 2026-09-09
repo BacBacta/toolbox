@@ -181,8 +181,10 @@ Ce qui reste, et qui compte plus que tout le reste :
 |---|---|
 | `POST /api/publier` | dépose `{ lien, instantane }` dans KV |
 | `GET /d/:lien` | rend la page de lecture, sans un script |
+| `PUT /c/:lien.png` | dépose la carte, dessinée sur le téléphone |
+| `GET /c/:lien.png` | la sert, immuable pour un an |
 | KV | liaison `INSTANTANES` |
-| R2 | **pas encore activé** — à faire dans le tableau de bord |
+| R2 | liaison `CARTES`, seau `atelier237-cartes` |
 
 Le lien fait **douze caractères** en base32 sans `I`, `1`, `O`, `0` ni `U` :
 il se lit à voix haute au téléphone et se recopie sur un cahier. Le prototype
@@ -199,7 +201,25 @@ tout l'intérêt du lien, ouvrir un devis plutôt que recevoir une image qu'on n
 peut ni chercher ni copier. Les registres rendent leur carte : on ne rejoue pas
 un écran à boutons en lecture seule.
 
-### Deux pièges du rendu serveur
+### La carte et l'aperçu
+
+La carte est **dessinée sur le téléphone** et téléversée telle quelle (§ 1,
+point 6). Le serveur n'a ni police, ni canvas, ni la moindre raison d'apprendre
+à dessiner : il range un octet et le rend. Elle part **après** le dépôt, jamais
+avec lui — une image en base64 dans du JSON coûte un tiers de sa taille en
+plus, et la page de lecture fonctionne sans elle.
+
+`og:image` n'est annoncée **que si la carte existe** : la page demande à R2 si
+elle est là. Une `og:image` qui rend 404 fait un aperçu cassé, ce qui est pire
+qu'un aperçu sobre — il donne l'air d'un lien douteux.
+
+Le seau n'est pas ouvert au monde : les cartes passent par une route de ce
+domaine, ce qui garde l'aperçu et la page sur la même origine. Et seule une
+vraie image y entre : on vérifie la **signature** du fichier et non l'en-tête
+annoncé, qui est déclaratif. Sans ce contrôle, l'adresse deviendrait un
+hébergement de fichiers sous notre nom.
+
+### Trois pièges du rendu serveur
 
 **Le nom du fichier est la route.** `functions/d/[lien].js` répond à
 `/d/n'importe quoi`. Rollup assainit les crochets d'un nom de sortie : le
@@ -208,6 +228,11 @@ auraient rendu 404, et la construction aurait réussi. Une garde du budget exige
 le nom exact, et refuse tout fichier de `functions/` qui ne soit pas une route
 attendue — un fragment partagé déposé dans `functions/assets/` deviendrait une
 route `/assets/…` qui masquerait les vrais fichiers de l'application.
+
+**Un `https://` écrit en dur.** L'adresse absolue sert à `og:url` et
+`og:image`, que WhatsApp suit telles quelles. Bâtie sur un schéma supposé, elle
+est fausse partout où le schéma diffère — à commencer par le serveur local, où
+l'on éprouve justement la chaîne complète. L'origine vient de la requête.
 
 **`min(1, calc((100vw - 32px) / 793.7))` est invalide.** Diviser une longueur
 par un nombre rend une longueur, et `min` refuse de mélanger un nombre et une

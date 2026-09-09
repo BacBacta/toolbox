@@ -31,7 +31,10 @@ export function Diffusion(props) {
             return;
         try {
             dessinerCarte(element, props.partage.card);
-            void cartePng(element).then((blob) => setPoids(Math.round(blob.size / 1024)), () => setPoids(null));
+            void cartePng(element).then((blob) => {
+                setPoids(Math.round(blob.size / 1024));
+                props.onCarte?.(blob);
+            }, () => setPoids(null));
         }
         catch {
             setMessage('La carte n’a pas pu être dessinée sur cet appareil.');

@@ -56,13 +56,26 @@ function envelopper(meta: MetaPage, css: string, corps: string): string {
   return `<!doctype html><html lang="fr"><head>${entete(meta)}<style>${css}</style></head><body>${corps}</body></html>`
 }
 
-/** Ce que WhatsApp affichera : deux lignes tirées de la carte du squelette. */
-export function metaDe(instantane: Instantane, ctx: RenderContext, lien: string): MetaPage {
+/**
+ * Ce que WhatsApp affichera : deux lignes tirées de la carte du squelette, et
+ * l'image quand elle existe.
+ *
+ * `image` reste absente si la carte n'a pas été déposée. Annoncer une
+ * `og:image` qui rend 404 ferait un aperçu cassé — pire qu'un aperçu sobre,
+ * parce qu'il donne l'air d'un lien douteux.
+ */
+export function metaDe(
+  instantane: Instantane,
+  ctx: RenderContext,
+  lien: string,
+  image?: string,
+): MetaPage {
   const carte = carteDe(instantane, ctx)
   return {
     titre: carte === null ? instantane.nom : carte.title,
     description: carte === null ? 'Document Atelier 237' : [carte.sub, carte.subline].filter((s) => s !== '').join(' · '),
     lien,
+    ...(image === undefined ? {} : { image }),
   }
 }
 
@@ -70,8 +83,9 @@ export function pageDeLecture(
   instantane: Instantane,
   ctx: RenderContext,
   lien: string,
+  image?: string,
 ): string {
-  const meta = metaDe(instantane, ctx, lien)
+  const meta = metaDe(instantane, ctx, lien, image)
   const document = documentDe(instantane, ctx)
 
   if (document !== null) {

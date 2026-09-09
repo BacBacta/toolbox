@@ -5822,17 +5822,25 @@ function entete(meta) {
 function envelopper(meta, css, corps) {
 	return `<!doctype html><html lang="fr"><head>${entete(meta)}<style>${css}</style></head><body>${corps}</body></html>`;
 }
-/** Ce que WhatsApp affichera : deux lignes tirées de la carte du squelette. */
-function metaDe(instantane, ctx, lien) {
+/**
+* Ce que WhatsApp affichera : deux lignes tirées de la carte du squelette, et
+* l'image quand elle existe.
+*
+* `image` reste absente si la carte n'a pas été déposée. Annoncer une
+* `og:image` qui rend 404 ferait un aperçu cassé — pire qu'un aperçu sobre,
+* parce qu'il donne l'air d'un lien douteux.
+*/
+function metaDe(instantane, ctx, lien, image) {
 	const carte = carteDe(instantane, ctx);
 	return {
 		titre: carte === null ? instantane.nom : carte.title,
 		description: carte === null ? "Document Atelier 237" : [carte.sub, carte.subline].filter((s) => s !== "").join(" · "),
-		lien
+		lien,
+		...image === void 0 ? {} : { image }
 	};
 }
-function pageDeLecture(instantane, ctx, lien) {
-	const meta = metaDe(instantane, ctx, lien);
+function pageDeLecture(instantane, ctx, lien, image) {
+	const meta = metaDe(instantane, ctx, lien, image);
 	const document = documentDe(instantane, ctx);
 	if (document !== null) return envelopper(meta, a4_default + lecture_default, `<main class="lecture">${K(document)}</main>${K(/* @__PURE__ */ u(PiedLecture, { instantane }))}`);
 	const carte = carteDe(instantane, ctx);
@@ -5866,11 +5874,13 @@ async function onRequest(contexte) {
 	if (!lienValide(lien)) return html(404, pageIntrouvable(), "no-store");
 	const instantane = await contexte.env.INSTANTANES.get(lien, "json");
 	if (instantane === null) return html(404, pageIntrouvable(), "no-store");
+	const origine = new URL(contexte.request.url).origin;
 	const ctx = {
 		lien: `${new URL(contexte.request.url).host}/d/${lien}`,
 		maintenant: /* @__PURE__ */ new Date()
 	};
-	return html(200, pageDeLecture(instantane, ctx, `https://${ctx.lien}`), "public, max-age=60");
+	const carte = await contexte.env.CARTES.head(lien) === null ? void 0 : `${origine}/c/${lien}.png`;
+	return html(200, pageDeLecture(instantane, ctx, `${origine}/d/${lien}`, carte), "public, max-age=60");
 }
 //#endregion
 export { onRequest };

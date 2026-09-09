@@ -9,5 +9,11 @@ export declare function Diffusion(props: {
      * avant. Mais le taire ferait croire à un lien qui n'existe pas.
      */
     readonly mot?: string;
+    /**
+     * La carte, une fois encodée. Elle est dessinée ici de toute façon, pour
+     * l'aperçu et pour le partage de fichier : la donner permet de la téléverser
+     * sans l'encoder une seconde fois.
+     */
+    readonly onCarte?: (png: Blob) => void;
     readonly onFermer: () => void;
 }): JSX.Element;
