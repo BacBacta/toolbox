@@ -230,6 +230,35 @@ La phase 2 doit donc livrer, en plus de ce que le brief prévoyait : un plan par
 compte lisible à chaque appel, et un compteur de consommation à l'appel pour
 l'étage 2 — le solde d'OpenRouter est global, il ne dit pas qui a dépensé quoi.
 
+## Le catalogue est complet : dix-sept sur dix-sept
+
+Les huit derniers squelettes sont écrits. Trois décisions de portage méritent
+d'être consignées, parce qu'elles s'écartent du prototype et qu'on se
+demandera pourquoi.
+
+**Le CV ne traduit que ses intitulés.** Le prototype basculait le CV entier en
+anglais — mais il ne pouvait le faire que pour le CV d'exemple qu'il portait en
+dur. Traduire le texte de quelqu'un demande le modèle, donc des jetons, pour un
+résultat qu'on ne saurait pas relire. La bascule ne touche donc que
+« Expérience professionnelle » / « Experience ». Et il ne réserve aucune place
+pour une photo : tant que l'atelier ne sait pas stocker une image, un carré vide
+marqué « photo » sur la feuille qu'on tend à un employeur est pire que rien.
+
+**L'ancienneté d'une dette se calcule.** Le prototype gardait un nombre de jours
+dans l'état de l'ardoise. Il n'aurait jamais bougé : une dette de trois mois se
+serait affichée « depuis 4 jours » pour toujours. On garde la date d'ouverture,
+et les jours se déduisent de l'instant que l'appelant fournit — la même règle
+que partout ailleurs, le moteur ne lit pas d'horloge.
+
+**Une case vide n'est pas une absence.** Sur la feuille de présence, le
+dénominateur ne compte que les séances où la personne figurait. Sans cette
+règle, le dernier inscrit ouvre la feuille à 20 % et n'y peut rien.
+
+Deux écrans portent un avertissement avant diffusion : l'ardoise (§ 2.5 du
+brief, mot pour mot) et le call-box, dont la recette du jour n'est pas une
+information de groupe. La feuille de présence partage l'appel du jour, que tout
+le monde a vu de ses yeux, jamais le taux d'assiduité de chacun.
+
 ## Reportées, et à quel moment il faudra trancher
 
 | Sujet | Quand | Ce qui est déjà prêt |
