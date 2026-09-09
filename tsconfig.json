@@ -20,6 +20,9 @@
       "path": "./packages/serveur"
     },
     {
+      "path": "./packages/comptes"
+    },
+    {
       "path": "./apps/web"
     }
   ]

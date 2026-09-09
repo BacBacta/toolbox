@@ -55,6 +55,16 @@ importers:
         specifier: ^8.2.2
         version: 8.2.2(@types/node@26.5.0)
 
+  packages/comptes:
+    dependencies:
+      '@a237/engine':
+        specifier: workspace:*
+        version: link:../engine
+    devDependencies:
+      vite:
+        specifier: ^8.2.2
+        version: 8.2.2(@types/node@26.5.0)
+
   packages/engine:
     dependencies:
       '@a237/legal-cm':
