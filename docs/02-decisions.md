@@ -10,7 +10,7 @@ tous les trois mois.
 | # | Question | Décision |
 |---|---|---|
 | 1 | Racine du dépôt | Le dépôt **est** la racine, pas de dossier `atelier237/` intermédiaire. |
-| 2 | `facture` en v1 | **Oui, squelette à part entière.** Elle partage le socle `legal-cm` avec le devis, mais porte la numérotation continue, le NIU client obligatoire et les mentions de règlement. C'est le document que la DGI contrôle. Construite après les deux squelettes de la section 11. |
+| 2 | `facture` en v1 | **Oui, squelette à part entière**, et **écrite**. Elle partage `schema/commun.ts` avec le devis et s'en écarte sur ce qui l'engage : échéance au lieu de validité, règlements reçus au lieu d'acompte annoncé, statut de paiement. |
 | 3 | Budget de 120 Ko gzip | Porte sur **la coquille initiale** (html + fragment d'entrée + css préchargée). Chaque outil est un fragment chargé à la demande, plafonné à 25 Ko, mis en cache par le service worker. |
 
 ---
@@ -58,6 +58,17 @@ minuscule. Ajouter le type `null` au sous-ensemble de JSON Schema coûterait plu
 qu'il ne rapporte. Un numéro de téléphone qu'on n'a pas est une propriété
 absente ; un NIU qu'on n'a pas est `''`.
 
+### Une facture neuve est payable à réception
+Pas de délai de trente jours par défaut : c'est une convention commerciale
+française, pas une règle camerounaise, et le brief interdit d'inventer un délai
+administratif (§ 9). L'utilisateur fixe son échéance.
+
+### L'échéance dépassée l'emporte sur l'acompte reçu
+Une facture en retard partiellement réglée est affichée « en retard », pas
+« partielle » : pour agir, c'est le retard qui compte. Un versement au-delà du
+dû ressort en trop-perçu plutôt que de creuser un reste négatif — ça se voit au
+lieu de se perdre.
+
 ### Le validateur de schéma est écrit à la main
 Cent lignes, sans dépendance, en vocabulaire JSON Schema standard pour servir
 tel quel de schéma de réponse contrainte au modèle en phase 4. Une clef
@@ -81,3 +92,4 @@ Worker, où le budget de poids n'existe pas.
 | Que se passe-t-il quand le serveur rejette une version périmée ? | phase 2 | § 2.7 — la réponse 409 doit renvoyer la version stockée et l'app poser la question. |
 | Taux USD → XAF pour `ai_calls.cost_xaf` | phase 4 | § 3.1 — le `USD=656` du prototype est le taux fixe **euro**/FCFA appliqué au dollar. À relever à la source, et à mettre en configuration du Worker, pas en constante. |
 | Les six vérifications de la section 6 du brief | à l'ouverture de chaque phase concernée | § 4 — aucune ne concerne la phase 1. |
+| Longueur du lien court pour les documents qui portent des noms et des montants | phase 2 | Un slug de 4 caractères en base32 fait environ un million de combinaisons : énumérable. Acceptable pour une liste de prix, discutable pour une facture ou une ardoise. À trancher avec le format d'URL, avant que des liens soient dans la nature. |

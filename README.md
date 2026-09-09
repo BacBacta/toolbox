@@ -19,11 +19,11 @@ commencé, conformément au point 4 de la section 11 du brief.
 
 | Paquet | État |
 |---|---|
-| `packages/engine` | montant en toutes lettres, TVA ligne par ligne, mise en forme, validateur de schéma, étage 1, deux squelettes (`njangi`, `devis`) |
-| `packages/legal-cm` | TVA 19,25 %, mentions obligatoires, formes NIU et RCCM, numérotation continue |
+| `packages/engine` | montant en toutes lettres, TVA ligne par ligne, mise en forme, validateur de schéma, numérotation continue, étage 1, trois squelettes (`devis`, `facture`, `njangi`) |
+| `packages/legal-cm` | TVA 19,25 %, mentions obligatoires, formes NIU et RCCM, numérotation |
 | `packages/render`, `apps/web` | pas commencés |
 
-278 tests, couverture du moteur à 97 %. Zéro dépendance de production.
+338 tests, couverture du moteur à 97 %. Zéro dépendance de production.
 
 ```bash
 pnpm install
