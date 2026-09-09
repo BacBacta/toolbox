@@ -33,6 +33,12 @@ export function cachesAPurger(existants, courant) {
     return existants.filter((c) => c.startsWith('atelier237-') && c !== courant);
 }
 /**
+ * La coquille, telle qu'elle est rangée et relue.
+ *
+ * `/` et non `/index.html` : voir `fichiersAPrecacher`.
+ */
+export const COQUILLE = '/';
+/**
  * La liste des fichiers à précharger, dédoublonnée.
  *
  * `cache.addAll` **rejette** quand deux entrées désignent la même requête, et
@@ -43,9 +49,19 @@ export function cachesAPurger(existants, courant) {
  *
  * Cette fonction est employée des deux côtés : par le greffon qui écrit
  * `precache.json` à la construction, et par le service worker qui le relit.
+ *
+ * **`/index.html` n'y figure pas, et c'est la même panne sous un autre
+ * déguisement.** Cloudflare Pages le redirige vers `/` en 308 ; `addAll` suit
+ * la redirection, obtient une réponse marquée `redirected`, et `Cache.put` la
+ * refuse. L'installation échoue en entier, sans un mot, et le mode avion ne
+ * marche pas. `/` sert les mêmes octets et ne redirige pas : la coquille se
+ * range et se relit sous ce nom-là. Le serveur des vérifications de bout en
+ * bout reproduit la redirection, faute de quoi la garde ne garderait rien.
  */
 export function fichiersAPrecacher(emis) {
-    const coquille = ['/', '/index.html', '/manifest.webmanifest'];
-    const tous = [...coquille, ...emis.map((f) => (f.startsWith('/') ? f : `/${f}`))];
-    return [...new Set(tous)];
+    const coquille = [COQUILLE, '/manifest.webmanifest'];
+    const emisSansCoquille = emis
+        .map((f) => (f.startsWith('/') ? f : `/${f}`))
+        .filter((f) => f !== '/index.html');
+    return [...new Set([...coquille, ...emisSansCoquille])];
 }

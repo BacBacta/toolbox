@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import { cachesAPurger, fichiersAPrecacher, nomCache, strategiePour } from './sw-strategie.js'
+import { COQUILLE, cachesAPurger, fichiersAPrecacher, nomCache, strategiePour } from './sw-strategie.js'
 
 /**
  * Le service worker, écrit à la main.
@@ -26,7 +26,7 @@ declare const self: ServiceWorkerGlobalScope
 declare const __EMPREINTE__: string
 
 const CACHE = nomCache(__EMPREINTE__)
-const COQUILLE = '/index.html'
+
 
 self.addEventListener('install', (evenement) => {
   evenement.waitUntil(

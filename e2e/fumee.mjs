@@ -13,6 +13,20 @@ const TYPES = {
 
 const serveur = createServer((req, res) => {
   const chemin = decodeURIComponent((req.url ?? '/').split('?')[0])
+  /*
+   * Cloudflare Pages redirige `/index.html` vers `/` en 308, et ce détail
+   * décide du mode avion : `cache.addAll` suit la redirection, obtient une
+   * réponse marquée `redirected`, et `Cache.put` la refuse. L'installation du
+   * service worker échoue alors en entier — plus de hors-ligne, sans un mot.
+   *
+   * Le serveur d'ici le reproduit, sinon la garde ne garde rien : servir le
+   * fichier directement laissait passer exactement ce qui casse en production.
+   */
+  if (chemin === '/index.html') {
+    res.writeHead(308, { Location: '/' })
+    res.end()
+    return
+  }
   let fichier = join(DIST, normalize(chemin))
   try {
     if (statSync(fichier).isDirectory()) fichier = join(fichier, 'index.html')

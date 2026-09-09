@@ -58,14 +58,25 @@ describe('cachesAPurger', () => {
 });
 describe('fichiersAPrecacher', () => {
     it('met la coquille en tête', () => {
-        expect(fichiersAPrecacher([])).toEqual(['/', '/index.html', '/manifest.webmanifest']);
+        expect(fichiersAPrecacher([])).toEqual(['/', '/manifest.webmanifest']);
+    });
+    it('n’y met jamais `/index.html`, qui redirige chez l’hébergeur', () => {
+        // Cloudflare Pages le renvoie vers `/` en 308. `addAll` suit la
+        // redirection, obtient une réponse marquée `redirected`, et `Cache.put` la
+        // refuse : l'installation échoue en entier, sans un mot, et le mode avion
+        // ne marche plus. `/` sert les mêmes octets et ne redirige pas.
+        expect(fichiersAPrecacher([])).not.toContain('/index.html');
+        expect(fichiersAPrecacher(['index.html'])).not.toContain('/index.html');
+        expect(fichiersAPrecacher(['/index.html'])).not.toContain('/index.html');
+        // La coquille reste préchargée, sous l'autre nom.
+        expect(fichiersAPrecacher(['index.html'])).toContain('/');
     });
     it('préfixe les fichiers émis par la construction', () => {
         expect(fichiersAPrecacher(['assets/app-abc.js'])).toContain('/assets/app-abc.js');
     });
     it('dédoublonne — sinon cache.addAll rejette et l’installation échoue en silence', () => {
         const liste = fichiersAPrecacher(['index.html', 'assets/app.js', '/assets/app.js']);
-        expect(liste.filter((f) => f === '/index.html')).toHaveLength(1);
+        expect(liste.filter((f) => f === '/')).toHaveLength(1);
         expect(liste.filter((f) => f === '/assets/app.js')).toHaveLength(1);
         expect(new Set(liste).size).toBe(liste.length);
     });

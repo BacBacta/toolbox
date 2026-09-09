@@ -1,7 +1,6 @@
 /// <reference lib="webworker" />
-import { cachesAPurger, fichiersAPrecacher, nomCache, strategiePour } from './sw-strategie.js';
+import { COQUILLE, cachesAPurger, fichiersAPrecacher, nomCache, strategiePour } from './sw-strategie.js';
 const CACHE = nomCache(__EMPREINTE__);
-const COQUILLE = '/index.html';
 self.addEventListener('install', (evenement) => {
     evenement.waitUntil((async () => {
         const cache = await caches.open(CACHE);
