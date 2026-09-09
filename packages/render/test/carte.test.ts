@@ -479,3 +479,12 @@ describe('dessinerCarte et cartePng, sans vrai canvas', () => {
     )
   })
 })
+
+describe('une carte sans lien', () => {
+  it('n’imprime pas d’adresse, mais garde son horodatage et sa signature', () => {
+    const t = textes(composer({ ...CARTE, link: '' }).primitives)
+    expect(t).not.toContain('atl.cm/n/ZBV3?t=36')
+    expect(t).toContain('Arrêté le 9 septembre 2026 à 08h45')
+    expect(t).toContain('ATELIER 237')
+  })
+})

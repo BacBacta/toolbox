@@ -79,7 +79,15 @@ export function App() {
     if (ouvert === null) {
         return (_jsxs("main", { class: "app", children: [erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), _jsx(Accueil, { outils: outils, onCreer: (s) => tenter(() => creer(s), 'Création impossible'), onOuvrir: (id) => tenter(() => ouvrir(id), 'Ouverture impossible'), onSupprimer: (id) => tenter(() => supprimer(id), 'Suppression impossible') })] }));
     }
-    const ctx = { lien: `atl.cm/a/${ouvert.id.slice(0, 4)}`, maintenant: new Date() };
+    /**
+     * Le lien est vide tant que la publication n'existe pas.
+     *
+     * Il serait facile d'écrire `atl.cm/a/1234` sur la carte et dans les
+     * relances : ce serait un lien mort, envoyé par le trésorier à ses membres,
+     * sous son nom. Le moteur sait taire un lien vide ; la phase 2 le remplira
+     * avec l'adresse que le serveur aura vraiment attribuée.
+     */
+    const ctx = { lien: '', maintenant: new Date() };
     return (_jsxs("main", { class: "app", children: [_jsx("button", { type: "button", class: "retour", onClick: () => {
                     setOuvert(null);
                     setErreur('');

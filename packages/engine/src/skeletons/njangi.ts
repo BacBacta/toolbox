@@ -54,6 +54,8 @@ export function njangiShare(etat: EtatNjangi, ctx: RenderContext): ShareSpec {
   const tour = beneficiaireDuTour(etat)
   const periode = `${LIBELLE[etat.periode]} ${etat.tour}`
 
+  // Un lien vide veut dire « pas encore publié » : on ne l'écrit pas plutôt que
+  // d'envoyer quelqu'un sur une page qui n'existe pas.
   const lignes = [
     `${etat.nom.toUpperCase()} — ${periode}`,
     `Collecté : ${montantF(c.collecte)} sur ${montantF(c.attendu)}`,
@@ -62,7 +64,7 @@ export function njangiShare(etat: EtatNjangi, ctx: RenderContext): ShareSpec {
       ? `En attente : ${c.retardataires.map((m) => m.nom).join(', ')}`
       : 'Personne en retard',
     ctx.lien,
-  ]
+  ].filter((l) => l !== '')
 
   // La relance part du pouce du trésorier, jamais du serveur (invariant § 2.4) :
   // dans un njangi la dette est sociale, et seule son autorité compte.
@@ -72,7 +74,8 @@ export function njangiShare(etat: EtatNjangi, ctx: RenderContext): ShareSpec {
     message:
       `Bonjour ${m.nom}. Njangi ${etat.nom}, ${periode} : ta part de ` +
       `${montantF(etat.cotisation)} n'est pas encore enregistrée. ` +
-      `L'état du carnet est ici : ${ctx.lien} — merci de régulariser dès que possible.`,
+      (ctx.lien === '' ? '' : `L'état du carnet est ici : ${ctx.lien} — `) +
+      `merci de régulariser dès que possible.`,
   }))
 
   return {

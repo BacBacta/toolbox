@@ -99,11 +99,12 @@ export function factureShare(etat: EtatFacture, ctx: RenderContext): ShareSpec {
     ctx.lien,
   ].filter((l): l is string => l !== null && l !== '')
 
+  const detail = ctx.lien === '' ? '' : ` Le détail est ici : ${ctx.lien}`
   const message = retard > 0
     ? `Bonjour. La facture N° ${etat.numero} de ${etat.emetteur.nom}, de ` +
-      `${montantF(c.reste)}, était à régler le ${echeance}. Le détail est ici : ${ctx.lien}`
+      `${montantF(c.reste)}, était à régler le ${echeance}.${detail}`
     : `Bonjour. Voici la facture N° ${etat.numero} de ${etat.emetteur.nom} : ` +
-      `${montantF(c.reste)} à régler pour le ${echeance}. Le détail est ici : ${ctx.lien}`
+      `${montantF(c.reste)} à régler pour le ${echeance}.${detail}`
 
   return {
     title: `Facture ${etat.numero}`,

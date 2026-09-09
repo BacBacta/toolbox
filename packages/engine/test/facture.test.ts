@@ -235,3 +235,18 @@ describe('initialiser', () => {
     expect(facture.defaults.reglements).toEqual([])
   })
 })
+
+describe('sans publication, pas de lien mort', () => {
+  function sansLien(maintenant: Date): RenderContext {
+    return { lien: '', maintenant }
+  }
+
+  it('la facture ne renvoie nulle part, à l’heure comme en retard', () => {
+    const avant = factureShare(FACTURE, sansLien(AVANT_ECHEANCE))
+    expect(avant.txt).not.toContain('atl.cm')
+    expect(avant.relances[0]?.message.endsWith('à régler pour le 30 septembre 2026.')).toBe(true)
+
+    const apres = factureShare(FACTURE, sansLien(APRES_ECHEANCE))
+    expect(apres.relances[0]?.message.endsWith('était à régler le 30 septembre 2026.')).toBe(true)
+  })
+})

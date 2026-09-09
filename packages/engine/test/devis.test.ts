@@ -177,3 +177,13 @@ describe('initialiser — le numéro et la date ne sont pas figés dans defaults
     expect(devis.defaults.emetteur.niu).toBe('')
   })
 })
+
+describe('sans publication, pas de lien mort', () => {
+  const SANS_LIEN: RenderContext = { lien: '', maintenant: CTX.maintenant }
+
+  it('le devis ne renvoie nulle part', () => {
+    const p = devisShare(DEVIS, SANS_LIEN)
+    expect(p.txt).not.toContain('atl.cm')
+    expect(p.relances[0]?.message.endsWith('valable 15 jours.')).toBe(true)
+  })
+})

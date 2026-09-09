@@ -88,7 +88,8 @@ export function devisShare(etat: EtatDevis, ctx: RenderContext): ShareSpec {
       tel: etat.client.tel ?? null,
       message:
         `Bonjour. Voici le devis N° ${etat.numero} de ${etat.emetteur.nom} : ` +
-        `${montantF(c.totalTTC)} TTC, valable ${etat.validite}. Le détail est ici : ${ctx.lien}`,
+        `${montantF(c.totalTTC)} TTC, valable ${etat.validite}.` +
+        (ctx.lien === '' ? '' : ` Le détail est ici : ${ctx.lien}`),
     }],
     relancesVides: 'Renseigne le client pour préparer l’envoi.',
   }

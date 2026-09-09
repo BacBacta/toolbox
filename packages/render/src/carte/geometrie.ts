@@ -371,15 +371,19 @@ export function composerCarte(spec: CardSpec, mesureur: Mesureur): {
   p.push({ type: 'rect', x: 0, y: H - HAUT_PIED, l: W, h: HAUT_PIED, couleur: COULEURS.bandeau })
   p.push({ type: 'rect', x: 0, y: H - HAUT_PIED, l: W, h: 3, couleur: COULEURS.bandeauTrait })
 
-  const policeLien = police(700, 29, MONO)
-  p.push({
-    type: 'texte',
-    x: M,
-    y: H - 84,
-    texte: tronquer(mesureur, spec.link, W - M * 2 - 240, policeLien),
-    police: policeLien,
-    couleur: COULEURS.accent,
-  })
+  // Un lien vide veut dire « pas encore publié ». On n'imprime pas une adresse
+  // qui n'existe pas sur une image que quelqu'un va faire circuler.
+  if (spec.link !== '') {
+    const policeLien = police(700, 29, MONO)
+    p.push({
+      type: 'texte',
+      x: M,
+      y: H - 84,
+      texte: tronquer(mesureur, spec.link, W - M * 2 - 240, policeLien),
+      police: policeLien,
+      couleur: COULEURS.accent,
+    })
+  }
 
   const policeHorodatage = police(500, 23, SANS)
   p.push({

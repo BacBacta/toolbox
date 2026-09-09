@@ -260,3 +260,30 @@ describe('le catalogue ne contredit pas les squelettes', () => {
     expect(trouverSquelette('noter le njangi', CATALOGUE)?.id).toBe('njangi')
   })
 })
+
+describe('tant que la publication n’existe pas, aucun lien n’est inventé', () => {
+  const SANS_LIEN: RenderContext = { lien: '', maintenant: CTX.maintenant }
+
+  it('le résumé du njangi ne finit pas sur une ligne vide', () => {
+    const txt = njangiShare(CARNET, SANS_LIEN).txt
+    expect(txt.endsWith('En attente : Adèle, Serge')).toBe(true)
+    expect(txt).not.toContain('atl.cm')
+  })
+
+  it('la relance reste une phrase française, sans lien mort', () => {
+    const message = njangiShare(CARNET, SANS_LIEN).relances[0]?.message ?? ''
+    expect(message).toContain("n'est pas encore enregistrée.")
+    expect(message).toContain('merci de régulariser dès que possible.')
+    expect(message).not.toContain('ici :')
+    expect(message).not.toMatch(/https?:|atl\.cm|\.\s+—/)
+  })
+
+  it('reprend le lien dès qu’il y en a un', () => {
+    const message = njangiShare(CARNET, CTX).relances[0]?.message ?? ''
+    expect(message).toContain("L'état du carnet est ici : atl.cm/n/ZBV3?t=36 — merci")
+  })
+
+  it('la carte n’imprime pas d’adresse inexistante', () => {
+    expect(njangiCard(CARNET, SANS_LIEN).link).toBe('')
+  })
+})

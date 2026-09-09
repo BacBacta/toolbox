@@ -170,7 +170,15 @@ export function App(): JSX.Element {
     )
   }
 
-  const ctx: RenderContext = { lien: `atl.cm/a/${ouvert.id.slice(0, 4)}`, maintenant: new Date() }
+  /**
+   * Le lien est vide tant que la publication n'existe pas.
+   *
+   * Il serait facile d'écrire `atl.cm/a/1234` sur la carte et dans les
+   * relances : ce serait un lien mort, envoyé par le trésorier à ses membres,
+   * sous son nom. Le moteur sait taire un lien vide ; la phase 2 le remplira
+   * avec l'adresse que le serveur aura vraiment attribuée.
+   */
+  const ctx: RenderContext = { lien: '', maintenant: new Date() }
 
   return (
     <main class="app">
