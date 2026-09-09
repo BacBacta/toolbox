@@ -196,17 +196,22 @@ export function basculerVersement(etat: EtatNjangi, index: number): EtatNjangi {
  * indéterminée jusqu'au premier tour vécu. Il n'a pas encore reçu, ce qui le
  * place naturellement dans la rotation.
  *
+ * **Le premier membre prend le tour.** Un njangi qui a des membres a forcément
+ * quelqu'un qui reçoit : sans ça l'écran affichait « Tour : — » et la carte
+ * partagée aussi, ce qui ne veut rien dire pour un trésorier.
+ *
  * @throws RangeError sur un nom vide — un carnet de njangi sans nom ne sert à rien.
  */
 export function ajouterMembre(etat: EtatNjangi, nom: string, tel?: string): EtatNjangi {
   const propre = nom.trim()
   if (propre === '') throw new RangeError('nom de membre vide')
+  const personneAuTour = etat.membres.every((m) => !m.estAuTour)
   const membre: MembreNjangi = {
     nom: propre,
     ...(tel !== undefined && tel.trim() !== '' ? { tel: tel.trim() } : {}),
     aVerse: false,
     aRecu: false,
-    estAuTour: false,
+    estAuTour: personneAuTour,
     versements: 0,
     tours: 0,
   }

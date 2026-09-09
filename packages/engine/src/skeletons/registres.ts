@@ -65,6 +65,7 @@ const CLIENTS: ConfigListe = {
     { clef: 'nom', titre: 'Nom', type: 'texte' },
     { clef: 'tel', titre: 'Téléphone', type: 'texte' },
   ],
+  personnes: true,
   libelleVide: 'Aucun contact pour l’instant.',
   libelleAjout: 'Ajouter un contact',
   relancesVides: 'Un annuaire ne se relance pas — ouvre plutôt une ardoise.',

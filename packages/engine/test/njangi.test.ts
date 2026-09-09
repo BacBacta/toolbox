@@ -219,6 +219,21 @@ describe('ajouterMembre', () => {
     expect(fiabilite(neuve!)).toBeNull()
   })
 
+  it('ne touche pas au tour quand quelqu’un le porte déjà', () => {
+    expect(beneficiaireDuTour(ajouterMembre(CARNET, 'Rosalie'))?.nom).toBe('Ernest')
+  })
+
+  it('donne le tour au premier membre d’un njangi qui n’en avait pas', () => {
+    // Sans ça, un carnet qu'on vient de remplir affiche « Tour : — », à l'écran
+    // comme sur la carte partagée, ce qui ne veut rien dire pour un trésorier.
+    const vide: EtatNjangi = { ...CARNET, membres: [] }
+    const premier = ajouterMembre(vide, 'Adèle')
+    expect(beneficiaireDuTour(premier)?.nom).toBe('Adèle')
+
+    const second = ajouterMembre(premier, 'Serge')
+    expect(beneficiaireDuTour(second)?.nom).toBe('Adèle')
+  })
+
   it('nettoie le nom et garde le numéro quand il y en a un', () => {
     const apres = ajouterMembre(CARNET, '  Rosalie  ', ' 699112233 ')
     expect(apres.membres[apres.membres.length - 1]).toMatchObject({

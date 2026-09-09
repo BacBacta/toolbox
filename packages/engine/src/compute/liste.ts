@@ -37,6 +37,12 @@ export interface ConfigListe {
   readonly alerte?: { readonly clef: string; readonly seuil: number; readonly libelle: string }
   readonly libelleVide: string
   readonly libelleAjout: string
+  /**
+   * Vrai quand une ligne nomme quelqu'un. Un annuaire, oui ; une liste de prix,
+   * non — coller les initiales d'un sac de riz devant son nom, ça vole la
+   * largeur au nom sur un écran de 360 px et ça n'apprend rien.
+   */
+  readonly personnes?: boolean
   /** Ce qu'on affiche à la place des relances : une liste ne se relance pas. */
   readonly relancesVides: string
   /**

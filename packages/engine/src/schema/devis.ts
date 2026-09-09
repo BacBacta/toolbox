@@ -14,7 +14,6 @@ export const devisSchema: JsonSchema = {
   required: ['nom', 'encre', 'numero', 'emisLe', 'emetteur', 'client', 'validite', 'acompte', 'lignes'],
   properties: {
     nom: { type: 'string', minLength: 1, maxLength: 60, title: 'Nom de l’outil' },
-    encre: encreSchema,
     numero: { type: 'string', minLength: 1, maxLength: 24, title: 'Numéro', description: 'Ex. DV-2026-0118. Unique, continu et chronologique.' },
     emisLe: { type: 'string', minLength: 10, maxLength: 32, title: 'Date d’émission', description: 'Date ISO 8601, figée à la création.' },
     emetteur: emetteurSchema,
@@ -23,6 +22,7 @@ export const devisSchema: JsonSchema = {
     validite: { type: 'string', maxLength: 40, title: 'Validité', description: 'Ex. « 15 jours ».' },
     acompte: { type: 'integer', minimum: 0, maximum: 100, title: 'Acompte à la commande (%)' },
     lignes: lignesSchema,
+    encre: encreSchema,
   },
 }
 

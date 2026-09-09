@@ -35,7 +35,6 @@ export const factureSchema: JsonSchema = {
   ],
   properties: {
     nom: { type: 'string', minLength: 1, maxLength: 60, title: 'Nom de l’outil' },
-    encre: encreSchema,
     numero: {
       type: 'string',
       minLength: 1,
@@ -62,6 +61,7 @@ export const factureSchema: JsonSchema = {
       description: 'Ex. « Règlement par MTN Mobile Money ou Orange Money ».',
     },
     lignes: lignesSchema,
+    encre: encreSchema,
     reglements: { type: 'array', maxItems: 100, title: 'Règlements reçus', items: reglementSchema },
   },
 }

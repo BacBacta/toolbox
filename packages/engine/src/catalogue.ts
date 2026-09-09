@@ -18,59 +18,81 @@ export interface FicheSquelette {
   readonly group: SkeletonGroup
   readonly title: string
   readonly keywords: readonly string[]
+  /**
+   * Le signe qui distingue l'outil dans la grille d'accueil.
+   *
+   * Des formes géométriques, comme dans le prototype : aucune police à charger,
+   * aucune image, et elles se distinguent à quatorze pixels. Des initiales ne
+   * marchaient pas — « Liste de prix » et « Livre de caisse » donnaient toutes
+   * deux « LD ».
+   *
+   * Choisies dans le bloc Formes géométriques, qui s'affiche en style texte
+   * partout : un glyphe rendu en émoji chez l'un et en trait chez l'autre ne
+   * serait plus le même repère.
+   */
+  readonly glyphe: string
 }
 
 export const CATALOGUE: readonly FicheSquelette[] = [
   {
     id: 'devis',
+    glyphe: '▤',
     group: 'documents',
     title: 'Devis',
     keywords: ['devis', 'proposition', 'chiffrage', 'estimation', 'cotation'],
   },
   {
     id: 'facture',
+    glyphe: '▥',
     group: 'documents',
     title: 'Facture',
     keywords: ['facture', 'facturation', 'note a payer', 'impaye', 'creance'],
   },
   {
     id: 'njangi',
+    glyphe: '◉',
     group: 'registres',
     title: 'Carnet de njangi',
     keywords: ['njangi', 'tontine', 'cotis', 'tour', 'membre', 'cagnotte'],
   },
   {
     id: 'prix',
+    glyphe: '≡',
     group: 'registres',
     title: 'Liste de prix',
     keywords: ['prix', 'tarif', 'catalogue', 'boutique', 'combien'],
   },
   {
     id: 'caisse',
+    glyphe: '▣',
     group: 'registres',
     title: 'Livre de caisse',
     keywords: ['caisse', 'recette', 'depense', 'entree sortie', 'journal'],
   },
   {
     id: 'stock',
+    glyphe: '▦',
     group: 'registres',
     title: 'Inventaire',
     keywords: ['stock', 'inventaire', 'magasin', 'reste', 'quantite'],
   },
   {
     id: 'clients',
+    glyphe: '◇',
     group: 'registres',
     title: 'Clients',
     keywords: ['client', 'contact', 'annuaire', 'repertoire', 'numero'],
   },
   {
     id: 'scolarite',
+    glyphe: '◪',
     group: 'calculs',
     title: 'Frais scolaires',
     keywords: ['scolarite', 'frais', 'ecole', 'pension', 'rentree'],
   },
   {
     id: 'course',
+    glyphe: '▲',
     group: 'calculs',
     title: 'Partage de course',
     keywords: ['course', 'moto', 'taxi', 'partage', 'diviser'],
