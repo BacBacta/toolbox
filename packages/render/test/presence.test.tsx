@@ -199,8 +199,8 @@ describe('les gestes de la feuille', () => {
           etat={CLASSE}
           ctx={CTX}
           onChange={change}
-          onDiffuser={(p) => {
-            partage = p
+          onDiffuser={(batir) => {
+            partage = batir(CTX)
           }}
           seanceInitiale={1}
         />,

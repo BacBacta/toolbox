@@ -1,10 +1,11 @@
 import { Fragment as _Fragment, jsx as _jsx, jsxs as _jsxs } from "preact/jsx-runtime";
-import { CATALOGUE, EXTRAIT_VIDE, montantF } from '@a237/engine';
+import { CATALOGUE, EXTRAIT_VIDE, lienPublic, montantF } from '@a237/engine';
 import { useEffect, useState } from 'preact/hooks';
 import { Diffusion } from './diffusion.js';
+import { publier } from './publier.js';
 import { CHARGEURS, outilDisponible } from './outils.js';
 import { numeroter } from './numeros.js';
-import { creerOutil, listerOutils, lireOutil, majEtat, supprimerOutil } from './stockage.js';
+import { creerOutil, filerPublication, listerOutils, lireOutil, majEtat, noterPublication, nouvelIdentifiant, supprimerOutil, } from './stockage.js';
 import { Atelier } from './atelier.js';
 /**
  * La coquille.
@@ -38,6 +39,8 @@ export function App() {
     const [coutDernier, setCoutDernier] = useState(null);
     const [partage, setPartage] = useState(null);
     const [erreur, setErreur] = useState('');
+    /** Ce que la dernière tentative de dépôt a donné, dit dans la feuille. */
+    const [motPublication, setMotPublication] = useState('');
     useEffect(() => {
         void listerOutils().then(setOutils);
     }, []);
@@ -58,6 +61,54 @@ export function App() {
      * rien dire — le pire des comportements pour quelqu'un qui a un réseau
      * capricieux et un téléphone plein. Tout ce qui est asynchrone passe par ici.
      */
+    /**
+     * Diffuser, c'est d'abord publier.
+     *
+     * L'ordre n'est pas indifférent : la carte porte le lien, donc il faut que
+     * le lien existe avant de la dessiner. Un dépôt refusé, en conflit ou
+     * simplement hors ligne n'empêche pas de partager — la carte part sans
+     * adresse, comme avant, et l'écran dit pourquoi.
+     */
+    async function diffuser(batir, outil) {
+        const maintenant = new Date();
+        const avec = (lien) => batir({
+            lien: lien === undefined ? '' : lienPublic(location.host, lien),
+            maintenant,
+        });
+        if (outil.lien !== undefined && outil.versionPubliee === outil.version) {
+            // Rien n'a bougé depuis le dernier dépôt : le lien vaut toujours, et on
+            // ne dépense pas une requête pour le redire.
+            setMotPublication('');
+            setPartage(avec(outil.lien));
+            return;
+        }
+        const issue = await publier(outil, maintenant, outil.lien);
+        if (issue.sorte === 'publie') {
+            const suivant = await noterPublication(outil, issue.lien, outil.version);
+            setOuvert(suivant);
+            setOutils(await listerOutils());
+            setMotPublication('');
+            setPartage(avec(issue.lien));
+            return;
+        }
+        if (issue.sorte === 'refuse')
+            setMotPublication(issue.pourquoi);
+        else if (issue.sorte === 'conflit') {
+            setMotPublication(`Une version plus récente de cet outil est déjà publiée (version ${issue.versionServeur}). ` +
+                'Ouvre-la, compare, puis modifie ici pour la remplacer.');
+        }
+        else {
+            await filerPublication({
+                id: nouvelIdentifiant(),
+                outilId: outil.id,
+                version: outil.version,
+                creeLe: Date.now(),
+            });
+            setMotPublication('Pas de réseau : la publication attend son tour. La carte part sans lien pour l’instant.');
+        }
+        // La carte part sans adresse plutôt que d'en porter une qui ne répond pas.
+        setPartage(avec(issue.sorte === 'refuse' ? undefined : outil.lien));
+    }
     function tenter(travail, quoi) {
         void travail().catch((cause) => {
             setErreur(`${quoi} : ${cause instanceof Error ? cause.message : String(cause)}`);
@@ -109,16 +160,18 @@ export function App() {
         return (_jsxs("main", { class: "app", children: [erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), _jsx(Accueil, { outils: outils, onCreer: (s, extrait, compose, fcfa) => tenter(() => creer(s, extrait, compose, fcfa), 'Création impossible'), onOuvrir: (id) => tenter(() => ouvrir(id), 'Ouverture impossible'), onSupprimer: (id) => tenter(() => supprimer(id), 'Suppression impossible') })] }));
     }
     /**
-     * Le lien est vide tant que la publication n'existe pas.
+     * Le lien de l'outil ouvert, ou rien.
      *
-     * Il serait facile d'écrire `atl.cm/a/1234` sur la carte et dans les
-     * relances : ce serait un lien mort, envoyé par le trésorier à ses membres,
-     * sous son nom. Le moteur sait taire un lien vide ; la phase 2 le remplira
-     * avec l'adresse que le serveur aura vraiment attribuée.
+     * Il ne s'écrit qu'une fois le dépôt accepté. Inventer `atl.cm/a/1234` sur
+     * la carte et dans les relances ferait un lien mort, envoyé par le trésorier
+     * à ses membres, sous son nom. Le moteur sait taire un lien vide.
      */
-    const ctx = { lien: '', maintenant: new Date() };
+    const ctx = {
+        lien: ouvert.lien === undefined ? '' : lienPublic(location.host, ouvert.lien),
+        maintenant: new Date(),
+    };
     return (_jsxs("main", { class: "app", children: [_jsx("button", { type: "button", class: "retour", onClick: () => {
                     setOuvert(null);
                     setErreur('');
-                }, children: "\u2190 Mes outils" }), erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), coutDernier !== null && (_jsxs("p", { class: "note cout-compose", children: ["Compos\u00E9 par le mod\u00E8le pour ", montantF(coutDernier), "."] })), module === null ? (_jsx("p", { class: "note", children: "Chargement de l\u2019outil\u2026" })) : (_jsx(module.Outil, { outil: ouvert, glyphe: glyphePour(ouvert.skeleton), ctx: ctx, onChange: (etat) => tenter(() => changer(etat), 'Enregistrement impossible'), onDiffuser: setPartage })), partage !== null && _jsx(Diffusion, { partage: partage, onFermer: () => setPartage(null) })] }));
+                }, children: "\u2190 Mes outils" }), erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), coutDernier !== null && (_jsxs("p", { class: "note cout-compose", children: ["Compos\u00E9 par le mod\u00E8le pour ", montantF(coutDernier), "."] })), module === null ? (_jsx("p", { class: "note", children: "Chargement de l\u2019outil\u2026" })) : (_jsx(module.Outil, { outil: ouvert, glyphe: glyphePour(ouvert.skeleton), ctx: ctx, onChange: (etat) => tenter(() => changer(etat), 'Enregistrement impossible'), onDiffuser: (batir) => tenter(() => diffuser(batir, ouvert), 'Diffusion impossible') })), partage !== null && (_jsx(Diffusion, { partage: partage, mot: motPublication, onFermer: () => setPartage(null) }))] }));
 }

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { EtatCallbox, RenderContext, ShareSpec } from '@a237/engine'
+import type { BatirPartage, EtatCallbox, RenderContext } from '@a237/engine'
 import { callbox } from '@a237/engine'
 import { render as monter } from 'preact'
 import { act } from 'preact/test-utils'
@@ -184,7 +184,7 @@ describe('les gestes du call-box', () => {
         .find((b) => b.textContent === 'Diffuser')
         ?.click(),
     )
-    const partage = diffuse.mock.calls[0]?.[0] as ShareSpec
+    const partage = (diffuse.mock.calls[0]?.[0] as BatirPartage)(CTX)
     expect(partage.warn).toContain('pas pour un groupe')
     expect(partage.relances).toEqual([])
   })

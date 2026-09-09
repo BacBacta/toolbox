@@ -1,4 +1,4 @@
-import type { CalculDemande, Extrait, RegistreDemande, RenderContext, ShareSpec } from '@a237/engine'
+import type { BatirPartage, CalculDemande, Extrait, RegistreDemande, RenderContext } from '@a237/engine'
 import type { JSX } from 'preact'
 import type { OutilEnregistre } from './stockage.js'
 
@@ -26,7 +26,7 @@ export interface ProprietesOutil {
   readonly glyphe: string
   readonly ctx: RenderContext
   readonly onChange: (etat: unknown) => void
-  readonly onDiffuser: (partage: ShareSpec) => void
+  readonly onDiffuser: (batir: BatirPartage) => void
 }
 
 export interface EtatNeuf {

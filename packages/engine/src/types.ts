@@ -81,6 +81,16 @@ export interface CardSpec {
   readonly stamp: string
 }
 
+/**
+ * De quoi bâtir une diffusion, une fois le contexte connu.
+ *
+ * L'écran rend une fonction et non une `ShareSpec` déjà faite, parce que le
+ * lien public n'existe pas encore au moment du clic : il est attribué par le
+ * dépôt, qui a lieu ensuite. Bâtir d'abord ferait une carte sans adresse, et
+ * des relances qui n'en portent pas non plus.
+ */
+export type BatirPartage = (ctx: RenderContext) => ShareSpec
+
 /** Une relance individuelle. Elle part du pouce du propriétaire, via `wa.me`. */
 export interface Relance {
   readonly nom: string

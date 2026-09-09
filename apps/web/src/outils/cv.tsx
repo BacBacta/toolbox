@@ -1,4 +1,4 @@
-import type { EtatCv, Extrait, Gabarit, LangueCv, RenderContext, ShareSpec } from '@a237/engine'
+import type { EtatCv, Extrait, Gabarit, LangueCv, ShareSpec } from '@a237/engine'
 import { GABARITS, controleCv, cv, debordeUnePage, valider } from '@a237/engine'
 import { DocumentCv } from '@a237/render/doc'
 import type { JSX } from 'preact'
@@ -93,7 +93,7 @@ export function Outil(props: ProprietesOutil): JSX.Element {
       sousTitre={etat.identite.titre === '' ? 'Curriculum vitæ' : etat.identite.titre}
       onglet={onglet}
       onOnglet={setOnglet}
-      onDiffuser={() => props.onDiffuser(cv.share(etat, props.ctx as RenderContext) as ShareSpec)}
+      onDiffuser={() => props.onDiffuser((c) => cv.share(etat, c) as ShareSpec)}
     >
       {onglet === 'Document' ? (
         <>

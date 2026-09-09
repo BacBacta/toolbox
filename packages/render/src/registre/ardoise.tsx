@@ -1,4 +1,4 @@
-import type { DetteVue, EtatArdoise, RenderContext, ShareSpec } from '@a237/engine'
+import type { BatirPartage, DetteVue, EtatArdoise, RenderContext } from '@a237/engine'
 import {
   ajouterDette, ardoise, basculerReglee, chercher, montantF, ordonner, retirerDette,
   totaux, vieillissement, vueDettes,
@@ -36,7 +36,7 @@ export function RegistreArdoise(props: {
   readonly etat: EtatArdoise
   readonly ctx: RenderContext
   readonly onChange: (etat: EtatArdoise) => void
-  readonly onDiffuser: (partage: ShareSpec) => void
+  readonly onDiffuser: (batir: BatirPartage) => void
   readonly ongletInitial?: OngletArdoise
 }): JSX.Element {
   const [onglet, setOnglet] = useState<OngletArdoise>(props.ongletInitial ?? 'Encours')
@@ -164,7 +164,7 @@ export function RegistreArdoise(props: {
           </div>
 
           <Actions>
-            <Action principale onClick={() => props.onDiffuser(ardoise.share(etat, props.ctx))}>
+            <Action principale onClick={() => props.onDiffuser((c) => ardoise.share(etat, c))}>
               Diffuser
             </Action>
             <Action onClick={ajouter}>Ajouter</Action>

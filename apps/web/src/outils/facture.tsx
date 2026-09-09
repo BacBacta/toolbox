@@ -27,7 +27,7 @@ export function Outil(props: ProprietesOutil): JSX.Element {
       sousTitre={`Facture N° ${etat.numero}`}
       onglet={onglet}
       onOnglet={setOnglet}
-      onDiffuser={() => props.onDiffuser(facture.share(etat, props.ctx))}
+      onDiffuser={() => props.onDiffuser((c) => facture.share(etat, c))}
     >
       {onglet === 'Document' ? (
         <>

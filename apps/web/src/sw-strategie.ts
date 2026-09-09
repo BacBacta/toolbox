@@ -23,11 +23,24 @@ export interface RequeteObservee {
 
 const DESTINATIONS_APP = new Set(['script', 'style', 'font', 'image', 'manifest', ''])
 
+/**
+ * Ce qui vit sur le même domaine sans appartenir à l'application.
+ *
+ * `/d/…` est une page publiée, rendue par le serveur ; `/api/…` sont les
+ * fonctions. Servir la coquille à leur place ferait voir l'accueil de
+ * l'application à qui ouvre le lien d'un devis — et seulement aux gens qui ont
+ * installé l'application, ce qui rend le défaut invisible pour celui qui a
+ * envoyé le lien.
+ *
+ * Hors ligne, ces adresses échouent, et c'est honnête : leur contenu est sur le
+ * serveur, il n'a jamais été sur le téléphone.
+ */
+const CHEMINS_SERVEUR = ['/d/', '/api/']
+
 export function strategiePour(requete: RequeteObservee, origine: string): Strategie {
   // On ne met jamais en cache autre chose qu'une lecture : publier, payer et
   // appeler le modèle passent par le réseau ou par la file d'attente.
   if (requete.methode !== 'GET') return 'reseau'
-  if (requete.mode === 'navigate') return 'coquille'
 
   let url: URL
   try {
@@ -36,6 +49,9 @@ export function strategiePour(requete: RequeteObservee, origine: string): Strate
     return 'reseau'
   }
   if (url.origin !== origine) return 'reseau'
+  if (CHEMINS_SERVEUR.some((prefixe) => url.pathname.startsWith(prefixe))) return 'reseau'
+
+  if (requete.mode === 'navigate') return 'coquille'
 
   return DESTINATIONS_APP.has(requete.destination) ? 'cache-puis-reseau' : 'reseau'
 }

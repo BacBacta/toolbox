@@ -4,7 +4,7 @@ import {
   devis, facture, motivation, njangi, presence, prix, recu, scolarite, stock,
   valider,
 } from '@a237/engine'
-import type { RenderContext, ShareSpec } from '@a237/engine'
+import type { BatirPartage, RenderContext } from '@a237/engine'
 import { render as monter } from 'preact'
 import { act } from 'preact/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -106,7 +106,7 @@ describe.each([
     const module = await CHARGEURS[id]!()
     const onDiffuser = poser(module, outil(id, module.creer(id, LE_9_SEPT, EXTRAIT_VIDE).etat))
     act(() => hote.querySelector<HTMLButtonElement>('.outil-action.principale')?.click())
-    const partage = onDiffuser.mock.calls[0]?.[0] as ShareSpec | undefined
+    const partage = (onDiffuser.mock.calls[0]?.[0] as BatirPartage | undefined)?.(CTX)
     expect(partage?.card.link).toBe('atl.cm/a/ZBV3')
   })
 })
@@ -286,7 +286,7 @@ describe('les quatre actes et lettres', () => {
     const neuf = module.creer('recu', LE_9_SEPT, EXTRAIT_VIDE)
     const onDiffuser = poser(module, outil('recu', neuf.etat))
     act(() => hote.querySelector<HTMLButtonElement>('.outil-action.principale')?.click())
-    const partage = onDiffuser.mock.calls[0]?.[0] as ShareSpec | undefined
+    const partage = (onDiffuser.mock.calls[0]?.[0] as BatirPartage | undefined)?.(CTX)
     expect(partage?.card.kicker).toBe('REÇU')
     expect(partage?.relances).toEqual([])
   })
@@ -410,7 +410,7 @@ describe('l’ardoise', () => {
     const neuf = module.creer('ardoise', LE_9_SEPT, EXTRAIT_VIDE)
     const onDiffuser = poser(module, outil('ardoise', neuf.etat))
     act(() => hote.querySelector<HTMLButtonElement>('.outil-action.principale')?.click())
-    const partage = onDiffuser.mock.calls[0]?.[0] as ShareSpec | undefined
+    const partage = (onDiffuser.mock.calls[0]?.[0] as BatirPartage | undefined)?.(CTX)
     expect(partage?.warn).toContain('pour toi, pas pour un groupe')
   })
 })

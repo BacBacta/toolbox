@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { EtatCalc, RenderContext, ShareSpec } from '@a237/engine'
+import type { BatirPartage, EtatCalc, RenderContext } from '@a237/engine'
 import { course, ESPACE_INSECABLE, scolarite } from '@a237/engine'
 import { render as monter } from 'preact'
 import { act } from 'preact/test-utils'
@@ -25,7 +25,7 @@ function poser(
   squelette: typeof scolarite,
   etat: EtatCalc,
   onChange: (e: EtatCalc) => void = () => undefined,
-  onDiffuser: (p: ShareSpec) => void = () => undefined,
+  onDiffuser: (batir: BatirPartage) => void = () => undefined,
 ): void {
   act(() => {
     monter(
@@ -129,7 +129,8 @@ describe('diffuser un calcul', () => {
     const onDiffuser = vi.fn()
     poser(scolarite, { nom: 'Aïcha', valeurs: { total: 75_000, verse: 30_000 } }, () => undefined, onDiffuser)
     act(() => hote.querySelector<HTMLButtonElement>('.outil-action.principale')?.click())
-    const partage = onDiffuser.mock.calls[0]?.[0] as ShareSpec
+    // L'écran rend de quoi bâtir : le lien n'existe qu'après le dépôt.
+    const partage = (onDiffuser.mock.calls[0]?.[0] as BatirPartage)(CTX)
     expect(partage.card.kicker).toBe('FRAIS SCOLAIRES')
     expect(partage.relances).toEqual([])
     expect(partage.txt).toContain('Reste à payer')

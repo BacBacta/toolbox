@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { EtatArdoise, RenderContext, ShareSpec } from '@a237/engine'
+import type { BatirPartage, EtatArdoise, RenderContext } from '@a237/engine'
 import { ESPACE_INSECABLE } from '@a237/engine'
 import { render as monter } from 'preact'
 import { act } from 'preact/test-utils'
@@ -200,7 +200,7 @@ describe('les gestes de l’ardoise', () => {
       (b) => b.textContent === 'Diffuser',
     )
     act(() => bouton?.click())
-    const partage = diffuse.mock.calls[0]?.[0] as ShareSpec
+    const partage = (diffuse.mock.calls[0]?.[0] as BatirPartage)(CTX)
     expect(partage.warn).toContain('pour toi, pas pour un groupe')
     expect(partage.relances.map((r) => r.nom)).toEqual(['Adèle Ngo Bell', 'Ernest Fotso'])
   })

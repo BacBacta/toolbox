@@ -1,4 +1,4 @@
-import type { EtatPresence, RenderContext, ShareSpec } from '@a237/engine'
+import type { BatirPartage, EtatPresence, RenderContext } from '@a237/engine'
 import {
   ajouterNom, appel, assiduites, basculerPresence, decroche, nomSeance, nouvelleSeance,
   presenceShare, retirerNom,
@@ -28,7 +28,7 @@ export function RegistrePresence(props: {
   readonly etat: EtatPresence
   readonly ctx: RenderContext
   readonly onChange: (etat: EtatPresence) => void
-  readonly onDiffuser: (partage: ShareSpec) => void
+  readonly onDiffuser: (batir: BatirPartage) => void
   readonly ongletInitial?: OngletPresence
   readonly seanceInitiale?: number
 }): JSX.Element {
@@ -129,7 +129,7 @@ export function RegistrePresence(props: {
           <Actions>
             <Action
               principale
-              onClick={() => props.onDiffuser(presenceShare(etat, props.ctx, courante))}
+              onClick={() => props.onDiffuser((c) => presenceShare(etat, c, courante))}
             >
               Diffuser
             </Action>

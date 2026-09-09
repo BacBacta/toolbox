@@ -3,7 +3,7 @@ import { jsx as _jsx } from "preact/jsx-runtime";
 import 'fake-indexeddb/auto';
 import { render as monter } from 'preact';
 import { act } from 'preact/test-utils';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/app.js';
 import { CHARGEURS } from '../src/outils.js';
 import { listerOutils, supprimerOutil } from '../src/stockage.js';
@@ -159,5 +159,73 @@ describe('créer et rouvrir un outil', () => {
         const [range] = await listerOutils();
         expect(range?.version).toBe(1);
         expect((range?.etat).membres[0]?.nom).toBe('Adèle');
+    });
+});
+describe('diffuser, c’est d’abord publier', () => {
+    const vraiFetch = globalThis.fetch;
+    afterEach(() => {
+        globalThis.fetch = vraiFetch;
+    });
+    function serveur(statut, corps = {}) {
+        const appel = vi.fn().mockResolvedValue({
+            ok: statut >= 200 && statut < 300,
+            status: statut,
+            json: () => Promise.resolve(corps),
+        });
+        globalThis.fetch = appel;
+        return appel;
+    }
+    async function ouvrirEtDiffuser(outil) {
+        cliquerTexte(outil);
+        await reposer();
+        cliquer('.outil-action.principale');
+        await reposer();
+    }
+    it('dépose l’outil, puis met l’adresse sur la carte', async () => {
+        // L'ordre n'est pas indifférent : la carte porte le lien, donc il faut que
+        // le lien existe avant de la dessiner.
+        const appel = serveur(200);
+        await ouvrirEtDiffuser('Carnet de njangi');
+        expect(appel).toHaveBeenCalledOnce();
+        expect(appel.mock.calls[0]?.[0]).toBe('/api/publier');
+        const [outil] = await listerOutils();
+        expect(outil?.lien).toMatch(/^[23456789ABCDEFGHJKLMNPQRSTVWXYZ]{12}$/);
+        expect(outil?.versionPubliee).toBe(outil?.version);
+        // Le résumé partagé porte l'adresse.
+        expect(hote.querySelector('.resume')?.textContent).toContain(`/d/${outil?.lien}`);
+    });
+    it('ne redépose pas un outil qui n’a pas bougé', async () => {
+        const appel = serveur(200);
+        await ouvrirEtDiffuser('Carnet de njangi');
+        cliquer('.feuille-fermer');
+        await reposer();
+        cliquer('.outil-action.principale');
+        await reposer();
+        expect(appel).toHaveBeenCalledOnce();
+        expect(hote.querySelector('.resume')?.textContent).toContain('/d/');
+    });
+    it('partage sans adresse quand le réseau manque, et le dit', async () => {
+        // Un lien inscrit d'avance serait une adresse morte, envoyée sous le nom
+        // de celui qui la partage.
+        globalThis.fetch = vi.fn().mockRejectedValue(new TypeError('hors ligne'));
+        await ouvrirEtDiffuser('Carnet de njangi');
+        expect(hote.textContent).toContain('la publication attend son tour');
+        const [outil] = await listerOutils();
+        expect(outil?.lien).toBeUndefined();
+        expect(hote.querySelector('.resume')?.textContent).not.toContain('/d/');
+    });
+    it('dit pourquoi une ardoise ne se publie pas, sans appeler personne', async () => {
+        const appel = serveur(200);
+        await ouvrirEtDiffuser('Ardoise clients');
+        expect(appel).not.toHaveBeenCalled();
+        expect(hote.textContent).toContain('noms et des dettes');
+        // Elle se partage quand même : ce qu'on lui retire, c'est l'adresse.
+        expect(hote.querySelector('.carte-apercu')).not.toBeNull();
+    });
+    it('annonce le conflit de version avec le numéro du serveur', async () => {
+        serveur(409, { erreur: 'version-perimee', versionServeur: 7 });
+        await ouvrirEtDiffuser('Carnet de njangi');
+        expect(hote.textContent).toContain('version 7');
+        expect((await listerOutils())[0]?.lien).toBeUndefined();
     });
 });

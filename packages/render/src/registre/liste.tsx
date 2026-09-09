@@ -1,4 +1,4 @@
-import type { ConfigListe, EtatListe, LigneListe, RenderContext, ShareSpec } from '@a237/engine'
+import type { BatirPartage, ConfigListe, EtatListe, LigneListe, RenderContext, ShareSpec } from '@a237/engine'
 import {
   ajouterLigne, basculerLigne, booleenDe, cellule, colonneBascule, colonneIdentite,
   colonnesSecondaires, comptageBascule, lignesEnAlerte, ligneNeuve, montantF, nf,
@@ -37,7 +37,7 @@ export function RegistreListe(props: {
   readonly etat: EtatListe
   readonly ctx: RenderContext
   readonly onChange: (etat: EtatListe) => void
-  readonly onDiffuser: (partage: ShareSpec) => void
+  readonly onDiffuser: (batir: BatirPartage) => void
   readonly partage: (etat: EtatListe, ctx: RenderContext) => ShareSpec
   readonly ongletInitial?: OngletListe
 }): JSX.Element {
@@ -152,7 +152,7 @@ export function RegistreListe(props: {
           )}
 
           <Actions>
-            <Action principale onClick={() => props.onDiffuser(props.partage(etat, props.ctx))}>
+            <Action principale onClick={() => props.onDiffuser((c) => props.partage(etat, c))}>
               Diffuser
             </Action>
             <Action onClick={() => setOnglet('Ajouter')}>{config.libelleAjout}</Action>

@@ -134,7 +134,7 @@ export {
 
 export type {
   CardItem, CardSpec, ComputeMap, Encre, EngineKind, ErreurValidation, JsonSchema,
-  Ligne, LigneCalculee, Relance, RenderContext, ShareSpec, Skeleton, SkeletonGroup,
+  Ligne, LigneCalculee, Relance, RenderContext, BatirPartage, ShareSpec, Skeleton, SkeletonGroup,
   SkeletonAnonyme, SkeletonId, Totaux, XAF,
 } from './types.js'
 

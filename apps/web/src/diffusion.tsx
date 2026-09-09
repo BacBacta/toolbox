@@ -26,6 +26,13 @@ async function copier(texte: string): Promise<boolean> {
 
 export function Diffusion(props: {
   readonly partage: ShareSpec
+  /**
+   * Ce que la publication a donné, quand elle n'a pas abouti.
+   *
+   * Elle n'empêche jamais de partager : la carte part sans adresse, comme
+   * avant. Mais le taire ferait croire à un lien qui n'existe pas.
+   */
+  readonly mot?: string
   readonly onFermer: () => void
 }): JSX.Element {
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -84,6 +91,7 @@ export function Diffusion(props: {
       </div>
 
       {props.partage.warn !== null && <div class="alerte">{props.partage.warn}</div>}
+      {props.mot !== undefined && props.mot !== '' && <p class="note">{props.mot}</p>}
 
       <canvas ref={canvas} class="carte-apercu" aria-label={props.partage.desc} />
       {poids !== null && <p class="champ-aide">PNG de {poids} Ko</p>}
