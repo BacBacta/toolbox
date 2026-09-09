@@ -1,6 +1,6 @@
-import type { Client, Emetteur, Manquement } from '@a237/legal-cm'
-import { mentionsManquantes } from '@a237/legal-cm'
+import type { Client, Emetteur } from '@a237/legal-cm'
 import type { Encre, Ligne, Totaux, XAF } from '../types.js'
+import { controleLegal, dateEmission } from './document.js'
 import { calculerLignes, montantAcompte } from './tva.js'
 
 /** L'état d'un devis. Autonome : la page de lecture le rend sans rien d'autre. */
@@ -36,21 +36,5 @@ export function chiffrer(etat: EtatDevis): ChiffrageDevis {
   return { ...totaux, acompteDu, soldeDu: totaux.totalTTC - acompteDu }
 }
 
-/**
- * Date d'émission analysée.
- * @throws RangeError si `emisLe` n'est pas une date ISO exploitable.
- */
-export function dateEmission(etat: EtatDevis): Date {
-  const d = new Date(etat.emisLe)
-  if (Number.isNaN(d.getTime())) {
-    throw new RangeError(`date d'émission illisible : « ${etat.emisLe} »`)
-  }
-  return d
-}
-
-/** Ce qui manque au devis pour être présentable à un contrôle. */
-export function controleLegal(etat: EtatDevis): Manquement[] {
-  return mentionsManquantes(etat.emetteur, etat.client)
-}
-
+export { controleLegal, dateEmission }
 export type { Client, Emetteur }

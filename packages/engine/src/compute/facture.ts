@@ -1,8 +1,8 @@
-import type { Client, Emetteur, Manquement } from '@a237/legal-cm'
-import { mentionsManquantes } from '@a237/legal-cm'
+import type { Client, Emetteur } from '@a237/legal-cm'
 import { joursEntre } from '../format.js'
 import { MOYENS_PAIEMENT } from '../schema/facture.js'
 import type { Encre, Ligne, Totaux, XAF } from '../types.js'
+import { controleLegal, dateEmission, dateIso } from './document.js'
 import { calculerLignes } from './tva.js'
 
 export type MoyenPaiement = (typeof MOYENS_PAIEMENT)[number]
@@ -73,20 +73,6 @@ export const LIBELLE_MOYEN: Readonly<Record<MoyenPaiement, string>> = {
   virement: 'Virement',
 }
 
-/**
- * Date ISO analysée.
- * @throws RangeError si la chaîne n'est pas exploitable.
- */
-export function dateIso(valeur: string, quoi: string): Date {
-  const d = new Date(valeur)
-  if (Number.isNaN(d.getTime())) throw new RangeError(`${quoi} illisible : « ${valeur} »`)
-  return d
-}
-
-export function dateEmission(etat: EtatFacture): Date {
-  return dateIso(etat.emisLe, "date d'émission")
-}
-
 export function dateEcheance(etat: EtatFacture): Date {
   return dateIso(etat.echeance, "date d'échéance")
 }
@@ -124,7 +110,5 @@ export function joursDeRetard(etat: EtatFacture, maintenant: Date): number {
   return Math.max(0, joursEntre(dateEcheance(etat), maintenant))
 }
 
-/** Ce qui manque à la facture pour être présentable à un contrôle. */
-export function controleLegal(etat: EtatFacture): Manquement[] {
-  return mentionsManquantes(etat.emetteur, etat.client)
-}
+export { controleLegal, dateEmission, dateIso }
+export type { Client, Emetteur }

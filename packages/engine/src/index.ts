@@ -1,8 +1,10 @@
 export { limiterItems, MAX_ITEMS_CARTE, texteReste } from './cardspec.js'
 export type { ItemsCarte } from './cardspec.js'
 
+export type { Date0, Parties } from './compute/document.js'
+export { controleLegal, dateEmission, dateIso } from './compute/document.js'
 export type { ChiffrageDevis, EtatDevis } from './compute/devis.js'
-export { chiffrer, controleLegal, dateEmission } from './compute/devis.js'
+export { chiffrer } from './compute/devis.js'
 export type {
   ChiffrageFacture, EtatFacture, MoyenPaiement, Reglement, StatutFacture,
 } from './compute/facture.js'
