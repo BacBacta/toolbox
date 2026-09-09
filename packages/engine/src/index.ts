@@ -43,7 +43,29 @@ export { devisSchema } from './schema/devis.js'
 export { factureSchema, MOYENS_PAIEMENT, reglementSchema } from './schema/facture.js'
 export { njangiSchema } from './schema/njangi.js'
 
-export { devis, facture, njangi, SQUELETTES, squeletteParId } from './skeletons/index.js'
+export type {
+  Colonne, ConfigListe, EtatListe, LigneListe, TotalListe, TypeColonne, ValeurCellule,
+} from './compute/liste.js'
+export {
+  ajouterLigne, basculerLigne, booleenDe, colonneBascule, colonneIdentite,
+  colonnesSecondaires, comptageBascule, lignesEnAlerte, ligneNeuve, nombreDe,
+  retirerLigne, schemaListe, texteDe, totalListe,
+} from './compute/liste.js'
+export { cellule, squeletteListe } from './skeletons/liste.js'
+export type { DefinitionListe, SqueletteListe } from './skeletons/liste.js'
+export { REGISTRES_LISTE } from './skeletons/registres.js'
+export type { ConfigCalc, EntreeCalc, EtatCalc, LecteurValeurs, Valeurs } from './compute/calc.js'
+export {
+  changerValeur, partCalc, precisionCalc, resultatCalc, schemaCalc, valeurDe,
+  valeursParDefaut,
+} from './compute/calc.js'
+export { squeletteCalc } from './skeletons/calc.js'
+export type { DefinitionCalc, SqueletteCalc } from './skeletons/calc.js'
+export { CALCULATRICES } from './skeletons/calculs.js'
+export {
+  caisse, clients, course, devis, facture, njangi, prix, scolarite, SQUELETTES,
+  squeletteParId, stock,
+} from './skeletons/index.js'
 
 export type {
   CardItem, CardSpec, ComputeMap, Encre, EngineKind, ErreurValidation, JsonSchema,

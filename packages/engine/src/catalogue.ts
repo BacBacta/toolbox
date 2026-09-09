@@ -39,6 +39,42 @@ export const CATALOGUE: readonly FicheSquelette[] = [
     title: 'Carnet de njangi',
     keywords: ['njangi', 'tontine', 'cotis', 'tour', 'membre', 'cagnotte'],
   },
+  {
+    id: 'prix',
+    group: 'registres',
+    title: 'Liste de prix',
+    keywords: ['prix', 'tarif', 'catalogue', 'boutique', 'combien'],
+  },
+  {
+    id: 'caisse',
+    group: 'registres',
+    title: 'Livre de caisse',
+    keywords: ['caisse', 'recette', 'depense', 'entree sortie', 'journal'],
+  },
+  {
+    id: 'stock',
+    group: 'registres',
+    title: 'Inventaire',
+    keywords: ['stock', 'inventaire', 'magasin', 'reste', 'quantite'],
+  },
+  {
+    id: 'clients',
+    group: 'registres',
+    title: 'Clients',
+    keywords: ['client', 'contact', 'annuaire', 'repertoire', 'numero'],
+  },
+  {
+    id: 'scolarite',
+    group: 'calculs',
+    title: 'Frais scolaires',
+    keywords: ['scolarite', 'frais', 'ecole', 'pension', 'rentree'],
+  },
+  {
+    id: 'course',
+    group: 'calculs',
+    title: 'Partage de course',
+    keywords: ['course', 'moto', 'taxi', 'partage', 'diviser'],
+  },
 ]
 
 export function ficheParId(id: string): FicheSquelette | null {
