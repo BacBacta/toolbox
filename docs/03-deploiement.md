@@ -170,5 +170,10 @@ une clef en `nom_poule` refusée sans raison, et l'exigence qu'une première
 colonne soit du texte — qui rendait « combien d'œufs par jour et combien
 vendus » inexprimable. Les deux ont été levées.
 
+Une deuxième série, après avoir donné au modèle le droit de refuser : toujours
+10/10, 0,137 FCFA de moyenne. L'invite est plus longue de deux schémas, d'où
+les seize millièmes de franc supplémentaires — et un refus coûte 0,08 F, moins
+qu'un registre, parce qu'il est plus court à écrire.
+
 Ce qui manque encore au critère : le chemin « plus de crédits » (402), qui
 suppose les comptes de D1.

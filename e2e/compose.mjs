@@ -78,11 +78,24 @@ const BASE = 'http://127.0.0.1:5200'
 const navigateur = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] })
 const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 } })
 
-// Le proxy est côté serveur : on le remplace ici par sa vraie réponse.
+/** Un refus, capturé en production sur « je veux un site internet ». */
+const REFUS = {
+  impossible:
+    'Je ne peux pas créer un site internet. Je suis un outil de gestion de registres.',
+  fcfa: 0.08,
+}
+
+/*
+ * Le proxy est côté serveur : on le remplace ici par ses vraies réponses. La
+ * demande décide laquelle — c'est ce qui permet d'éprouver le refus dans le
+ * même parcours que la composition.
+ */
 let appels = 0
 await contexte.route('**/api/ai', async (route) => {
   appels++
-  await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(REPONSE) })
+  const { demande } = JSON.parse(route.request().postData() ?? '{}')
+  const corps = String(demande).includes('site internet') ? REFUS : REPONSE
+  await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(corps) })
 })
 
 const page = await contexte.newPage()
@@ -153,6 +166,25 @@ dit(
   'il se rouvre après rechargement, sans rappeler le modèle',
 )
 dit(appels === 1, 'et sans repayer une génération', `${appels} appel(s)`)
+
+/*
+ * Le refus, qui est l'autre moitié du contrat.
+ *
+ * « Je veux un site internet » créait un registre « Ventes » inventé de bout
+ * en bout : le modèle n'avait aucune sortie et faisait ce qu'on lui demandait.
+ */
+await page.goto(BASE, { waitUntil: 'networkidle' })
+const avant = appels
+await page.fill('#demande', 'je veux un site internet')
+await page.waitForTimeout(150)
+await page.getByText('Compose-le pour moi').click()
+await page.waitForTimeout(800)
+
+const texte = await page.textContent('body')
+dit(texte.includes('Je ne peux pas créer un site internet'), 'le refus du modèle est rapporté tel quel')
+dit(!texte.includes('Ventes'), 'et aucun outil n’est inventé')
+dit(!texte.includes('Réessaie'), 'sans proposer de recommencer : la réponse ne changera pas')
+dit(appels === avant + 1, 'un seul appel payé pour le refus', `${appels - avant}`)
 
 dit(erreurs.length === 0, 'aucune erreur de page', erreurs.join(' | '))
 
