@@ -88,6 +88,26 @@ tel quel de schéma de réponse contrainte au modèle en phase 4. Une clef
 `__proto__` venue de `JSON.parse` est cherchée avec `Object.hasOwn` et non par
 accès direct, sinon elle remonterait la chaîne de prototypes. Testé.
 
+### Un registre décrit par ses colonnes n'est pas du code
+Quatre outils du prototype — liste de prix, livre de caisse, inventaire,
+annuaire — ne sont qu'un tableau de lignes avec des colonnes différentes. Ils
+déclarent leurs colonnes ; **le schéma s'en déduit**, et avec lui la validation,
+la carte, le partage et le formulaire d'édition. Deux calculatrices tiennent de
+même dans une formule. Ajouter un cinquième registre de ce genre coûte vingt
+lignes de description.
+
+Ce qui ne rentre pas dans une fabrique y reste étranger : le njangi a une
+rotation, l'ardoise aura un vieillissement, la présence une matrice. Une
+fabrique qui prétendrait les couvrir aussi serait un langage de programmation
+déguisé, et le brief veut précisément l'inverse.
+
+### Les paquets déclarent `"sideEffects": false`
+Sans ça, Rollup ne peut pas prouver que construire un squelette au chargement
+d'un module est sans conséquence, et garde tout : la coquille payait sept
+kilo-octets pour des outils que personne n'avait ouverts. `budget.mjs` cherche
+maintenant des marqueurs d'outils dans le fragment de départ et échoue s'il en
+trouve.
+
 ### Le formulaire d'édition se déduit du schéma
 Écrire un écran par squelette, ce serait dix-sept écrans à tenir à jour qui
 divergeraient du schéma au premier champ ajouté — et le schéma est ce que le

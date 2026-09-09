@@ -19,16 +19,22 @@ commencé, conformément au point 4 de la section 11 du brief.
 
 | Paquet | État |
 |---|---|
-| `packages/engine` | montant en toutes lettres, TVA ligne par ligne, mise en forme, validateur de schéma, numérotation continue, étage 1, trois squelettes (`devis`, `facture`, `njangi`) |
+| `packages/engine` | montant en toutes lettres, TVA ligne par ligne, mise en forme, validateur de schéma, numérotation continue, étage 1, **neuf squelettes sur dix-sept** — dont six qui ne sont que de la configuration |
 | `packages/legal-cm` | TVA 19,25 %, mentions obligatoires, formes NIU et RCCM, numérotation |
-| `packages/render` | feuille A4 réelle, documents `devis` et `facture`, registre njangi, carte partagée en canvas |
+| `packages/render` | feuille A4 réelle, documents `devis` et `facture`, registre njangi, écran générique de liste, calculatrice, carte partagée en canvas |
 | `packages/outils-test` | scanners partagés par les tests de pureté |
 | `apps/web` | la PWA : accueil, stockage IndexedDB, formulaire dressé à partir du schéma, diffusion, service worker |
 | `e2e` | une vérification dans un vrai navigateur, mode avion compris |
 
-695 tests, couverture à 95 %. Coquille initiale : **18,6 Ko gzip** pour un
-plafond de 120. Deux dépendances tierces de production : `preact` et
-`idb-keyval`.
+853 tests, couverture à 96 %. Coquille initiale : **14,9 Ko gzip** pour un
+plafond de 120 — et elle ne grossira pas avec les huit squelettes restants,
+chacun vivant dans son propre fragment. Deux dépendances tierces de production :
+`preact` et `idb-keyval`.
+
+Écrits : devis, facture, carnet de njangi, liste de prix, livre de caisse,
+inventaire, clients, frais scolaires, partage de course. Restent : CV,
+attestation, reconnaissance de dette, lettre de motivation, reçu, ardoise
+clients, feuille de présence, call-box.
 
 En ligne sur **https://atelier237.vercel.app**, et vérifié sur un vrai
 téléphone : l'application s'ouvre **données coupées**, et « Partager la carte »
