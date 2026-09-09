@@ -177,3 +177,23 @@ qu'un registre, parce qu'il est plus court à écrire.
 
 Ce qui manque encore au critère : le chemin « plus de crédits » (402), qui
 suppose les comptes de D1.
+
+### Consommation à l'appel
+
+La clef OpenRouter est du prépayé : chaque génération débite son solde, et la
+facturation vient du routeur, pas d'une estimation (`usage.cost`).
+
+Trois conséquences dans le code.
+
+Le **402** d'OpenRouter — plus de crédit — est traduit en 402 par le proxy et
+non en panne. L'écran dit de recharger, sans proposer de réessayer, et rappelle
+que les outils déjà créés continuent de marcher : l'étage 1 ne coûte rien et
+couvre l'essentiel.
+
+Le **coût de chaque composition s'affiche** sur l'outil qu'elle vient d'ouvrir.
+
+Le **plafond se règle chez OpenRouter**, pas ici : une limite de crédit posée
+sur la clef borne la dépense, quoi qu'il arrive côté application. C'est le seul
+garde-fou disponible tant que les comptes de D1 n'existent pas — il est global
+et non par utilisateur, donc le premier venu peut l'épuiser pour tout le monde.
+Raison de plus pour le poser bas.
