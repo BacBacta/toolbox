@@ -34,6 +34,66 @@ var CATALOGUE = [
 		]
 	},
 	{
+		id: "attestation",
+		glyphe: "◈",
+		group: "documents",
+		title: "Attestation",
+		keywords: [
+			"attestation",
+			"certificat",
+			"preuve emploi",
+			"travail",
+			"attestation de travail",
+			"certifier",
+			"temoignage ecrit"
+		]
+	},
+	{
+		id: "recu",
+		glyphe: "▭",
+		group: "documents",
+		title: "Reçu",
+		keywords: [
+			"recu",
+			"quittance",
+			"acompte",
+			"j ai recu",
+			"preuve de paiement",
+			"versement recu"
+		]
+	},
+	{
+		id: "dette",
+		glyphe: "◧",
+		group: "documents",
+		title: "Reconnaissance de dette",
+		keywords: [
+			"reconnaissance",
+			"reconnaissance de dette",
+			"dette ecrite",
+			"pret",
+			"emprunt",
+			"j ai prete",
+			"papier de dette",
+			"engagement ecrit"
+		]
+	},
+	{
+		id: "motivation",
+		glyphe: "▰",
+		group: "documents",
+		title: "Lettre de motivation",
+		keywords: [
+			"lettre",
+			"motivation",
+			"lettre de motivation",
+			"demande d emploi",
+			"candidature",
+			"postuler",
+			"demande de stage"
+		]
+	},
+	{
 		id: "njangi",
 		glyphe: "◉",
 		group: "registres",

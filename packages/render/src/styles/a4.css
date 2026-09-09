@@ -298,3 +298,113 @@
     box-shadow: none;
   }
 }
+
+/* ────────────────────── actes et lettres ────────────────────── */
+/*
+ * Ces quatre documents ne portent pas de tableau taxé. Ce qui les distingue,
+ * c'est la disposition : un acte pose ses parties avant son corps, une lettre
+ * française met l'expéditeur à gauche et le destinataire à droite. Le reste —
+ * papier, titre, signatures, pied — vient des mêmes pièces que le devis.
+ */
+
+/* Un corps de texte long : la mesure compte plus que la taille. */
+.a4-corps {
+  margin-top: 6mm;
+  font-size: 9.5pt;
+  line-height: 1.7;
+  color: var(--encre);
+  text-align: justify;
+}
+
+.a4-corps p {
+  margin: 0 0 3.5mm;
+}
+
+/* Les deux parties d'un acte, nommées avant le corps. */
+.a4-parties {
+  margin-top: 6mm;
+  font-size: 9.5pt;
+  line-height: 1.9;
+}
+
+.a4-parties .qui {
+  font-weight: 700;
+  color: var(--pa);
+}
+
+/* Le montant encadré : ce que l'œil doit trouver en premier sur l'acte. */
+.a4-encadre {
+  margin-top: 6mm;
+  padding: 4mm 5mm;
+  border: 0.5mm solid var(--pa);
+  border-radius: 1mm;
+  break-inside: avoid;
+}
+
+.a4-encadre .etiquette {
+  font-size: 7.5pt;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pa);
+}
+
+.a4-encadre .chiffre {
+  margin-top: 1mm;
+  font-size: 16pt;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.a4-encadre .lettres {
+  margin-top: 0.8mm;
+  font-size: 9pt;
+  font-style: italic;
+  color: var(--gris);
+}
+
+.a4-encadre .echeance {
+  margin-top: 2.5mm;
+  font-size: 9pt;
+}
+
+/* La disposition d'une lettre française. */
+.a4-lettre-tete {
+  display: flex;
+  justify-content: space-between;
+  gap: 10mm;
+  font-size: 9pt;
+  line-height: 1.5;
+}
+
+.a4-lettre-tete .expediteur {
+  max-width: 70mm;
+}
+
+.a4-lettre-tete .destinataire {
+  max-width: 80mm;
+  text-align: right;
+  color: var(--gris);
+}
+
+.a4-lettre-date {
+  margin-top: 8mm;
+  font-size: 9pt;
+  text-align: right;
+  color: var(--gris);
+}
+
+.a4-lettre-objet {
+  display: inline-block;
+  margin-top: 6mm;
+  padding-bottom: 1mm;
+  border-bottom: 0.3mm solid var(--pa);
+  font-size: 10pt;
+  font-weight: 600;
+}
+
+.a4-lettre-signature {
+  margin-top: 10mm;
+  font-size: 10pt;
+  text-align: right;
+}

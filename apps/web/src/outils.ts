@@ -72,6 +72,12 @@ export const CHARGEURS: Readonly<Record<string, () => Promise<ModuleOutil>>> = {
   'compose-calcul': () => import('./outils/calc.js'),
   devis: () => import('./outils/devis.js'),
   facture: () => import('./outils/facture.js'),
+  // Un seul fragment pour les quatre actes : même cadre, même formulaire, seul
+  // le rendu de la page change.
+  attestation: () => import('./outils/actes.js'),
+  recu: () => import('./outils/actes.js'),
+  dette: () => import('./outils/actes.js'),
+  motivation: () => import('./outils/actes.js'),
   njangi: () => import('./outils/njangi.js'),
   // Un seul fragment pour les quatre registres décrits par leurs colonnes, et
   // un pour les deux calculatrices : ils partagent leur écran et leur moteur.

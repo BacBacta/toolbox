@@ -2,6 +2,9 @@ export {
   BlocClient, Entete, NumeroPage, PageA4, Paragraphes, PiedLegal, TitreDocument, ZonesSignature,
 } from './chrome.js'
 export type { ZoneSignature } from './chrome.js'
+export {
+  DocumentAttestation, DocumentDette, DocumentMotivation, DocumentRecu,
+} from './actes.js'
 export { DocumentDevis } from './devis.js'
 export { DocumentFacture } from './facture.js'
 export { BlocTotaux, TableauLignes } from './tableau.js'

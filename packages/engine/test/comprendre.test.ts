@@ -28,6 +28,10 @@ describe('les demandes claires ouvrent le bon outil', () => {
     ['carnet d adresses de mes clients', 'clients'],
     ['frais de scolarite de la rentree', 'scolarite'],
     ['partager la course de benskin', 'course'],
+    ['une attestation de travail', 'attestation'],
+    ['j ai recu un acompte, il me faut un recu', 'recu'],
+    ['une reconnaissance de dette pour mon pret', 'dette'],
+    ['une lettre de motivation pour postuler', 'motivation'],
   ])('« %s » → %s', (demande, id) => {
     const r = c(demande)
     expect(r.sorte).toBe('sur')
@@ -75,7 +79,7 @@ describe('ce que l’étage 1 ne sait pas faire, il le dit', () => {
   it.each([
     'il me faut un contrat de bail',
     'je veux faire un cv',
-    'une lettre de motivation',
+    'un pacte d actionnaires',
   ])('« %s » sort de sa portée', (demande) => {
     expect(c(demande).sorte).toBe('hors-portee')
   })

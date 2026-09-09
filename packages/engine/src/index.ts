@@ -41,6 +41,19 @@ export type { Comprehension } from './comprendre.js'
 export { comprendre } from './comprendre.js'
 export type { Extrait } from './extraire.js'
 export { EXTRAIT_VIDE, extraire } from './extraire.js'
+export type {
+  EtatAttestation, EtatDette, EtatMotivation, EtatRecu, Expediteur, LigneRecu,
+  ManqueActe, Partie, TotauxRecu,
+} from './compute/actes.js'
+export { controleDette, controleEmetteur, totauxRecu } from './compute/actes.js'
+export {
+  ACTES, PREFIXE_ATTESTATION, PREFIXE_RECU, attestation, attestationCard,
+  attestationShare, dette, detteCard, detteShare, motivation, motivationCard,
+  motivationShare, recu, recuCard, recuShare,
+} from './skeletons/actes.js'
+export {
+  attestationSchema, detteSchema, motivationSchema, recuSchema,
+} from './schema/actes.js'
 export type { CalculDemande, EntreeDemandee } from './calcul.js'
 export { MAX_ENTREES, schemaCalcul, verifierCalcul } from './calcul.js'
 export type { ReponseModele } from './composition.js'

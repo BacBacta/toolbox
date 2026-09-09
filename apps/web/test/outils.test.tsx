@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import {
-  EXTRAIT_VIDE, caisse, clients, course, devis, facture, njangi, prix, scolarite,
-  stock, valider,
+  EXTRAIT_VIDE, attestation, caisse, clients, course, dette, devis, facture,
+  motivation, njangi, prix, recu, scolarite, stock, valider,
 } from '@a237/engine'
 import type { RenderContext, ShareSpec } from '@a237/engine'
 import { render as monter } from 'preact'
@@ -24,6 +24,10 @@ const SCHEMAS: Readonly<Record<string, typeof devis.schema>> = {
   clients: clients.schema,
   scolarite: scolarite.schema,
   course: course.schema,
+  attestation: attestation.schema,
+  recu: recu.schema,
+  dette: dette.schema,
+  motivation: motivation.schema,
 }
 
 let hote: HTMLDivElement
@@ -58,8 +62,9 @@ function poser(module: ModuleOutil, o: OutilEnregistre, onDiffuser = vi.fn()): t
 describe('le registre des outils', () => {
   it('couvre les squelettes qui ont un écran, et le dit', () => {
     expect(Object.keys(CHARGEURS).sort()).toEqual([
-      'caisse', 'clients', 'compose', 'compose-calcul', 'course', 'devis', 'facture',
-      'njangi', 'prix', 'scolarite', 'stock',
+      'attestation', 'caisse', 'clients', 'compose', 'compose-calcul', 'course',
+      'dette', 'devis', 'facture', 'motivation', 'njangi', 'prix', 'recu',
+      'scolarite', 'stock',
     ])
     expect(outilDisponible('njangi')).toBe(true)
     expect(outilDisponible('callbox')).toBe(false)
@@ -202,5 +207,86 @@ describe('les outils composés par le modèle', () => {
     expect(neuf.nom).toBe('Suivi des livraisons')
     poser(module, { ...outil('compose', neuf.etat), registre: REGISTRE })
     expect(hote.textContent).toContain('Aucune livraison')
+  })
+})
+
+describe('les quatre actes et lettres', () => {
+  const ACTES = ['attestation', 'recu', 'dette', 'motivation'] as const
+
+  it.each(ACTES)('« %s » s’ouvre et rend un document valide', async (id) => {
+    const module = await CHARGEURS[id]!()
+    const neuf = module.creer(id, LE_9_SEPT, EXTRAIT_VIDE)
+    expect(valider(SCHEMAS[id]!, neuf.etat)).toEqual([])
+    poser(module, outil(id, neuf.etat))
+    // Un acte neuf est vide : il s'ouvre donc sur son formulaire.
+    expect(hote.textContent).toContain('Modifier')
+  })
+
+  it('la reconnaissance de dette réclame ses parties, pas un NIU', async () => {
+    const module = await CHARGEURS.dette!()
+    const neuf = module.creer('dette', LE_9_SEPT, EXTRAIT_VIDE)
+    poser(module, outil('dette', neuf.etat))
+    act(() => hote.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="false"]')?.click())
+    const alerte = hote.querySelector('.alerte')?.textContent ?? ''
+    expect(alerte).toContain('emprunteur')
+    // Il n'y a pas d'entreprise dans un acte entre deux personnes.
+    expect(alerte).not.toContain('RCCM')
+  })
+
+  it('le reçu réclame l’entête légal de l’entreprise', async () => {
+    const module = await CHARGEURS.recu!()
+    const neuf = module.creer('recu', LE_9_SEPT, EXTRAIT_VIDE)
+    poser(module, outil('recu', neuf.etat))
+    act(() => hote.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="false"]')?.click())
+    expect(hote.querySelector('.alerte')?.textContent).toContain('NIU')
+  })
+
+  it('la lettre de motivation ne réclame rien : elle n’a pas de mention obligatoire', async () => {
+    const module = await CHARGEURS.motivation!()
+    const neuf = module.creer('motivation', LE_9_SEPT, EXTRAIT_VIDE)
+    poser(module, outil('motivation', neuf.etat))
+    act(() => hote.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="false"]')?.click())
+    expect(hote.querySelector('.alerte')).toBeNull()
+  })
+
+  it('dit à chaque acte ce qu’il risque, pas ce que risque une facture', async () => {
+    // L'encart énonçait « un client qui veut déduire ne pourra pas s'en
+    // servir » sur les quatre documents — la raison d'une facture, servie à
+    // une reconnaissance de dette où il n'y a ni client ni TVA.
+    const lu = async (id: 'dette' | 'recu'): Promise<string> => {
+      const module = await CHARGEURS[id]!()
+      const neuf = module.creer(id, LE_9_SEPT, EXTRAIT_VIDE)
+      // Les quatre actes partagent un même composant : sans démontage, Preact
+      // rapproche les deux rendus et l'onglet du précédent survit.
+      act(() => monter(null, hote))
+      poser(module, outil(id, neuf.etat))
+      act(() =>
+        hote.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="false"]')?.click(),
+      )
+      return hote.querySelector('.alerte')?.textContent ?? ''
+    }
+    const surLaDette = await lu('dette')
+    expect(surLaDette).toContain('devant un juge')
+    expect(surLaDette).not.toContain('déduire')
+    const surLeRecu = await lu('recu')
+    expect(surLeRecu).toContain('n’identifie pas l’entreprise')
+    expect(surLeRecu).not.toContain('déduire')
+  })
+
+  it('refuse un identifiant qui n’est pas un acte', async () => {
+    const module = await CHARGEURS.attestation!()
+    expect(() => module.creer('bail', LE_9_SEPT, EXTRAIT_VIDE)).toThrow('acte inconnu')
+  })
+
+  it('diffuse une carte, jamais une relance', async () => {
+    // Un acte se remet en main propre ou s'envoie à une personne : il n'a pas
+    // de liste de gens à relancer.
+    const module = await CHARGEURS.recu!()
+    const neuf = module.creer('recu', LE_9_SEPT, EXTRAIT_VIDE)
+    const onDiffuser = poser(module, outil('recu', neuf.etat))
+    act(() => hote.querySelector<HTMLButtonElement>('.outil-action.principale')?.click())
+    const partage = onDiffuser.mock.calls[0]?.[0] as ShareSpec | undefined
+    expect(partage?.card.kicker).toBe('REÇU')
+    expect(partage?.relances).toEqual([])
   })
 })
