@@ -134,6 +134,105 @@ function envoyer(clef, corps) {
 		body: JSON.stringify(corps)
 	});
 }
+/**
+* La description que lit le modèle — en prose, pas en schéma.
+*
+* Un schéma JSON récursif ne se déclare pas sans `$ref`, que le validateur
+* écrit à la main ne connaît pas. La première version dépliait donc l'arbre :
+* chaque niveau embarquait deux fois le sous-schéma, soit soixante-quatre
+* copies de la feuille et **quarante mille caractères** — dix mille jetons
+* d'invite à chaque appel, contre deux mille sept cents pour un registre
+* entier. Le coût d'une génération est passé de 0,13 à 0,76 franc, et le
+* modèle, noyé sous la répétition, refusait des demandes qu'il savait traiter.
+*
+* Trois lignes de français disent la même chose et se lisent mieux. La
+* vérification, elle, ne coûte rien et reste exhaustive : `verifierExpression`
+* parcourt l'arbre lui-même.
+*/
+var DESCRIPTION_FORMULE = "Un arbre. Chaque nœud est exactement l’une de ces trois formes : {\"nombre\": 19.25} une constante ; {\"ref\": \"total\"} une entrée déclarée ; {\"op\": \"moins\", \"gauche\": …, \"droite\": …} une opération, où gauche et droite sont eux-mêmes des nœuds. Opérations : plus, moins, fois, divise, pourcent (gauche × droite ÷ 100), min, max. Six niveaux d'imbrication au plus. Exemple — le reste à payer : {\"op\":\"moins\",\"gauche\":{\"ref\":\"total\"},\"droite\":{\"ref\":\"verse\"}}";
+/**
+* Ce que le schéma ne dit pas : qu'un nœud est **exactement** l'une des trois
+* formes, et que chaque `ref` désigne une entrée qui existe.
+*
+* Un schéma d'union serait plus juste, mais `JsonSchema` ici n'a pas de
+* `oneOf` — et l'ajouter pour ce seul usage compliquerait un validateur écrit
+* à la main que tout le reste du moteur emploie. On le vérifie donc à côté.
+*/
+function verifierExpression(valeur, clefs, chemin = "$.formule") {
+	return formes(valeur, clefs, chemin, 0);
+}
+var OPERATIONS = [
+	"plus",
+	"moins",
+	"fois",
+	"divise",
+	"pourcent",
+	"min",
+	"max"
+];
+/**
+* Vérifie l'arbre nœud par nœud.
+*
+* Elle fait tout : la forme, les types, l'ensemble fermé des opérations, les
+* références, la profondeur. Un schéma déplié faisait la moitié du travail
+* pour quarante mille caractères ; cette marche fait tout pour rien.
+*/
+function formes(valeur, clefs, chemin, niveau) {
+	if (typeof valeur !== "object" || valeur === null || Array.isArray(valeur)) return [{
+		chemin,
+		message: "un nœud de formule est un objet"
+	}];
+	const o = valeur;
+	const inconnus = Object.keys(o).filter((c) => ![
+		"nombre",
+		"ref",
+		"op",
+		"gauche",
+		"droite"
+	].includes(c));
+	if (inconnus.length > 0) return [{
+		chemin,
+		message: `champ inconnu : « ${inconnus.join(" », « ")} »`
+	}];
+	const presents = [
+		"nombre",
+		"ref",
+		"op"
+	].filter((c) => o[c] !== void 0);
+	if (presents.length !== 1) return [{
+		chemin,
+		message: presents.length === 0 ? "un nœud vide : mets « nombre », « ref », ou « op » avec « gauche » et « droite »" : `« ${presents.join(" » et « ")} » ensemble : un nœud est une seule de ces trois formes`
+	}];
+	if (o["nombre"] !== void 0) return typeof o["nombre"] === "number" && Number.isFinite(o["nombre"]) ? [] : [{
+		chemin,
+		message: "« nombre » doit être un nombre fini"
+	}];
+	if (o["ref"] !== void 0) {
+		if (typeof o["ref"] !== "string") return [{
+			chemin,
+			message: "« ref » doit être la clef d’une entrée"
+		}];
+		return clefs.includes(o["ref"]) ? [] : [{
+			chemin,
+			message: `« ${o["ref"]} » ne désigne aucune entrée (elles s’appellent ${clefs.join(", ")})`
+		}];
+	}
+	if (typeof o["op"] !== "string" || !OPERATIONS.includes(o["op"])) return [{
+		chemin,
+		message: `« ${String(o["op"])} » n’est pas une opération connue (${OPERATIONS.join(", ")})`
+	}];
+	if (niveau >= 6) return [{
+		chemin,
+		message: `formule trop profonde : 6 niveaux au plus`
+	}];
+	const erreurs = [];
+	for (const cote of ["gauche", "droite"]) if (o[cote] === void 0) erreurs.push({
+		chemin: `${chemin}.${cote}`,
+		message: `« ${o["op"]} » exige ${cote}`
+	});
+	else erreurs.push(...formes(o[cote], clefs, `${chemin}.${cote}`, niveau + 1));
+	return erreurs;
+}
 //#endregion
 //#region ../engine/src/valider.ts
 /**
@@ -209,92 +308,6 @@ function valider(schema, valeur, chemin = "$") {
 			return e;
 		}
 	}
-}
-function noeud(profondeur) {
-	const sous = profondeur <= 1 ? {
-		type: "object",
-		additionalProperties: false,
-		properties: {
-			nombre: { type: "number" },
-			ref: {
-				type: "string",
-				maxLength: 24
-			}
-		}
-	} : noeud(profondeur - 1);
-	return {
-		type: "object",
-		additionalProperties: false,
-		description: "Soit { \"nombre\": 19.25 }, soit { \"ref\": \"total\" } qui reprend une entrée, soit { \"op\": …, \"gauche\": …, \"droite\": … }.",
-		properties: {
-			nombre: {
-				type: "number",
-				description: "Une constante."
-			},
-			ref: {
-				type: "string",
-				maxLength: 24,
-				description: "La clef d’une entrée déclarée."
-			},
-			op: {
-				type: "string",
-				enum: [
-					"plus",
-					"moins",
-					"fois",
-					"divise",
-					"pourcent",
-					"min",
-					"max"
-				],
-				description: "« pourcent » rend gauche × droite ÷ 100."
-			},
-			gauche: sous,
-			droite: sous
-		}
-	};
-}
-var schemaExpression = noeud(6);
-/**
-* Ce que le schéma ne dit pas : qu'un nœud est **exactement** l'une des trois
-* formes, et que chaque `ref` désigne une entrée qui existe.
-*
-* Un schéma d'union serait plus juste, mais `JsonSchema` ici n'a pas de
-* `oneOf` — et l'ajouter pour ce seul usage compliquerait un validateur écrit
-* à la main que tout le reste du moteur emploie. On le vérifie donc à côté.
-*/
-function verifierExpression(valeur, clefs, chemin = "$.formule") {
-	const erreurs = [...valider(schemaExpression, valeur)];
-	if (erreurs.length > 0) return erreurs;
-	return formes(valeur, clefs, chemin, 0);
-}
-function formes(e, clefs, chemin, niveau) {
-	const o = e;
-	const presents = [
-		"nombre",
-		"ref",
-		"op"
-	].filter((c) => o[c] !== void 0);
-	if (presents.length !== 1) return [{
-		chemin,
-		message: presents.length === 0 ? "un nœud vide : mets « nombre », « ref », ou « op » avec « gauche » et « droite »" : `« ${presents.join(" » et « ")} » ensemble : un nœud est une seule de ces trois formes`
-	}];
-	if (o["nombre"] !== void 0) return [];
-	if (o["ref"] !== void 0) return clefs.includes(String(o["ref"])) ? [] : [{
-		chemin,
-		message: `« ${String(o["ref"])} » ne désigne aucune entrée (elles s’appellent ${clefs.join(", ")})`
-	}];
-	if (niveau >= 6) return [{
-		chemin,
-		message: `formule trop profonde : 6 niveaux au plus`
-	}];
-	const erreurs = [];
-	for (const cote of ["gauche", "droite"]) if (o[cote] === void 0) erreurs.push({
-		chemin: `${chemin}.${cote}`,
-		message: `« ${String(o["op"])} » exige ${cote}`
-	});
-	else erreurs.push(...formes(o[cote], clefs, `${chemin}.${cote}`, niveau + 1));
-	return erreurs;
 }
 var schemaCalcul = {
 	type: "object",
@@ -384,7 +397,11 @@ var schemaCalcul = {
 					type: "string",
 					enum: ["F", ""]
 				},
-				formule: schemaExpression
+				formule: {
+					type: "object",
+					properties: {},
+					description: DESCRIPTION_FORMULE
+				}
 			}
 		}
 	}

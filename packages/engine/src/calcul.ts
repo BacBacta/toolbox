@@ -1,5 +1,5 @@
 import type { Expression } from './expression.js'
-import { schemaExpression, verifierExpression } from './expression.js'
+import { DESCRIPTION_FORMULE, verifierExpression } from './expression.js'
 import type { ErreurValidation, JsonSchema } from './types.js'
 import { valider } from './valider.js'
 
@@ -78,7 +78,13 @@ export const schemaCalcul: JsonSchema = {
       properties: {
         libelle: { type: 'string', minLength: 2, maxLength: 32, description: 'Ex. « Reste à payer ».' },
         unite: { type: 'string', enum: ['F', ''] },
-        formule: schemaExpression,
+        /*
+         * La formule est décrite, pas dépliée : un schéma récursif sans
+         * `$ref` embarquait soixante-quatre copies de sa feuille — quarante
+         * mille caractères d'invite payés à chaque appel. `verifierExpression`
+         * la vérifie ensuite entièrement, et gratuitement.
+         */
+        formule: { type: 'object', properties: {}, description: DESCRIPTION_FORMULE },
       },
     },
   },
