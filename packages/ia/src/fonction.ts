@@ -1,3 +1,5 @@
+import type { Seance } from '@a237/comptes'
+import { controlerQuota } from '@a237/comptes'
 import type { RegistreDemande } from '@a237/engine'
 import { CATALOGUE, etageDe } from '@a237/engine'
 import type { Fournisseur } from './fournisseur.js'
@@ -23,12 +25,12 @@ import { traiter } from './traiter.js'
  * un objet passé à chaque requête. Les lire au chargement du module aurait
  * marché sur Vercel et rendu partout `undefined` sur Cloudflare.
  *
- * **Ce qui manque encore, et qu'il faut savoir.** Le brief exige un quota par
- * compte (`credits > 0`, sinon 402) et un journal des coûts dans `ai_calls`.
- * Les comptes vivent dans D1, qui n'existe pas encore. En attendant, le
- * garde-fou est grossier mais explicite : la fonction refuse de servir tant
- * qu'on ne l'a pas **ouverte à la main**. Poser la clef ne suffit donc pas à
- * ouvrir un robinet qui coûte de l'argent à chaque appel ; il faut le vouloir.
+ * Le quota et le journal des coûts sont **obligatoires**, et c'est voulu : il
+ * n'existe pas de chemin par lequel une génération se paie sans être comptée.
+ * `repondre` ne connaît pourtant ni D1 ni les comptes — elle reçoit une séance,
+ * qui porte le compte déjà lu et sait retirer, rendre et journaliser. Ce qui
+ * décide du droit de composer reste dans `@a237/comptes` ; ce fichier
+ * l'applique.
  */
 
 /** Une demande plus longue qu'un paragraphe n'est pas une demande d'outil. */
@@ -87,29 +89,17 @@ function fournisseurChoisi(r: Reglages): Fournisseur {
     : openrouter(r.clef, r.modele, { entree: r.prixEntree, sortie: r.prixSortie })
 }
 
-/**
- * Le porteur d'abonnement, quand il y en aura.
- *
- * Il n'y a pas encore de comptes : ils vivent dans D1, qui arrive avec la
- * phase 2. La fonction rend donc faux, et l'étage 3 est fermé à tout le monde
- * — ce qui est la bonne valeur par défaut : on ne facture personne, et on ne
- * dépense pas non plus.
- *
- * C'est une couture d'une ligne. Le jour où les comptes existent, elle lit le
- * plan du compte ; rien d'autre ne bouge, parce que la décision de ce qui
- * relève de l'abonnement est déjà prise ailleurs, gratuitement et sans réseau.
- */
-function abonne(): boolean {
-  return false
-}
-
 /** Ce que l'adaptateur d'un hébergeur doit renvoyer : un code et un corps. */
 export interface Reponse {
   readonly statut: number
   readonly corps: Record<string, unknown>
 }
 
-export async function repondre(corpsRecu: unknown, r: Reglages): Promise<Reponse> {
+export async function repondre(
+  corpsRecu: unknown,
+  r: Reglages,
+  seance: Seance,
+): Promise<Reponse> {
   if (r.clef === '' || !r.ouverte) {
     // 503 et non 500 : ce n'est pas cassé, ce n'est pas encore branché. Le
     // client le dit tel quel à l'utilisateur au lieu de tourner dans le vide.
@@ -136,19 +126,50 @@ export async function repondre(corpsRecu: unknown, r: Reglages): Promise<Reponse
    * Le contrôle est ici et non dans le navigateur : un prix qu'on peut
    * contourner avec les outils de développement n'est pas un prix.
    */
-  if (etageDe(demande, CATALOGUE) === 3 && !abonne()) {
+  const etage = etageDe(demande, CATALOGUE)
+  const verdict = controlerQuota(seance.compte, etage, seance.maintenant)
+  if (verdict.sorte !== 'passe') {
+    return { statut: 402, corps: { erreur: verdict.sorte, pourquoi: verdict.pourquoi } }
+  }
+
+  /*
+   * La réservation, et la course qu'elle tranche.
+   *
+   * Le verdict ci-dessus a lu un compte ; entre cette lecture et ici, une
+   * autre requête du même compte a pu prendre le dernier crédit. C'est la base
+   * qui arbitre, et elle le dit en ne changeant aucune ligne.
+   */
+  if (!(await seance.prendreUnCredit())) {
     return {
       statut: 402,
       corps: {
-        erreur: 'abonnement-requis',
-        pourquoi:
-          'Cette demande vaut plusieurs outils d’un coup. Compose-les un par un, ou prends un abonnement.',
+        erreur: 'credits-epuises',
+        pourquoi: 'Tes compositions sont utilisées. L’abonnement en donne quarante par mois.',
       },
     }
   }
 
   try {
     const resultat = await traiter(demande, fournisseurChoisi(r), r.tauxFcfa)
+
+    /*
+     * Le journal, et ce qu'il permet de tenir.
+     *
+     * Le § 8 plafonne le coût moyen d'une génération à un franc, et le § 7 fait
+     * de dix générations mesurées le critère d'arrêt de la phase 4. Une
+     * promesse qu'on ne mesure pas est une croyance.
+     *
+     * Un refus du modèle et une sortie invalide sont journalisés aussi, avec
+     * `ok` à faux : ils ont coûté des jetons, et les omettre ferait
+     * sous-estimer la dépense réelle de tout le monde.
+     */
+    await seance.journaliser({
+      etage,
+      jetonsEntree: resultat.cout.entree,
+      jetonsSortie: resultat.cout.sortie,
+      coutXaf: resultat.cout.fcfa,
+      ok: resultat.sorte === 'reussi' || resultat.sorte === 'calcule',
+    })
 
     // Le coût part dans le journal du serveur en attendant `ai_calls` : la
     // promesse du brief est « moins d'un franc par génération », et une
@@ -195,6 +216,16 @@ export async function repondre(corpsRecu: unknown, r: Reglages): Promise<Reponse
     // Le message d'un fournisseur peut contenir la clef en écho : on ne le
     // propage pas au client, on le garde côté serveur.
     console.error('appel_ia_echoue', cause)
+
+    /*
+     * Rien n'est revenu : le crédit retourne au compte.
+     *
+     * Aucun de ces chemins n'a produit de sortie utilisable, et aucun n'est de
+     * la faute de qui a demandé — notre compte fournisseur est à sec, notre
+     * clef est refusée, ou le réseau a lâché. Retenir le crédit ferait payer
+     * notre panne à quelqu'un qui en a cinq.
+     */
+    await seance.rendreUnCredit()
 
     if (cause instanceof ErreurFournisseur && cause.sorte === 'credit-epuise') {
       /*

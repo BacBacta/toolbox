@@ -1,3 +1,5 @@
+import type { AppelIa, Seance } from '@a237/comptes'
+import { compteNeuf } from '@a237/comptes'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
@@ -16,15 +18,53 @@ const ENV = { ...process.env }
  * On appelle `repondre` et non un adaptateur : les réglages arrivent en
  * argument, ce qui laisse chaque cas poser son environnement sans toucher à
  * celui du processus. L'adaptateur Cloudflare, lui, s'éprouve à part.
+ *
+ * La séance vient d'un compte en mémoire : ce fichier éprouve le proxy, pas les
+ * comptes, qui ont leur propre paquet et leurs essais contre du vrai SQLite. Le
+ * journal est retenu pour que les cas puissent le lire.
  */
+const LE_9_SEPT = new Date('2026-09-09T07:45:00.000Z')
+
+interface SeanceDEssai extends Seance {
+  readonly journal: Array<Omit<AppelIa, 'compteId'>>
+  readonly rendus: { compte: number }
+}
+
+function seanceDEssai(compte = compteNeuf('u1')): SeanceDEssai {
+  const journal: Array<Omit<AppelIa, 'compteId'>> = []
+  const rendus = { compte: 0 }
+  let credits = compte.credits
+  return {
+    compte,
+    maintenant: LE_9_SEPT,
+    journal,
+    rendus,
+    prendreUnCredit: () => {
+      if (credits <= 0) return Promise.resolve(false)
+      credits -= 1
+      return Promise.resolve(true)
+    },
+    rendreUnCredit: () => {
+      credits += 1
+      rendus.compte += 1
+      return Promise.resolve()
+    },
+    journaliser: (appel) => {
+      journal.push(appel)
+      return Promise.resolve()
+    },
+  }
+}
+
 async function appeler(
   req: { method?: string; body?: unknown },
+  seance: Seance = seanceDEssai(),
 ): Promise<{ statut: number; corps: Record<string, unknown> }> {
   const { reglagesDe, repondre } = await import('../src/fonction.js')
   if (req.method !== undefined && req.method !== 'POST') {
     return { statut: 405, corps: { erreur: 'méthode non permise' } }
   }
-  const { statut, corps } = await repondre(req.body, reglagesDe(process.env))
+  const { statut, corps } = await repondre(req.body, reglagesDe(process.env), seance)
   return { statut, corps }
 }
 
@@ -280,5 +320,111 @@ describe('l’étage 3 est fermé tant qu’il n’y a pas d’abonnement', () =
     const r = await appeler({ method: 'POST', body: { demande: 'suivre mes livraisons de gaz' } })
     expect(r.statut).toBe(200)
     expect(appels).toHaveBeenCalled()
+  })
+})
+
+describe('le quota, appliqué avant la dépense', () => {
+  beforeEach(() => {
+    process.env.A237_CLEF_IA = 'une-clef'
+    process.env.A237_IA_OUVERTE = '1'
+  })
+
+  const REGISTRE_VALIDE = JSON.stringify({
+    titre: 'Suivi', kicker: 'SUIVI', titreNom: 'Nom',
+    colonnes: [{ clef: 'client', titre: 'Client', type: 'texte' }],
+    libelleVide: 'Rien pour l’instant.', libelleAjout: 'Ajouter',
+    relancesVides: 'Un suivi se consulte.',
+  })
+
+  it('un compte sans crédit n’appelle pas le modèle', async () => {
+    const appels = vi.fn()
+    vi.stubGlobal('fetch', appels)
+    const r = await appeler(
+      { method: 'POST', body: { demande: 'suivre mes livraisons de gaz' } },
+      seanceDEssai({ ...compteNeuf('u1'), credits: 0 }),
+    )
+    expect(r.statut).toBe(402)
+    expect(r.corps.erreur).toBe('credits-epuises')
+    expect(appels).not.toHaveBeenCalled()
+  })
+
+  it('et celui qui perd la course au dernier crédit non plus', async () => {
+    /*
+     * Le contrôle du quota a lu un compte ; entre cette lecture et la
+     * réservation, une autre requête du même compte a pris le dernier crédit.
+     * C'est la base qui arbitre, en ne changeant aucune ligne — et sans cette
+     * seconde barrière, on paierait deux générations pour un crédit.
+     */
+    const appels = vi.fn()
+    vi.stubGlobal('fetch', appels)
+    const perdante: Seance = {
+      ...seanceDEssai({ ...compteNeuf('u1'), credits: 1 }),
+      prendreUnCredit: () => Promise.resolve(false),
+    }
+    const r = await appeler({ method: 'POST', body: { demande: 'suivre mes livraisons de gaz' } }, perdante)
+
+    expect(r.statut).toBe(402)
+    expect(r.corps.erreur).toBe('credits-epuises')
+    expect(appels).not.toHaveBeenCalled()
+  })
+
+  it('un abonné passe à l’étage 3', async () => {
+    const appels = vi.fn().mockResolvedValue(repondOpenrouter(REGISTRE_VALIDE))
+    vi.stubGlobal('fetch', appels)
+    const abonne = {
+      ...compteNeuf('u1'),
+      plan: 'atelier' as const,
+      planExpire: LE_9_SEPT.getTime() + 86_400_000,
+    }
+    const r = await appeler(
+      { method: 'POST', body: { demande: 'il me faut tout ce qu il faut pour ma boutique' } },
+      seanceDEssai(abonne),
+    )
+    expect(r.statut).toBe(200)
+    expect(appels).toHaveBeenCalled()
+  })
+
+  it('journalise ce que l’appel a coûté, jetons compris', async () => {
+    // Le § 8 plafonne le coût moyen à un franc, et le § 7 fait de dix
+    // générations mesurées le critère d'arrêt de la phase 4.
+    const seance = seanceDEssai()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(repondOpenrouter(REGISTRE_VALIDE)))
+    await appeler({ method: 'POST', body: { demande: 'suivre mes livraisons de gaz' } }, seance)
+
+    expect(seance.journal).toHaveLength(1)
+    const [appel] = seance.journal
+    expect(appel?.ok).toBe(true)
+    expect(appel?.etage).toBe(2)
+    expect(appel?.jetonsEntree).toBeGreaterThan(0)
+    expect(appel?.coutXaf).toBeGreaterThan(0)
+    expect(appel?.coutXaf ?? 99).toBeLessThan(1)
+  })
+
+  it('journalise aussi un refus du modèle : il a coûté des jetons', async () => {
+    const seance = seanceDEssai()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      repondOpenrouter(JSON.stringify({ impossible: 'Je ne peux pas créer un site internet.' })),
+    ))
+    await appeler({ method: 'POST', body: { demande: 'suivre mes livraisons de gaz' } }, seance)
+
+    expect(seance.journal).toHaveLength(1)
+    expect(seance.journal[0]?.ok).toBe(false)
+    expect(seance.rendus.compte).toBe(0)
+  })
+
+  it('mais rend le crédit d’un appel qui n’est jamais parti', async () => {
+    /*
+     * Notre compte fournisseur à sec, notre clef refusée, le réseau qui lâche :
+     * aucun de ces chemins n'a produit de sortie, et aucun n'est de la faute de
+     * qui a demandé. Retenir le crédit ferait payer notre panne à quelqu'un qui
+     * en a cinq.
+     */
+    const seance = seanceDEssai()
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('réseau coupé')))
+    const r = await appeler({ method: 'POST', body: { demande: 'suivre mes livraisons de gaz' } }, seance)
+
+    expect(r.statut).toBe(502)
+    expect(seance.rendus.compte).toBe(1)
+    expect(seance.journal).toHaveLength(0)
   })
 })

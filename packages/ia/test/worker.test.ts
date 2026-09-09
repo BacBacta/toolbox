@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { baseDEssai } from '../../comptes/test/sqlite.js'
 import { onRequest } from '../src/worker.js'
 
 /**
@@ -10,14 +11,21 @@ import { onRequest } from '../src/worker.js'
 
 const FERME = {} as const
 
-function poste(corps: unknown, env: Record<string, string | undefined> = FERME): Promise<Response> {
+/** Un jeton d'appareil bien formé : cent vingt-huit bits en hexadécimal. */
+const JETON = 'a1b2c3d4e5f60718293a4b5c6d7e8f90'
+
+function poste(
+  corps: unknown,
+  env: Record<string, string | undefined> = FERME,
+  entetes: Record<string, string> = { authorization: `Appareil ${JETON}` },
+): Promise<Response> {
   return onRequest({
     request: new Request('https://exemple.cm/api/ai', {
       method: 'POST',
       body: JSON.stringify(corps),
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...entetes },
     }),
-    env,
+    env: { ...env, COMPTES: baseDEssai() },
   })
 }
 
@@ -50,8 +58,12 @@ describe('l’adaptateur Cloudflare', () => {
     // Et non comme une panne : une exception qui remonte donnerait un 500,
     // et le client réessaierait indéfiniment.
     const r = await onRequest({
-      request: new Request('https://exemple.cm/api/ai', { method: 'POST', body: 'pas du json' }),
-      env: { A237_CLEF_IA: 'k', A237_IA_OUVERTE: '1' },
+      request: new Request('https://exemple.cm/api/ai', {
+        method: 'POST',
+        body: 'pas du json',
+        headers: { authorization: `Appareil ${JETON}` },
+      }),
+      env: { A237_CLEF_IA: 'k', A237_IA_OUVERTE: '1', COMPTES: baseDEssai() },
     })
     expect(r.status).toBe(400)
   })
@@ -63,5 +75,39 @@ describe('l’adaptateur Cloudflare', () => {
       fs.readFileSync(new URL('../src/fonction.ts', import.meta.url), 'utf8'),
     )
     expect(source).not.toMatch(/process\.env\.[A-Z]/)
+  })
+})
+
+describe('l’appareil doit se présenter', () => {
+  const OUVERT = { A237_CLEF_IA: 'k', A237_IA_OUVERTE: '1' }
+
+  it('sans en-tête, rien ne part', async () => {
+    const r = await poste({ demande: 'un devis' }, OUVERT, {})
+    expect(r.status).toBe(401)
+    expect((await r.json() as { erreur: string }).erreur).toBe('appareil-inconnu')
+  })
+
+  it('un jeton mal formé se refuse sur sa forme, sans toucher à la base', async () => {
+    for (const faux of ['Appareil pas-un-jeton', 'Bearer ' + JETON, JETON, 'Appareil ']) {
+      const r = await poste({ demande: 'un devis' }, OUVERT, { authorization: faux })
+      expect(r.status, faux).toBe(401)
+    }
+  })
+
+  it('et sans base de comptes, on ne sert pas — surtout pas gratuitement', async () => {
+    /*
+     * La liaison peut manquer : un déploiement de prévisualisation qui n'a pas
+     * les mêmes ressources. Servir quand même ouvrirait un robinet qui coûte de
+     * l'argent à chaque appel et que personne ne compte.
+     */
+    const r = await onRequest({
+      request: new Request('https://exemple.cm/api/ai', {
+        method: 'POST',
+        body: JSON.stringify({ demande: 'un devis' }),
+        headers: { authorization: `Appareil ${JETON}` },
+      }),
+      env: OUVERT,
+    })
+    expect(r.status).toBe(503)
   })
 })

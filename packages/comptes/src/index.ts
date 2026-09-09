@@ -27,3 +27,6 @@ export {
   rattacherAppareil, rendreUnCredit,
 } from './base.js'
 export type { AppelIa, BaseD1, Requete } from './base.js'
+
+export { SCHEMA_AUTORISATION, jetonDeLEntete, ouvrirSeance } from './seance.js'
+export type { Seance } from './seance.js'

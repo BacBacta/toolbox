@@ -14,6 +14,16 @@
 export interface Cout {
   readonly dollars: number
   readonly fcfa: number
+  /*
+   * Les jetons voyagent avec le prix qu'ils ont fait.
+   *
+   * Le franc d'aujourd'hui dépend d'un modèle, d'un tarif et d'un taux, et les
+   * trois bougent. Garder le compte de jetons permet de recalculer ce qu'un
+   * mois passé aurait coûté avec le modèle d'aujourd'hui — sans eux, le
+   * journal ne répond qu'à la question qu'on lui a posée le jour même.
+   */
+  readonly entree: number
+  readonly sortie: number
 }
 
 export function couter(
@@ -23,5 +33,10 @@ export function couter(
 ): Cout {
   const dollars = (jetons.entree * prix.entree + jetons.sortie * prix.sortie) / 1_000_000
   // Arrondi au centime de franc : en dessous, on journalise du bruit.
-  return { dollars, fcfa: Math.round(dollars * tauxFcfaParDollar * 100) / 100 }
+  return {
+    dollars,
+    fcfa: Math.round(dollars * tauxFcfaParDollar * 100) / 100,
+    entree: jetons.entree,
+    sortie: jetons.sortie,
+  }
 }

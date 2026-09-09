@@ -25,3 +25,12 @@ id = "5e3c4fb72fd541f3ac31cfd40f9d2618"
 [[r2_buckets]]
 binding = "CARTES"
 bucket_name = "atelier237-cartes"
+
+# Les comptes, les appareils, les paiements et le journal des coûts.
+# D1 est du SQLite : relationnel, transactionnel — c'est cette transaction qui
+# empêche un paiement de passer à « réussi » sans que l'abonnement suive.
+# Le schéma vit dans `packages/comptes/migrations/`.
+[[d1_databases]]
+binding = "COMPTES"
+database_name = "atelier237-comptes"
+database_id = "bec8ca4c-a267-4fcc-abef-e14b772fa996"

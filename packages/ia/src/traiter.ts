@@ -112,6 +112,8 @@ export async function traiter(
       : {
           dollars: dollarsAnnonces,
           fcfa: Math.round(dollarsAnnonces * tauxFcfaParDollar * 100) / 100,
+          entree: jetons.entree,
+          sortie: jetons.sortie,
         }
   }
 }

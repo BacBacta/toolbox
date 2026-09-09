@@ -1,3 +1,41 @@
+/**
+* L'abonnement court-il encore ?
+*
+* Un abonnement expiré n'est pas une erreur : c'est un compte qui redevient un
+* essai, sans rien perdre. Les outils vivent sur le téléphone (§ 2.7) et les
+* publications restent en ligne ; ce qui s'arrête, c'est la composition par le
+* modèle, la seule chose qui coûte de l'argent à chaque usage.
+*/
+function abonne(compte, maintenant) {
+	if (compte.plan !== "atelier") return false;
+	return compte.planExpire !== null && compte.planExpire > maintenant.getTime();
+}
+/** Un compte neuf, tel qu'il naît au premier appareil qui se présente. */
+function compteNeuf(id) {
+	return {
+		id,
+		plan: "essai",
+		planExpire: null,
+		credits: 5
+	};
+}
+//#endregion
+//#region ../comptes/src/quota.ts
+var POURQUOI_ABONNEMENT = "Cette demande vaut plusieurs outils d’un coup. Compose-les un par un, ou prends un abonnement.";
+var POURQUOI_ESSAI = "Tes compositions d’essai sont utilisées. L’abonnement en donne quarante par mois ; tout le reste de l’atelier continue de marcher sans rien payer.";
+var POURQUOI_ATELIER = "Tes quarante compositions du mois sont utilisées. Reprends un mois pour les recharger : les jours qui te restent ne sont pas perdus, ils s’ajoutent.";
+function controlerQuota(compte, etage, maintenant) {
+	if (etage === 3 && !abonne(compte, maintenant)) return {
+		sorte: "abonnement-requis",
+		pourquoi: POURQUOI_ABONNEMENT
+	};
+	if (compte.credits <= 0) return {
+		sorte: "credits-epuises",
+		pourquoi: abonne(compte, maintenant) ? POURQUOI_ATELIER : POURQUOI_ESSAI
+	};
+	return { sorte: "passe" };
+}
+//#endregion
 //#region ../engine/src/catalogue.ts
 var CATALOGUE = [
 	{
@@ -899,6 +937,104 @@ function lireReponseModele(valeur) {
 	};
 }
 //#endregion
+//#region ../comptes/src/identite.ts
+function hex(octets) {
+	return Array.from(octets, (o) => o.toString(16).padStart(2, "0")).join("");
+}
+function jetonValide(jeton) {
+	return jeton.length === 32 && /^[0-9a-f]+$/.test(jeton);
+}
+/** Ce que le serveur range à la place du jeton. */
+async function empreinte(secret) {
+	const condense = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret));
+	return hex(new Uint8Array(condense));
+}
+//#endregion
+//#region ../comptes/src/base.ts
+function versCompte(ligne) {
+	return {
+		id: ligne.id,
+		plan: ligne.plan === "atelier" ? "atelier" : "essai",
+		planExpire: ligne.plan_expire,
+		credits: ligne.credits
+	};
+}
+/**
+* Le compte que porte cet appareil, ouvert s'il n'existait pas.
+*
+* L'ouverture est paresseuse et sans un mot : personne ne s'inscrit pour se
+* servir de l'atelier (§ 2), et le serveur ne voit un appareil qu'au premier
+* appel qui coûte quelque chose.
+*
+* L'ordre des écritures n'est pas indifférent, et la clé étrangère le décide :
+* un appareil ne peut pas désigner un compte qui n'existe pas. On ouvre donc un
+* compte candidat, puis on tente le lien. Deux requêtes simultanées d'un même
+* appareil neuf se disputent la clé primaire de `appareils`, `INSERT OR IGNORE`
+* en laisse passer une, et la relecture dit laquelle a gagné — la perdante
+* remballe son candidat, qui n'a jamais porté personne.
+*
+* `INSERT OR IGNORE` sur les comptes compte autant : sans lui, revenir
+* remettrait les crédits à cinq et l'essai n'aurait pas de fin.
+*/
+async function compteDeLAppareil(db, empreinte, maintenant) {
+	const t = maintenant.getTime();
+	const candidat = compteNeuf(crypto.randomUUID());
+	await db.prepare("INSERT OR IGNORE INTO comptes (id, plan, plan_expire, credits, cree_le) VALUES (?, ?, ?, ?, ?)").bind(candidat.id, candidat.plan, candidat.planExpire, candidat.credits, t).run();
+	await db.prepare("INSERT OR IGNORE INTO appareils (empreinte, compte_id, vu_le) VALUES (?, ?, ?)").bind(empreinte, candidat.id, t).run();
+	const compteId = (await db.prepare("SELECT compte_id FROM appareils WHERE empreinte = ?").bind(empreinte).first())?.compte_id ?? candidat.id;
+	if (compteId !== candidat.id) await db.prepare("DELETE FROM comptes WHERE id = ? AND NOT EXISTS (SELECT 1 FROM appareils WHERE compte_id = ?)").bind(candidat.id, candidat.id).run();
+	const ligne = await db.prepare("SELECT id, plan, plan_expire, credits FROM comptes WHERE id = ?").bind(compteId).first();
+	if (ligne === null) throw new Error(`compte introuvable après ouverture : ${compteId}`);
+	await db.prepare("UPDATE appareils SET vu_le = ? WHERE empreinte = ?").bind(t, empreinte).run();
+	return versCompte(ligne);
+}
+/**
+* Retire un crédit, ou rend faux.
+*
+* La condition est **dans la requête** et non autour d'elle. Deux appels
+* simultanés d'un compte à qui il reste un crédit passeraient tous les deux un
+* contrôle fait en JavaScript, et on paierait deux générations pour un crédit ;
+* ici, le second ne change aucune ligne et l'apprend.
+*/
+async function prendreUnCredit(db, compteId) {
+	return ((await db.prepare("UPDATE comptes SET credits = credits - 1 WHERE id = ? AND credits > 0").bind(compteId).run()).meta?.changes ?? 0) > 0;
+}
+/**
+* Rend le crédit d'un appel qui n'est jamais parti.
+*
+* On réserve avant d'appeler, parce que c'est le seul ordre qui empêche de
+* dépenser deux fois. Reste le cas où le modèle n'a jamais été joint : aucun
+* jeton n'a été consommé, et retenir le crédit ferait payer une panne de
+* réseau à quelqu'un qui n'en a que cinq.
+*/
+async function rendreUnCredit(db, compteId) {
+	await db.prepare("UPDATE comptes SET credits = credits + 1 WHERE id = ?").bind(compteId).run();
+}
+/** Le journal des coûts. Sans lui, le plafond du § 8 ne se mesure pas. */
+async function journaliser(db, appel, maintenant) {
+	await db.prepare("INSERT INTO appels_ia (id, compte_id, etage, jetons_entree, jetons_sortie, cout_xaf, ok, cree_le) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), appel.compteId, appel.etage, appel.jetonsEntree, appel.jetonsSortie, appel.coutXaf, appel.ok ? 1 : 0, maintenant.getTime()).run();
+}
+function jetonDeLEntete(entetes) {
+	const brut = entetes.get("authorization");
+	if (brut === null) return null;
+	const [schema, jeton] = brut.split(" ");
+	if (schema !== "Appareil" || jeton === void 0) return null;
+	return jeton;
+}
+async function ouvrirSeance(db, jeton, maintenant) {
+	const compte = await compteDeLAppareil(db, await empreinte(jeton), maintenant);
+	return {
+		compte,
+		maintenant,
+		prendreUnCredit: () => prendreUnCredit(db, compte.id),
+		rendreUnCredit: () => rendreUnCredit(db, compte.id),
+		journaliser: (appel) => journaliser(db, {
+			...appel,
+			compteId: compte.id
+		}, maintenant)
+	};
+}
+//#endregion
 //#region src/fournisseur.ts
 /**
 * Une panne de fournisseur, nommée.
@@ -1058,7 +1194,9 @@ function couter(jetons, prix, tauxFcfaParDollar) {
 	const dollars = (jetons.entree * prix.entree + jetons.sortie * prix.sortie) / 1e6;
 	return {
 		dollars,
-		fcfa: Math.round(dollars * tauxFcfaParDollar * 100) / 100
+		fcfa: Math.round(dollars * tauxFcfaParDollar * 100) / 100,
+		entree: jetons.entree,
+		sortie: jetons.sortie
 	};
 }
 //#endregion
@@ -1194,7 +1332,9 @@ async function traiter(demande, fournisseur, tauxFcfaParDollar) {
 	function cout() {
 		return dollarsAnnonces === null ? couter(jetons, fournisseur.prix, tauxFcfaParDollar) : {
 			dollars: dollarsAnnonces,
-			fcfa: Math.round(dollarsAnnonces * tauxFcfaParDollar * 100) / 100
+			fcfa: Math.round(dollarsAnnonces * tauxFcfaParDollar * 100) / 100,
+			entree: jetons.entree,
+			sortie: jetons.sortie
 		};
 	}
 }
@@ -1234,12 +1374,12 @@ function lireJson(texte) {
 * un objet passé à chaque requête. Les lire au chargement du module aurait
 * marché sur Vercel et rendu partout `undefined` sur Cloudflare.
 *
-* **Ce qui manque encore, et qu'il faut savoir.** Le brief exige un quota par
-* compte (`credits > 0`, sinon 402) et un journal des coûts dans `ai_calls`.
-* Les comptes vivent dans D1, qui n'existe pas encore. En attendant, le
-* garde-fou est grossier mais explicite : la fonction refuse de servir tant
-* qu'on ne l'a pas **ouverte à la main**. Poser la clef ne suffit donc pas à
-* ouvrir un robinet qui coûte de l'argent à chaque appel ; il faut le vouloir.
+* Le quota et le journal des coûts sont **obligatoires**, et c'est voulu : il
+* n'existe pas de chemin par lequel une génération se paie sans être comptée.
+* `repondre` ne connaît pourtant ni D1 ni les comptes — elle reçoit une séance,
+* qui porte le compte déjà lu et sait retirer, rendre et journaliser. Ce qui
+* décide du droit de composer reste dans `@a237/comptes` ; ce fichier
+* l'applique.
 */
 /** Une demande plus longue qu'un paragraphe n'est pas une demande d'outil. */
 var MAX_DEMANDE = 400;
@@ -1277,22 +1417,7 @@ function fournisseurChoisi(r) {
 		sortie: r.prixSortie
 	});
 }
-/**
-* Le porteur d'abonnement, quand il y en aura.
-*
-* Il n'y a pas encore de comptes : ils vivent dans D1, qui arrive avec la
-* phase 2. La fonction rend donc faux, et l'étage 3 est fermé à tout le monde
-* — ce qui est la bonne valeur par défaut : on ne facture personne, et on ne
-* dépense pas non plus.
-*
-* C'est une couture d'une ligne. Le jour où les comptes existent, elle lit le
-* plan du compte ; rien d'autre ne bouge, parce que la décision de ce qui
-* relève de l'abonnement est déjà prise ailleurs, gratuitement et sans réseau.
-*/
-function abonne() {
-	return false;
-}
-async function repondre(corpsRecu, r) {
+async function repondre(corpsRecu, r, seance) {
 	if (r.clef === "" || !r.ouverte) return {
 		statut: 503,
 		corps: { erreur: "la composition par le modèle n’est pas encore ouverte" }
@@ -1303,15 +1428,31 @@ async function repondre(corpsRecu, r) {
 		statut: 400,
 		corps: { erreur: "demande absente ou trop longue" }
 	};
-	if (etageDe(demande, CATALOGUE) === 3 && !abonne()) return {
+	const etage = etageDe(demande, CATALOGUE);
+	const verdict = controlerQuota(seance.compte, etage, seance.maintenant);
+	if (verdict.sorte !== "passe") return {
 		statut: 402,
 		corps: {
-			erreur: "abonnement-requis",
-			pourquoi: "Cette demande vaut plusieurs outils d’un coup. Compose-les un par un, ou prends un abonnement."
+			erreur: verdict.sorte,
+			pourquoi: verdict.pourquoi
+		}
+	};
+	if (!await seance.prendreUnCredit()) return {
+		statut: 402,
+		corps: {
+			erreur: "credits-epuises",
+			pourquoi: "Tes compositions sont utilisées. L’abonnement en donne quarante par mois."
 		}
 	};
 	try {
 		const resultat = await traiter(demande, fournisseurChoisi(r), r.tauxFcfa);
+		await seance.journaliser({
+			etage,
+			jetonsEntree: resultat.cout.entree,
+			jetonsSortie: resultat.cout.sortie,
+			coutXaf: resultat.cout.fcfa,
+			ok: resultat.sorte === "reussi" || resultat.sorte === "calcule"
+		});
 		console.log(JSON.stringify({
 			evenement: "appel_ia",
 			modele: r.modele,
@@ -1350,6 +1491,7 @@ async function repondre(corpsRecu, r) {
 		};
 	} catch (cause) {
 		console.error("appel_ia_echoue", cause);
+		await seance.rendreUnCredit();
 		if (cause instanceof ErreurFournisseur && cause.sorte === "credit-epuise") return {
 			statut: 402,
 			corps: { erreur: "plus de crédit pour composer" }
@@ -1362,6 +1504,12 @@ async function repondre(corpsRecu, r) {
 }
 //#endregion
 //#region src/worker.ts
+/** Ce que `reglagesDe` sait lire : les chaînes, et elles seules. */
+function chainesDe(env) {
+	const propre = {};
+	for (const [clef, valeur] of Object.entries(env)) if (typeof valeur === "string") propre[clef] = valeur;
+	return propre;
+}
 function json(statut, corps) {
 	return new Response(JSON.stringify(corps), {
 		status: statut,
@@ -1373,14 +1521,27 @@ function json(statut, corps) {
 }
 async function onRequest(contexte) {
 	if (contexte.request.method !== "POST") return json(405, { erreur: "méthode non permise" });
+	const base = contexte.env.COMPTES;
+	if (base === void 0) return json(503, { erreur: "la composition par le modèle n’est pas encore ouverte" });
+	const jeton = jetonDeLEntete(contexte.request.headers);
+	if (jeton === null || !jetonValide(jeton)) return json(401, {
+		erreur: "appareil-inconnu",
+		pourquoi: "Cet appareil ne s’est pas présenté."
+	});
 	let corps;
 	try {
 		corps = await contexte.request.json();
 	} catch {
 		corps = void 0;
 	}
-	const { statut, corps: reponse } = await repondre(corps, reglagesDe(contexte.env));
-	return json(statut, reponse);
+	const seance = await ouvrirSeance(base, jeton, /* @__PURE__ */ new Date());
+	const { statut, corps: reponse } = await repondre(corps, reglagesDe(chainesDe(contexte.env)), seance);
+	const restants = statut === 200 ? Math.max(0, seance.compte.credits - 1) : seance.compte.credits;
+	return json(statut, {
+		...reponse,
+		credits: restants,
+		plan: seance.compte.plan
+	});
 }
 //#endregion
 export { onRequest };

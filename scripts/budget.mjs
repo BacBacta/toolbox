@@ -206,6 +206,11 @@ for (const [chemin, marqueur, quoi] of [
   ['functions/d/[lien].js', '<!doctype html>', 'la page de lecture, preuve que le rendu est inclus'],
   ['functions/c/[lien].js', EXPORTE_ONREQUEST, 'l’export nommé que Pages appelle'],
   ['functions/c/[lien].js', 'image/png', 'le service des cartes'],
+  ['functions/api/compte/[[chemin]].js', EXPORTE_ONREQUEST, 'l’export nommé que Pages appelle'],
+  ['functions/api/pay/[[chemin]].js', EXPORTE_ONREQUEST, 'l’export nommé que Pages appelle'],
+  // Sans la vérification de signature, n'importe qui s'offre un abonnement
+  // avec `curl` : c'est la seule ligne de ce fichier qui protège de l'argent.
+  ['functions/api/pay/[[chemin]].js', 'memeSignature', 'la vérification de signature du rappel'],
 ]) {
   try {
     const source = readFileSync(chemin, 'utf8')
@@ -226,6 +231,7 @@ for (const [chemin, marqueur, quoi] of [
 {
   const attendus = new Set([
     'functions/api/ai.js', 'functions/api/publier.js',
+    'functions/api/compte/[[chemin]].js', 'functions/api/pay/[[chemin]].js',
     'functions/d/[lien].js', 'functions/c/[lien].js',
   ])
   const vus = []
