@@ -25,8 +25,21 @@ régler dans l'interface.
 
 ```bash
 pnpm build
-wrangler pages deploy apps/web/dist
+npx wrangler pages deploy apps/web/dist --project-name atelier237
 ```
+
+`wrangler` n'est pas une dépendance du dépôt : il ne sert qu'à mettre en ligne,
+et `npx` le prend au vol. La première fois, il faut s'authentifier —
+`npx wrangler login` ouvre un navigateur. Sans navigateur (intégration
+continue, machine distante), c'est un jeton :
+
+```bash
+export CLOUDFLARE_API_TOKEN=…   # droits « Cloudflare Pages : Edit »
+export CLOUDFLARE_ACCOUNT_ID=…
+```
+
+Le jeton se crée dans le tableau de bord Cloudflare, et **n'entre jamais dans
+le dépôt**.
 
 Les fonctions vivent dans `functions/` : `functions/api/ai.js` répond sur
 `/api/ai`. Elles partent avec le même déploiement que les fichiers statiques —
