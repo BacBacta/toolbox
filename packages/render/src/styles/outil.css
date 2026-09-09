@@ -324,7 +324,98 @@
   text-align: center;
 }
 
+.calc-resultat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--bandeau);
+}
+
+.calc-libelle {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--encre-3);
+}
+
+.calc-valeur {
+  font-size: 32px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
 .outil-graphique {
   width: 100%;
   height: auto;
+}
+
+/* ───────────────────────── champs et messages ───────────────────────── */
+/*
+ * Ces règles vivent ici et non dans l'application : ce sont les composants de
+ * ce paquet qui les emploient. Les laisser dans apps/web, c'était un écran qui
+ * sortait correct en test et cassé à l'affichage — le test de dérive entre le
+ * JSX et le CSS l'a attrapé.
+ */
+
+.champ {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.champ-libelle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--encre-2);
+}
+
+.champ-aide {
+  font-size: 12px;
+  color: var(--encre-3);
+}
+
+.champ input,
+.champ select,
+.champ textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--trait);
+  border-radius: 10px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  /* 16 px au minimum : en dessous, Safari zoome à la mise au point. */
+  font-size: 16px;
+}
+
+.champ textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.champ-case {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+
+.champ-case input {
+  width: 22px;
+  min-height: 22px;
+}
+
+.note {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-left: 4px solid var(--encre-3);
+  border-radius: 4px;
+  background: var(--bandeau);
+  font-size: 14px;
 }

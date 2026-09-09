@@ -20,8 +20,12 @@ export interface ModuleOutil {
    * L'état d'un outil neuf. Il vit avec le fragment de l'outil et non dans la
    * coquille : le squelette complet — schéma, calculs, valeurs par défaut — ne
    * se charge qu'au moment où on en a vraiment besoin.
+   *
+   * L'identifiant est passé parce qu'un même fragment sert plusieurs
+   * squelettes : les quatre registres de liste partagent un écran, les deux
+   * calculatrices aussi.
    */
-  readonly creer: (maintenant: Date) => EtatNeuf
+  readonly creer: (skeleton: string, maintenant: Date) => EtatNeuf
 }
 
 /**
@@ -36,6 +40,14 @@ export const CHARGEURS: Readonly<Record<string, () => Promise<ModuleOutil>>> = {
   devis: () => import('./outils/devis.js'),
   facture: () => import('./outils/facture.js'),
   njangi: () => import('./outils/njangi.js'),
+  // Un seul fragment pour les quatre registres décrits par leurs colonnes, et
+  // un pour les deux calculatrices : ils partagent leur écran et leur moteur.
+  prix: () => import('./outils/liste.js'),
+  caisse: () => import('./outils/liste.js'),
+  stock: () => import('./outils/liste.js'),
+  clients: () => import('./outils/liste.js'),
+  scolarite: () => import('./outils/calc.js'),
+  course: () => import('./outils/calc.js'),
 }
 
 export function outilDisponible(skeleton: string): boolean {

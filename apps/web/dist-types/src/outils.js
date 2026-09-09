@@ -10,6 +10,14 @@ export const CHARGEURS = {
     devis: () => import('./outils/devis.js'),
     facture: () => import('./outils/facture.js'),
     njangi: () => import('./outils/njangi.js'),
+    // Un seul fragment pour les quatre registres décrits par leurs colonnes, et
+    // un pour les deux calculatrices : ils partagent leur écran et leur moteur.
+    prix: () => import('./outils/liste.js'),
+    caisse: () => import('./outils/liste.js'),
+    stock: () => import('./outils/liste.js'),
+    clients: () => import('./outils/liste.js'),
+    scolarite: () => import('./outils/calc.js'),
+    course: () => import('./outils/calc.js'),
 };
 export function outilDisponible(skeleton) {
     return Object.hasOwn(CHARGEURS, skeleton);

@@ -134,7 +134,7 @@ export function App(): JSX.Element {
     const chargeur = CHARGEURS[skeleton]
     if (chargeur === undefined) throw new Error(`aucun écran pour « ${skeleton} »`)
     const maintenant = new Date()
-    const neuf = (await chargeur()).creer(maintenant)
+    const neuf = (await chargeur()).creer(skeleton, maintenant)
     const outil = await creerOutil(skeleton, neuf.nom, neuf.etat, maintenant)
     setOutils(await listerOutils())
     setOuvert(outil)

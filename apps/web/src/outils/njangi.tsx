@@ -19,7 +19,7 @@ export function Outil(props: ProprietesOutil): JSX.Element {
   )
 }
 
-export function creer(maintenant: Date): { nom: string; etat: unknown } {
+export function creer(_skeleton: string, maintenant: Date): { nom: string; etat: unknown } {
   return {
     nom: njangi.title,
     etat: njangi.initialiser?.({ lien: '', maintenant }) ?? njangi.defaults,

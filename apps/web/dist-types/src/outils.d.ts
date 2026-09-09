@@ -17,8 +17,12 @@ export interface ModuleOutil {
      * L'état d'un outil neuf. Il vit avec le fragment de l'outil et non dans la
      * coquille : le squelette complet — schéma, calculs, valeurs par défaut — ne
      * se charge qu'au moment où on en a vraiment besoin.
+     *
+     * L'identifiant est passé parce qu'un même fragment sert plusieurs
+     * squelettes : les quatre registres de liste partagent un écran, les deux
+     * calculatrices aussi.
      */
-    readonly creer: (maintenant: Date) => EtatNeuf;
+    readonly creer: (skeleton: string, maintenant: Date) => EtatNeuf;
 }
 /**
  * Un import dynamique par squelette.

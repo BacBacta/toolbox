@@ -5,5 +5,8 @@ export {
 export type { Kpi, TonBadge } from './chrome.js'
 export { Histogramme } from './graphique.js'
 export type { BarreGraphique } from './graphique.js'
+export { Calculatrice } from './calc.js'
+export { RegistreListe } from './liste.js'
+export type { OngletListe } from './liste.js'
 export { RegistreNjangi } from './njangi.js'
 export type { OngletNjangi } from './njangi.js'

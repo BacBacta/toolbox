@@ -14,7 +14,7 @@ export function Outil(props) {
     const etat = props.outil.etat;
     return (_jsx(CadreDocument, { titre: props.outil.nom, sousTitre: `Devis N° ${etat.numero}`, onglet: onglet, onOnglet: setOnglet, onDiffuser: () => props.onDiffuser(devis.share(etat, props.ctx)), children: onglet === 'Document' ? (_jsxs(_Fragment, { children: [_jsx(Manquements, { manquements: controleLegal(etat) }), _jsx(DocumentDevis, { etat: etat })] })) : (_jsx(ChampsSchema, { schema: devis.schema, valeur: etat, masques: MASQUES, onChange: props.onChange })) }));
 }
-export function creer(maintenant) {
+export function creer(_skeleton, maintenant) {
     return {
         nom: devis.title,
         etat: devis.initialiser?.({ lien: '', maintenant }) ?? devis.defaults,

@@ -8,7 +8,7 @@ export function Outil(props) {
         return _jsx(EtatInvalide, { erreurs: erreurs });
     return (_jsx(RegistreNjangi, { etat: props.outil.etat, ctx: props.ctx, onChange: props.onChange, onDiffuser: props.onDiffuser }));
 }
-export function creer(maintenant) {
+export function creer(_skeleton, maintenant) {
     return {
         nom: njangi.title,
         etat: njangi.initialiser?.({ lien: '', maintenant }) ?? njangi.defaults,

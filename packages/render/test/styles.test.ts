@@ -85,9 +85,32 @@ describe('les deux feuilles', () => {
     expect(CSS).not.toContain('fonts.googleapis')
   })
 
+  /**
+   * Ce qui reçoit le doigt fait 44 px de côté au minimum.
+   *
+   * Une exception, et une seule : la case à cocher elle-même est petite, mais
+   * c'est son étiquette qui reçoit le tap, et l'étiquette fait ses 44 px. Une
+   * exception listée avec sa raison vaut mieux qu'un seuil abaissé pour tout
+   * le monde.
+   */
+  const CIBLES_IMBRIQUEES = new Set(['.champ-case input'])
+
   it('donnent au doigt de quoi viser : 44 px de côté au minimum', () => {
-    const cibles = [...OUTIL.matchAll(/min-height:\s*(\d+)px/g)].map((m) => Number(m[1]))
-    expect(cibles.length).toBeGreaterThan(3)
-    expect(Math.min(...cibles)).toBeGreaterThanOrEqual(44)
+    const regles = [...OUTIL.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+      .map(([, selecteur, corps]) => ({
+        selecteur: (selecteur ?? '').trim().replace(/\s+/g, ' '),
+        hauteur: Number(/min-height:\s*(\d+)px/.exec(corps ?? '')?.[1] ?? Number.NaN),
+      }))
+      .filter((r) => Number.isFinite(r.hauteur))
+
+    expect(regles.length).toBeGreaterThan(3)
+    const trop = regles.filter(
+      (r) => r.hauteur < 44 && !CIBLES_IMBRIQUEES.has(r.selecteur),
+    )
+    expect(trop.map((r) => `${r.selecteur} : ${r.hauteur}px`)).toEqual([])
+  })
+
+  it('l’étiquette d’une case à cocher, elle, fait bien 44 px', () => {
+    expect(/\.champ-case\s*\{[^}]*min-height:\s*44px/.test(OUTIL)).toBe(true)
   })
 })

@@ -93,56 +93,11 @@
 }
 
 /* ─────────────────────────────── formulaire ─────────────────────────────── */
-
-.champ {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
-}
-
-.champ-libelle {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--encre-2);
-}
-
-.champ-aide {
-  font-size: 12px;
-  color: var(--encre-3);
-}
-
-.champ input,
-.champ select,
-.champ textarea {
-  width: 100%;
-  min-height: 44px;
-  padding: 10px 12px;
-  border: 1px solid var(--trait);
-  border-radius: 10px;
-  background: #fff;
-  color: inherit;
-  font: inherit;
-  /* 16 px au minimum : en dessous, Safari zoome à la mise au point. */
-  font-size: 16px;
-}
-
-.champ textarea {
-  min-height: 96px;
-  resize: vertical;
-}
-
-.champ-case {
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-}
-
-.champ-case input {
-  width: 22px;
-  min-height: 22px;
-}
+/*
+ * Les règles de base des champs vivent dans `@a237/render` : ce sont ses
+ * composants qui les emploient. Ici, seulement ce qui est propre au formulaire
+ * dressé à partir du schéma, qui n'existe que dans l'application.
+ */
 
 .champ-groupe {
   margin: 12px 0;
@@ -189,19 +144,13 @@
 
 /* ─────────────────────────── messages et feuille ─────────────────────────── */
 
-.alerte,
-.note {
+.alerte {
   margin: 12px 0;
   padding: 10px 12px;
-  border-left: 4px solid var(--encre-3);
+  border-left: 4px solid var(--alerte);
   border-radius: 4px;
-  background: var(--bandeau);
-  font-size: 14px;
-}
-
-.alerte {
-  border-left-color: var(--alerte);
   background: #f6e5e3;
+  font-size: 14px;
 }
 
 .etat-invalide code {
