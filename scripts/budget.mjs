@@ -106,7 +106,8 @@ const MARQUEURS_OUTILS = [
  * ailleurs.
  */
 const MARQUEURS_SERVEUR = [
-  ['generativelanguage.googleapis.com', 'appel au fournisseur de modèle'],
+  ['generativelanguage.googleapis.com', 'appel direct à Gemini'],
+  ['openrouter.ai/api', 'appel au routeur de modèles'],
   ['x-goog-api-key', 'entête d’authentification du modèle'],
   ['A237_CLEF_IA', 'nom de la variable qui porte la clef'],
   ['Tu configures un registre', 'invite envoyée au modèle'],

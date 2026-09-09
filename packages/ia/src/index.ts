@@ -1,7 +1,7 @@
 export type { Cout } from './cout.js'
 export { couter } from './cout.js'
 export type { DemandeModele, Fournisseur, ReponseModele } from './fournisseur.js'
-export { gemini } from './fournisseur.js'
+export { gemini, openrouter } from './fournisseur.js'
 export { batirInvite, batirReproches } from './invite.js'
 export type { Resultat } from './traiter.js'
 export { traiter } from './traiter.js'

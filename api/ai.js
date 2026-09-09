@@ -54,6 +54,86 @@ function gemini(clef, modele = "gemini-2.5-flash-lite") {
 		}
 	};
 }
+/**
+* OpenRouter : un routeur, pas un modèle.
+*
+* Il parle la forme d'API d'OpenAI et mène à des centaines de modèles, dont
+* celui du brief. L'intérêt ici n'est pas la variété — c'est qu'il permet de
+* changer de modèle **sans redéployer**, par une variable d'environnement.
+* Le brief pose un budget (moins d'un franc la génération, § 8) et non une
+* marque ; pouvoir en essayer un autre le lendemain vaut mieux que d'avoir
+* bien deviné le premier jour.
+*
+* Deux prudences.
+*
+* `response_format` n'est pas compris par tous les modèles du routeur. On le
+* demande — il réduit les reprises, et une reprise double le coût — mais si la
+* requête est refusée, on recommence **une fois sans lui** : l'invite exige
+* déjà du JSON nu et `lireJson` sait déshabiller un bloc de code. Ainsi
+* n'importe quel modèle reste utilisable, et le choix redevient une décision
+* de gestion plutôt qu'une contrainte technique.
+*
+* Et le coût vient du routeur quand il le donne (`usage.cost`), parce qu'il
+* applique sa marge et que notre table de prix ne la connaît pas.
+*/
+function openrouter(clef, modele = "google/gemini-2.5-flash-lite", prix = {
+	entree: .1,
+	sortie: .4
+}) {
+	return {
+		nom: modele,
+		prix,
+		async appeler(demande) {
+			const messages = [{
+				role: "user",
+				content: demande.invite
+			}];
+			if (demande.reprise !== void 0) {
+				messages.push({
+					role: "assistant",
+					content: demande.reprise.sortie
+				});
+				messages.push({
+					role: "user",
+					content: demande.reprise.reproches
+				});
+			}
+			const base = {
+				model: modele,
+				messages,
+				temperature: 0,
+				max_tokens: 2048,
+				usage: { include: true }
+			};
+			let reponse = await envoyer(clef, {
+				...base,
+				response_format: { type: "json_object" }
+			});
+			if (reponse.status >= 400 && reponse.status < 500 && reponse.status !== 401) reponse = await envoyer(clef, base);
+			if (!reponse.ok) throw new Error(`le modèle a répondu ${reponse.status}`);
+			const corps = await reponse.json();
+			const dollars = corps.usage?.cost;
+			return {
+				texte: corps.choices?.[0]?.message?.content ?? "",
+				jetonsEntree: corps.usage?.prompt_tokens ?? 0,
+				jetonsSortie: corps.usage?.completion_tokens ?? 0,
+				...typeof dollars === "number" ? { dollars } : {}
+			};
+		}
+	};
+}
+function envoyer(clef, corps) {
+	return fetch("https://openrouter.ai/api/v1/chat/completions", {
+		method: "POST",
+		headers: {
+			authorization: `Bearer ${clef}`,
+			"content-type": "application/json",
+			"http-referer": "https://atelier237.vercel.app",
+			"x-title": "Atelier 237"
+		},
+		body: JSON.stringify(corps)
+	});
+}
 //#endregion
 //#region src/cout.ts
 function couter(jetons, prix, tauxFcfaParDollar) {
@@ -388,6 +468,7 @@ async function traiter(demande, fournisseur, tauxFcfaParDollar) {
 		entree: 0,
 		sortie: 0
 	};
+	let dollarsAnnonces = null;
 	let sortie = "";
 	let erreurs = [];
 	for (let essai = 1; essai <= 2; essai++) {
@@ -400,6 +481,7 @@ async function traiter(demande, fournisseur, tauxFcfaParDollar) {
 		});
 		jetons.entree += reponse.jetonsEntree;
 		jetons.sortie += reponse.jetonsSortie;
+		if (reponse.dollars !== void 0) dollarsAnnonces = (dollarsAnnonces ?? 0) + reponse.dollars;
 		sortie = reponse.texte;
 		const valeur = lireJson(reponse.texte);
 		if (valeur === void 0) {
@@ -413,16 +495,22 @@ async function traiter(demande, fournisseur, tauxFcfaParDollar) {
 		if (erreurs.length === 0) return {
 			sorte: "reussi",
 			registre: valeur,
-			cout: couter(jetons, fournisseur.prix, tauxFcfaParDollar),
+			cout: cout(),
 			essais: essai
 		};
 	}
 	return {
 		sorte: "invalide",
 		erreurs,
-		cout: couter(jetons, fournisseur.prix, tauxFcfaParDollar),
+		cout: cout(),
 		essais: 2
 	};
+	function cout() {
+		return dollarsAnnonces === null ? couter(jetons, fournisseur.prix, tauxFcfaParDollar) : {
+			dollars: dollarsAnnonces,
+			fcfa: Math.round(dollarsAnnonces * tauxFcfaParDollar * 100) / 100
+		};
+	}
 }
 /**
 * Le JSON du modèle, ou rien.
@@ -445,6 +533,26 @@ function lireJson(texte) {
 var MAX_DEMANDE = 400;
 /** Le taux sert au journal des coûts. Une décision de gestion, pas une constante. */
 var TAUX_FCFA_PAR_DOLLAR = Number(process.env.A237_TAUX_FCFA ?? "600");
+/**
+* Le fournisseur et le modèle se choisissent dans l'environnement.
+*
+* Le brief pose un **budget** — moins d'un franc la génération (§ 8) — et non
+* une marque. Pouvoir changer de modèle sans redéployer, c'est pouvoir tenir
+* ce budget quand les prix bougent, et essayer mieux quand un modèle plus
+* fidèle au schéma apparaît. Une reprise double le coût : un modèle qui se
+* trompe moins peut revenir moins cher qu'un modèle moins cher.
+*
+* Le prix sert au journal quand le fournisseur ne dit pas ce qu'il a facturé.
+* OpenRouter, lui, le dit, et son chiffre l'emporte — il applique sa marge.
+*/
+function fournisseurChoisi(clef) {
+	const modele = process.env.A237_MODELE;
+	const prix = {
+		entree: Number(process.env.A237_PRIX_ENTREE ?? "0.1"),
+		sortie: Number(process.env.A237_PRIX_SORTIE ?? "0.4")
+	};
+	return process.env.A237_FOURNISSEUR === "gemini" ? gemini(clef, modele ?? "gemini-2.5-flash-lite") : openrouter(clef, modele ?? "google/gemini-2.5-flash-lite", prix);
+}
 async function handler(req, res) {
 	if (req.method !== "POST") {
 		res.status(405).json({ erreur: "méthode non permise" });
@@ -463,9 +571,10 @@ async function handler(req, res) {
 		return;
 	}
 	try {
-		const resultat = await traiter(demande, gemini(clef), TAUX_FCFA_PAR_DOLLAR);
+		const resultat = await traiter(demande, fournisseurChoisi(clef), TAUX_FCFA_PAR_DOLLAR);
 		console.log(JSON.stringify({
 			evenement: "appel_ia",
+			modele: process.env.A237_MODELE ?? "google/gemini-2.5-flash-lite",
 			essais: resultat.essais,
 			fcfa: resultat.cout.fcfa,
 			aboutit: resultat.sorte === "reussi"

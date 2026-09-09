@@ -112,3 +112,40 @@ Ce qui reste, et qui compte plus que tout le reste :
    vraiment, pas seulement sur le tien.
 3. Se rappeler que **la publication n'existe pas encore** : la carte se partage,
    mais le lien viendra avec la phase 2.
+
+## Ouvrir la composition par le modèle
+
+Quatre variables d'environnement, à poser dans Vercel — jamais dans le dépôt.
+
+| Variable | Rôle | Défaut |
+|---|---|---|
+| `A237_CLEF_IA` | La clef du fournisseur. | — |
+| `A237_IA_OUVERTE` | `1` ouvre le service. **Rien d'autre ne l'ouvre.** | fermé |
+| `A237_FOURNISSEUR` | `openrouter` ou `gemini`. | `openrouter` |
+| `A237_MODELE` | L'identifiant du modèle chez le fournisseur. | `google/gemini-2.5-flash-lite` |
+| `A237_TAUX_FCFA` | Taux FCFA par dollar, pour le journal des coûts. | `600` |
+
+Deux gestes et non un : poser la clef n'ouvre pas le robinet. Tant que les
+comptes de D1 n'existent pas, il n'y a pas de quota, et un proxy ouvert sans
+quota est un service payant offert à qui passe.
+
+### Choisir le modèle
+
+Le brief pose un **budget** — moins d'un franc la génération (§ 8) — et non une
+marque. Pour une génération d'étage 2 (~1 500 jetons en entrée, ~500 en
+sortie), au taux de 600 F le dollar, avec les prix relevés sur OpenRouter le
+9 septembre 2026 :
+
+| Modèle | Entrée / sortie par million | Une génération |
+|---|---|---|
+| `google/gemini-2.5-flash-lite` | 0,10 $ / 0,40 $ | **0,21 F** |
+| `google/gemini-3.1-flash-lite` | 0,25 $ / 1,50 $ | 0,68 F |
+| `google/gemini-3.5-flash-lite` | 0,30 $ / 2,50 $ | 1,02 F — hors budget |
+
+Le défaut suit le brief. Le 3.1 tient encore le budget avec un tiers de marge,
+et une reprise coûte un tour de plus : un modèle qui se trompe moins peut
+revenir moins cher qu'un modèle moins cher. Ça se mesure — le coût réel de
+chaque appel est journalisé, et c'est celui qu'OpenRouter facture, pas notre
+estimation.
+
+Changer de modèle ne demande pas de redéploiement : la variable suffit.

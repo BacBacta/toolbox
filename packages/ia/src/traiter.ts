@@ -38,6 +38,12 @@ export async function traiter(
   tauxFcfaParDollar: number,
 ): Promise<Resultat> {
   const jetons = { entree: 0, sortie: 0 }
+  /*
+   * Le coût annoncé par le fournisseur, quand il l'annonce. Un routeur
+   * applique sa marge : son chiffre est le vrai, notre table de prix ne fait
+   * qu'estimer. `null` tant qu'aucun tour ne l'a donné.
+   */
+  let dollarsAnnonces: number | null = null
   let sortie = ''
   let erreurs: readonly ErreurValidation[] = []
 
@@ -50,6 +56,7 @@ export async function traiter(
     )
     jetons.entree += reponse.jetonsEntree
     jetons.sortie += reponse.jetonsSortie
+    if (reponse.dollars !== undefined) dollarsAnnonces = (dollarsAnnonces ?? 0) + reponse.dollars
     sortie = reponse.texte
 
     const valeur = lireJson(reponse.texte)
@@ -63,7 +70,7 @@ export async function traiter(
       return {
         sorte: 'reussi',
         registre: valeur as RegistreDemande,
-        cout: couter(jetons, fournisseur.prix, tauxFcfaParDollar),
+        cout: cout(),
         essais: essai,
       }
     }
@@ -72,8 +79,17 @@ export async function traiter(
   return {
     sorte: 'invalide',
     erreurs,
-    cout: couter(jetons, fournisseur.prix, tauxFcfaParDollar),
+    cout: cout(),
     essais: 2,
+  }
+
+  function cout(): Cout {
+    return dollarsAnnonces === null
+      ? couter(jetons, fournisseur.prix, tauxFcfaParDollar)
+      : {
+          dollars: dollarsAnnonces,
+          fcfa: Math.round(dollarsAnnonces * tauxFcfaParDollar * 100) / 100,
+        }
   }
 }
 

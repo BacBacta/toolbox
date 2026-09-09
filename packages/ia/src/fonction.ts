@@ -1,5 +1,6 @@
 import type { RegistreDemande } from '@a237/engine'
-import { gemini } from './fournisseur.js'
+import type { Fournisseur } from './fournisseur.js'
+import { gemini, openrouter } from './fournisseur.js'
 import { traiter } from './traiter.js'
 
 /**
@@ -46,6 +47,29 @@ const MAX_DEMANDE = 400
 /** Le taux sert au journal des coûts. Une décision de gestion, pas une constante. */
 const TAUX_FCFA_PAR_DOLLAR = Number(process.env.A237_TAUX_FCFA ?? '600')
 
+/**
+ * Le fournisseur et le modèle se choisissent dans l'environnement.
+ *
+ * Le brief pose un **budget** — moins d'un franc la génération (§ 8) — et non
+ * une marque. Pouvoir changer de modèle sans redéployer, c'est pouvoir tenir
+ * ce budget quand les prix bougent, et essayer mieux quand un modèle plus
+ * fidèle au schéma apparaît. Une reprise double le coût : un modèle qui se
+ * trompe moins peut revenir moins cher qu'un modèle moins cher.
+ *
+ * Le prix sert au journal quand le fournisseur ne dit pas ce qu'il a facturé.
+ * OpenRouter, lui, le dit, et son chiffre l'emporte — il applique sa marge.
+ */
+function fournisseurChoisi(clef: string): Fournisseur {
+  const modele = process.env.A237_MODELE
+  const prix = {
+    entree: Number(process.env.A237_PRIX_ENTREE ?? '0.1'),
+    sortie: Number(process.env.A237_PRIX_SORTIE ?? '0.4'),
+  }
+  return process.env.A237_FOURNISSEUR === 'gemini'
+    ? gemini(clef, modele ?? 'gemini-2.5-flash-lite')
+    : openrouter(clef, modele ?? 'google/gemini-2.5-flash-lite', prix)
+}
+
 export default async function handler(req: RequeteEntrante, res: ReponseSortante): Promise<void> {
   if (req.method !== 'POST') {
     res.status(405).json({ erreur: 'méthode non permise' })
@@ -69,7 +93,7 @@ export default async function handler(req: RequeteEntrante, res: ReponseSortante
   }
 
   try {
-    const resultat = await traiter(demande, gemini(clef), TAUX_FCFA_PAR_DOLLAR)
+    const resultat = await traiter(demande, fournisseurChoisi(clef), TAUX_FCFA_PAR_DOLLAR)
 
     // Le coût part dans le journal du serveur en attendant `ai_calls` : la
     // promesse du brief est « moins d'un franc par génération », et une
@@ -77,6 +101,7 @@ export default async function handler(req: RequeteEntrante, res: ReponseSortante
     console.log(
       JSON.stringify({
         evenement: 'appel_ia',
+        modele: process.env.A237_MODELE ?? 'google/gemini-2.5-flash-lite',
         essais: resultat.essais,
         fcfa: resultat.cout.fcfa,
         aboutit: resultat.sorte === 'reussi',
