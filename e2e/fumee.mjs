@@ -1,0 +1,167 @@
+import { createServer } from 'node:http'
+import { readFileSync, statSync } from 'node:fs'
+import { extname, join, normalize } from 'node:path'
+// playwright-core est installé à part : voir README.md.
+import { chromium } from 'playwright-core'
+
+const DIST = process.env.DIST ?? new URL('../apps/web/dist', import.meta.url).pathname
+const TYPES = {
+  '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css',
+  '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml',
+}
+
+const serveur = createServer((req, res) => {
+  const chemin = decodeURIComponent((req.url ?? '/').split('?')[0])
+  let fichier = join(DIST, normalize(chemin))
+  try {
+    if (statSync(fichier).isDirectory()) fichier = join(fichier, 'index.html')
+  } catch {
+    fichier = join(DIST, 'index.html')
+  }
+  try {
+    const corps = readFileSync(fichier)
+    res.writeHead(200, { 'Content-Type': TYPES[extname(fichier)] ?? 'application/octet-stream' })
+    res.end(corps)
+  } catch {
+    res.writeHead(404).end('non trouvé')
+  }
+})
+
+await new Promise((r) => serveur.listen(5199, '127.0.0.1', r))
+const BASE = 'http://127.0.0.1:5199'
+
+const navigateur = await chromium.launch({
+  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+  args: ['--no-sandbox'],
+})
+// Un Android d'entrée de gamme : petit écran, doigt.
+const contexte = await navigateur.newContext({
+  viewport: { width: 360, height: 740 },
+  isMobile: true,
+  hasTouch: true,
+  deviceScaleFactor: 2,
+})
+const page = await contexte.newPage()
+page.setDefaultTimeout(8000)
+const erreurs = []
+page.on('pageerror', (e) => erreurs.push(String(e)))
+page.on('console', (m) => {
+  if (m.type() === 'error') erreurs.push(`console: ${m.text()}`)
+})
+
+function dit(quoi, ok, detail = '') {
+  process.stdout.write(`${ok ? 'OK ' : 'KO '} ${quoi}${detail ? ` — ${detail}` : ''}\n`)
+  if (!ok) process.exitCode = 1
+}
+
+/** Un contrôle qui échoue ne doit pas bloquer les suivants. */
+async function essaie(quoi, travail, detail = () => '') {
+  try {
+    const resultat = await travail()
+    dit(quoi, resultat === true || resultat === undefined, detail(resultat))
+    return resultat
+  } catch (cause) {
+    dit(quoi, false, String(cause).split('\n')[0])
+    return null
+  }
+}
+
+await page.goto(BASE, { waitUntil: 'networkidle' })
+dit('la page s’ouvre', (await page.title()) === 'Atelier 237')
+dit("l'accueil s'affiche", await page.getByText('De quoi as-tu besoin ?').isVisible())
+
+// Étage 1 : la recherche par mots-clés.
+await page.fill('#recherche', 'noter le njangi du quartier')
+await page.waitForTimeout(80)
+dit('la recherche filtre', (await page.locator('.carte-squelette').count()) === 1)
+
+await page.locator('.carte-squelette').first().click()
+await page.waitForSelector('text=Aucun membre pour l’instant', { timeout: 5000 })
+dit('l’outil s’ouvre', true)
+
+// Ajouter deux membres.
+await page.locator('[role="tab"]', { hasText: 'Membres' }).click()
+for (const [nom, tel] of [['Adèle', '699445566'], ['Serge', '699112233']]) {
+  await page.fill('[aria-label="Nom du membre"]', nom)
+  if (tel) await page.fill('[aria-label="Téléphone du membre, facultatif"]', tel)
+  await page.getByText('Ajouter au carnet').click()
+  await page.waitForTimeout(120)
+}
+await page.locator('[role="tab"]', { hasText: 'Cagnotte' }).click()
+dit('les membres sont là', (await page.locator('.outil-rangee').count()) === 2)
+
+// Marquer un versement.
+await page.locator('[aria-label="Adèle : doit sa part"]').click()
+await page.waitForTimeout(120)
+dit('le versement est enregistré', await page.locator('[aria-label="Adèle : a versé"]').isVisible())
+dit('la barre avance', (await page.locator('[role="progressbar"]').getAttribute('aria-valuenow')) === '50')
+
+// Diffuser : la carte doit être dessinée pour de vrai.
+await page.getByText('Diffuser', { exact: true }).click()
+await page.waitForSelector('canvas', { timeout: 5000 })
+await page.waitForTimeout(400)
+const carte = await page.evaluate(() => {
+  const c = document.querySelector('canvas')
+  if (!c) return null
+  const ctx = c.getContext('2d')
+  const pixels = ctx.getImageData(0, 0, c.width, c.height).data
+  const couleurs = new Set()
+  for (let i = 0; i < pixels.length; i += 4000) {
+    couleurs.add(`${pixels[i]},${pixels[i + 1]},${pixels[i + 2]}`)
+  }
+  return { largeur: c.width, hauteur: c.height, couleurs: couleurs.size, url: c.toDataURL().length }
+})
+dit('la carte fait 1080 de large', carte?.largeur === 1080, `${carte?.largeur}×${carte?.hauteur}`)
+dit('la carte est vraiment dessinée', (carte?.couleurs ?? 0) > 3, `${carte?.couleurs} teintes échantillonnées`)
+dit('le PNG pèse moins de 200 Ko', (carte?.url ?? 0) * 0.75 < 200 * 1024,
+  `${Math.round(((carte?.url ?? 0) * 0.75) / 1024)} Ko`)
+// Adèle a versé : elle n'est plus relancée. Serge, si.
+const relances = await page.locator('a.outil-bascule').count()
+dit('une seule relance, celle du retardataire', relances === 1, relances + ' relance(s)')
+const href = relances > 0 ? await page.locator('a.outil-bascule').first().getAttribute('href') : ''
+dit('la relance ouvre wa.me sur le bon numero', (href ?? '').startsWith('https://wa.me/237699112233?text='))
+dit('le message est deja ecrit', decodeURIComponent(href ?? '').includes('Serge'))
+
+// Le service worker, puis le mode avion.
+await essaie('le service worker est actif', async () => {
+  const etat = await page.evaluate(async () => {
+    const attente = new Promise((r) => setTimeout(() => r('trop lent'), 6000))
+    const pret = navigator.serviceWorker.ready.then((reg) => reg.active?.state ?? 'absent')
+    return Promise.race([pret, attente])
+  })
+  return etat === 'activated' ? true : etat
+}, (r) => (r === true ? '' : String(r)))
+
+await essaie('le cache est rempli', async () => {
+  const n = await page.evaluate(async () => {
+    const noms = await caches.keys()
+    if (noms.length === 0) return 0
+    const cache = await caches.open(noms[0])
+    return (await cache.keys()).length
+  })
+  return n > 3 ? true : n
+}, (r) => (r === true ? '' : `${r} entrées`))
+
+await essaie("l'app s'ouvre en mode avion", async () => {
+  await contexte.setOffline(true)
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.waitForSelector('#recherche', { timeout: 8000 })
+  return true
+})
+
+await essaie('les outils sont toujours là hors ligne', async () => {
+  const n = await page.locator('.outil-rangee').count()
+  return n === 1 ? true : n
+}, (r) => (r === true ? '' : `${r} outil(s)`))
+
+await essaie("un outil s'ouvre hors ligne", async () => {
+  await page.locator('.lien-outil').first().click()
+  await page.waitForSelector('text=Adèle', { timeout: 8000 })
+  return true
+})
+
+dit('aucune erreur de page', erreurs.length === 0, erreurs.slice(0, 3).join(' | '))
+
+await navigateur.close()
+serveur.close()
+process.stdout.write('FIN\n')
