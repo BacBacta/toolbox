@@ -15,7 +15,7 @@ const EMETTEUR: Emetteur = {
 }
 
 const ENTREPRISE: Client = { nom: 'Ets Mbarga & Fils', niu: 'M019887641203K', estEntreprise: true }
-const PARTICULIER: Client = { nom: 'M. Fotso', niu: null, estEntreprise: false }
+const PARTICULIER: Client = { nom: 'M. Fotso', niu: '', estEntreprise: false }
 
 describe('un émetteur complet', () => {
   it('ne manque de rien', () => {
@@ -53,7 +53,7 @@ describe('le RCCM et les mentions de l’entête', () => {
 
 describe('le B2B exige le NIU du client', () => {
   it('bloque un client entreprise sans NIU', () => {
-    const m = mentionsManquantes(EMETTEUR, { ...ENTREPRISE, niu: null })
+    const m = mentionsManquantes(EMETTEUR, { ...ENTREPRISE, niu: '' })
     expect(m).toContainEqual({
       champ: 'client.niu',
       libelle: 'NIU du client (obligatoire en B2B)',

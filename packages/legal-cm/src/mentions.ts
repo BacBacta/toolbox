@@ -23,11 +23,19 @@ export interface Emetteur {
   readonly centre: string
 }
 
-/** Le destinataire. `estEntreprise` déclenche l'exigence de son NIU. */
+/**
+ * Le destinataire. `estEntreprise` déclenche l'exigence de son NIU.
+ *
+ * Les champs inconnus sont des chaînes vides, jamais `null` : l'état d'un outil
+ * fait l'aller-retour par JSON et est validé par un schéma volontairement
+ * minuscule, où ajouter le type `null` coûterait plus qu'il ne rapporte.
+ */
 export interface Client {
   readonly nom: string
-  readonly niu: string | null
+  readonly niu: string
   readonly estEntreprise: boolean
+  /** Numéro pour la relance. Absent quand on ne l'a pas. */
+  readonly tel?: string
 }
 
 export type Gravite = 'bloquant' | 'avertissement'
@@ -83,7 +91,7 @@ export function mentionsManquantes(emetteur: Emetteur, client?: Client): Manquem
     if (client.estEntreprise) {
       if (vide(client.niu)) {
         m.push({ champ: 'client.niu', libelle: 'NIU du client (obligatoire en B2B)', gravite: 'bloquant' })
-      } else if (!estNiuBienForme(client.niu ?? '')) {
+      } else if (!estNiuBienForme(client.niu)) {
         m.push({ champ: 'client.niu', libelle: 'NIU du client mal formé', gravite: 'avertissement' })
       }
     }
