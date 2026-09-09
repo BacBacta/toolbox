@@ -64,12 +64,20 @@ describe('ce que le schéma seul laisserait passer', () => {
     expect(e.some((x) => x.message.includes('une seule colonne de type bascule'))).toBe(true)
   })
 
-  it('refuse une première colonne qui ne nomme pas la ligne', () => {
-    const e = verifierRegistre({
-      ...SANS_TOTAL,
-      colonnes: [{ clef: 'montant', titre: 'Montant', type: 'montant' }],
-    })
-    expect(e.some((x) => x.chemin === '$.colonnes[0].type')).toBe(true)
+  it('accepte une première colonne qui n’est pas du texte', () => {
+    // Deux générations réelles sont mortes sur l'exigence inverse. « Combien
+    // d'œufs par jour et combien vendus » n'a aucune colonne texte naturelle :
+    // la règle rendait le registre inexprimable, alors qu'une quantité ou une
+    // date nomme très bien une ligne.
+    expect(
+      verifierRegistre({
+        ...SANS_TOTAL,
+        colonnes: [
+          { clef: 'jour', titre: 'Jour', type: 'nombre' },
+          { clef: 'vendus', titre: 'Vendus', type: 'nombre' },
+        ],
+      }),
+    ).toEqual([])
   })
 
   it('refuse une clef qui n’en est pas une, en nommant ce qui cloche', () => {

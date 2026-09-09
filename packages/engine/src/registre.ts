@@ -77,7 +77,7 @@ export const schemaRegistre: JsonSchema = {
     colonnes: {
       type: 'array', minItems: 1, maxItems: MAX_COLONNES, title: 'Colonnes',
       description:
-        'La première nomme la ligne et doit être de type texte. Au plus une colonne de type bascule.',
+        'La première nomme la ligne — mets devant celle qui identifie le mieux. Au plus une colonne de type bascule.',
       items: {
         type: 'object',
         additionalProperties: false,
@@ -150,14 +150,6 @@ export function verifierRegistre(valeur: unknown): readonly ErreurValidation[] {
 
   const r = valeur as RegistreDemande
   const clefs = r.colonnes.map((c) => c.clef)
-
-  const premiere = r.colonnes[0]
-  if (premiere !== undefined && premiere.type !== 'texte') {
-    erreurs.push({
-      chemin: '$.colonnes[0].type',
-      message: 'la première colonne nomme la ligne : elle doit être de type texte',
-    })
-  }
 
   /*
    * Le souligné est accepté.

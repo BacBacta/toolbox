@@ -22,7 +22,7 @@ Règles :
 - Les montants sont en francs CFA, entiers, sans décimale.
 - Les libellés sont en français, courts, tutoiement, sans jargon comptable.
 - ${MAX_COLONNES} colonnes au maximum : ça se lit sur un téléphone de 360 pixels.
-- La première colonne nomme la ligne et est de type texte.
+- La première colonne nomme la ligne : mets devant celle qui l'identifie.
 - Au plus une colonne de type bascule.
 - N'invente pas de colonne que la demande ne réclame pas.
 - Si la demande décrit une dette entre personnes, ne mets aucun montant en

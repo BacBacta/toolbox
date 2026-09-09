@@ -265,7 +265,7 @@ var schemaRegistre = {
 			minItems: 1,
 			maxItems: 6,
 			title: "Colonnes",
-			description: "La première nomme la ligne et doit être de type texte. Au plus une colonne de type bascule.",
+			description: "La première nomme la ligne — mets devant celle qui identifie le mieux. Au plus une colonne de type bascule.",
 			items: {
 				type: "object",
 				additionalProperties: false,
@@ -379,11 +379,6 @@ function verifierRegistre(valeur) {
 	if (erreurs.length > 0) return erreurs;
 	const r = valeur;
 	const clefs = r.colonnes.map((c) => c.clef);
-	const premiere = r.colonnes[0];
-	if (premiere !== void 0 && premiere.type !== "texte") erreurs.push({
-		chemin: "$.colonnes[0].type",
-		message: "la première colonne nomme la ligne : elle doit être de type texte"
-	});
 	for (const [i, c] of r.colonnes.entries()) if (!/^[a-z][a-zA-Z0-9_]*$/.test(c.clef)) {
 		const fautifs = [...new Set([...c.clef].filter((x) => !/[a-zA-Z0-9_]/.test(x)))];
 		erreurs.push({
@@ -437,7 +432,7 @@ Règles :
 - Les montants sont en francs CFA, entiers, sans décimale.
 - Les libellés sont en français, courts, tutoiement, sans jargon comptable.
 - 6 colonnes au maximum : ça se lit sur un téléphone de 360 pixels.
-- La première colonne nomme la ligne et est de type texte.
+- La première colonne nomme la ligne : mets devant celle qui l'identifie.
 - Au plus une colonne de type bascule.
 - N'invente pas de colonne que la demande ne réclame pas.
 - Si la demande décrit une dette entre personnes, ne mets aucun montant en

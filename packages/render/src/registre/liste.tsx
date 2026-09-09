@@ -2,7 +2,7 @@ import type { ConfigListe, EtatListe, LigneListe, RenderContext, ShareSpec } fro
 import {
   ajouterLigne, basculerLigne, booleenDe, cellule, colonneBascule, colonneIdentite,
   colonnesSecondaires, comptageBascule, lignesEnAlerte, ligneNeuve, montantF, nf,
-  retirerLigne, texteDe, totalListe,
+  retirerLigne, totalListe,
 } from '@a237/engine'
 import type { JSX } from 'preact'
 import { useState } from 'preact/hooks'
@@ -105,7 +105,16 @@ export function RegistreListe(props: {
           ) : (
             <Rangees>
               {etat.lignes.map((ligne, i) => {
-                const nom = texteDe(ligne, identite.clef)
+                /*
+                 * La première colonne nomme la ligne, quel que soit son type.
+                 *
+                 * Elle devait être du texte, et cette règle rendait certains
+                 * registres inexprimables : « combien d'œufs par jour et
+                 * combien vendus » n'a aucune colonne texte naturelle. Une
+                 * date ou une quantité nomme très bien une ligne — il suffit
+                 * de la lire comme elle s'imprime.
+                 */
+                const nom = cellule(ligne, identite)
                 const coche = bascule === null ? true : booleenDe(ligne, bascule.clef)
                 return (
                   <Rangee key={`${i}-${nom}`}>

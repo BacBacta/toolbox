@@ -79,7 +79,7 @@ function items(config: ConfigListe, etat: EtatListe): readonly CardItem[] {
     const coche = bascule === null ? true : booleenDe(ligne, bascule.clef)
     const valeur = secondaires.map((c) => cellule(ligne, c)).join(' · ')
     return {
-      n: texteDe(ligne, identite.clef) === '' ? '—' : texteDe(ligne, identite.clef),
+      n: cellule(ligne, identite) === '' ? '—' : cellule(ligne, identite),
       ok: coche && !alertees.has(i),
       warn: alertees.has(i) || (bascule !== null && !coche),
       val: valeur === '' ? null : valeur,
