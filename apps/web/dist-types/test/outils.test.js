@@ -42,8 +42,8 @@ function poser(module, o, onDiffuser = vi.fn()) {
 describe('le registre des outils', () => {
     it('couvre les squelettes qui ont un écran, et le dit', () => {
         expect(Object.keys(CHARGEURS).sort()).toEqual([
-            'caisse', 'clients', 'compose', 'course', 'devis', 'facture', 'njangi', 'prix',
-            'scolarite', 'stock',
+            'caisse', 'clients', 'compose', 'compose-calcul', 'course', 'devis', 'facture',
+            'njangi', 'prix', 'scolarite', 'stock',
         ]);
         expect(outilDisponible('njangi')).toBe(true);
         expect(outilDisponible('callbox')).toBe(false);

@@ -1,8 +1,9 @@
-import type { Comprehension, Extrait, FicheSquelette, RegistreDemande } from '@a237/engine'
+import type { Comprehension, Extrait, FicheSquelette } from '@a237/engine'
 import { EXTRAIT_VIDE, comprendre, montantF } from '@a237/engine'
 import type { JSX } from 'preact'
 import { useState } from 'preact/hooks'
 import { composer } from './composer.js'
+import type { Compose } from './outils.js'
 
 /**
  * L'atelier : on dit ce dont on a besoin, l'outil s'ouvre.
@@ -27,11 +28,12 @@ import { composer } from './composer.js'
 
 export interface ProprietesAtelier {
   readonly fiches: readonly FicheSquelette[]
-  readonly onCreer: (skeleton: string, extrait: Extrait, registre?: RegistreDemande) => void
+  readonly onCreer: (skeleton: string, extrait: Extrait, compose?: Compose) => void
 }
 
-/** L'identifiant d'un registre qui n'a pas de squelette. Voir `outils/liste.tsx`. */
-const ID_COMPOSE = 'compose'
+/** Les identifiants des outils qui n'ont pas de squelette. Voir `outils/`. */
+const ID_COMPOSE_REGISTRE = 'compose'
+const ID_COMPOSE_CALCUL = 'compose-calcul'
 
 type Composition =
   | 'repos'
@@ -80,7 +82,12 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
         setComposition('repos')
         setDemande('')
         setReponse(null)
-        props.onCreer(ID_COMPOSE, EXTRAIT_VIDE, r.registre)
+        props.onCreer(ID_COMPOSE_REGISTRE, EXTRAIT_VIDE, { registre: r.registre })
+      } else if (r.sorte === 'calcule') {
+        setComposition('repos')
+        setDemande('')
+        setReponse(null)
+        props.onCreer(ID_COMPOSE_CALCUL, EXTRAIT_VIDE, { calcul: r.calcul })
       } else if (r.sorte === 'pas-ouvert') {
         setComposition('pas-ouvert')
       } else if (r.sorte === 'hors-sujet') {
@@ -159,8 +166,8 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
       {reponse?.sorte === 'hors-portee' && (
         <div class="atelier-reponse">
           <p class="atelier-dit">
-            Aucun de mes outils ne correspond. Je peux essayer d’en composer un — un
-            registre avec les colonnes que tu décris.
+            Aucun de mes outils ne correspond. Je peux en composer un — un registre
+            avec tes colonnes, ou une calculatrice avec tes champs.
           </p>
 
           {composition === 'repos' && (

@@ -1,11 +1,11 @@
 import type { RenderContext, ShareSpec } from '@a237/engine'
 import { CATALOGUE, EXTRAIT_VIDE } from '@a237/engine'
-import type { Extrait, RegistreDemande } from '@a237/engine'
+import type { Extrait } from '@a237/engine'
 import type { JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
 import { Diffusion } from './diffusion.js'
 import { CHARGEURS, outilDisponible } from './outils.js'
-import type { ModuleOutil } from './outils.js'
+import type { Compose, ModuleOutil } from './outils.js'
 import { creerOutil, listerOutils, lireOutil, majEtat, supprimerOutil } from './stockage.js'
 import type { OutilEnregistre } from './stockage.js'
 import { Atelier } from './atelier.js'
@@ -30,13 +30,13 @@ const DISPONIBLES = CATALOGUE.filter((f) => outilDisponible(f.id))
  * plus ancienne, faux pour un registre composé, qui est un cas normal.
  */
 function glyphePour(skeleton: string): string {
-  if (skeleton === 'compose') return '✳'
+  if (skeleton.startsWith('compose')) return '✳'
   return CATALOGUE.find((f) => f.id === skeleton)?.glyphe ?? '◇'
 }
 
 function Accueil(props: {
   readonly outils: readonly OutilEnregistre[]
-  readonly onCreer: (skeleton: string, extrait: Extrait, registre?: RegistreDemande) => void
+  readonly onCreer: (skeleton: string, extrait: Extrait, compose?: Compose) => void
   readonly onOuvrir: (id: string) => void
   readonly onSupprimer: (id: string) => void
 }): JSX.Element {
@@ -138,13 +138,13 @@ export function App(): JSX.Element {
   async function creer(
     skeleton: string,
     extrait: Extrait,
-    registre?: RegistreDemande,
+    compose?: Compose,
   ): Promise<void> {
     const chargeur = CHARGEURS[skeleton]
     if (chargeur === undefined) throw new Error(`aucun écran pour « ${skeleton} »`)
     const maintenant = new Date()
-    const neuf = (await chargeur()).creer(skeleton, maintenant, extrait, registre)
-    const outil = await creerOutil(skeleton, neuf.nom, neuf.etat, maintenant, registre)
+    const neuf = (await chargeur()).creer(skeleton, maintenant, extrait, compose)
+    const outil = await creerOutil(skeleton, neuf.nom, neuf.etat, maintenant, compose)
     setOutils(await listerOutils())
     setOuvert(outil)
   }
@@ -171,8 +171,8 @@ export function App(): JSX.Element {
         {erreur !== '' && <div class="alerte">{erreur}</div>}
         <Accueil
           outils={outils}
-          onCreer={(s, extrait, registre) =>
-            tenter(() => creer(s, extrait, registre), 'Création impossible')
+          onCreer={(s, extrait, compose) =>
+            tenter(() => creer(s, extrait, compose), 'Création impossible')
           }
           onOuvrir={(id) => tenter(() => ouvrir(id), 'Ouverture impossible')}
           onSupprimer={(id) => tenter(() => supprimer(id), 'Suppression impossible')}

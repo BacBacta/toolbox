@@ -1,4 +1,4 @@
-import type { ErreurValidation, RegistreDemande } from '@a237/engine'
+import type { CalculDemande, ErreurValidation, RegistreDemande } from '@a237/engine'
 import { lireReponseModele } from '@a237/engine'
 import { couter } from './cout.js'
 import type { Cout } from './cout.js'
@@ -31,6 +31,13 @@ export type Resultat =
    * registre, il rendait un registre. « Je veux un site internet » produisait
    * un registre « Ventes » inventé de bout en bout — et facturé.
    */
+  /** Une calculatrice : quelques entrées, une formule déclarée, un résultat. */
+  | {
+      readonly sorte: 'calcule'
+      readonly calcul: CalculDemande
+      readonly cout: Cout
+      readonly essais: number
+    }
   | {
       readonly sorte: 'hors-sujet'
       readonly pourquoi: string
@@ -80,6 +87,9 @@ export async function traiter(
     const lu = lireReponseModele(valeur)
     if (lu.sorte === 'registre') {
       return { sorte: 'reussi', registre: lu.registre, cout: cout(), essais: essai }
+    }
+    if (lu.sorte === 'calcul') {
+      return { sorte: 'calcule', calcul: lu.calcul, cout: cout(), essais: essai }
     }
     if (lu.sorte === 'refus') {
       // On ne reprend pas un refus : ce serait payer un tour pour lui faire

@@ -1,6 +1,18 @@
-import type { Extrait, RegistreDemande, RenderContext, ShareSpec } from '@a237/engine'
+import type { CalculDemande, Extrait, RegistreDemande, RenderContext, ShareSpec } from '@a237/engine'
 import type { JSX } from 'preact'
 import type { OutilEnregistre } from './stockage.js'
+
+/**
+ * Ce que le modèle a composé, quand il a composé quelque chose.
+ *
+ * Deux formes, jamais les deux à la fois : un registre tient une liste, une
+ * calculatrice répond à une question. La coquille les transporte sans les
+ * comprendre — c'est le fragment de l'outil qui sait les dessiner.
+ */
+export interface Compose {
+  readonly registre?: RegistreDemande
+  readonly calcul?: CalculDemande
+}
 
 export interface ProprietesOutil {
   readonly outil: OutilEnregistre
@@ -41,7 +53,7 @@ export interface ModuleOutil {
     skeleton: string,
     maintenant: Date,
     extrait: Extrait,
-    registre?: RegistreDemande,
+    compose?: Compose,
   ) => EtatNeuf
 }
 
@@ -57,6 +69,7 @@ export const CHARGEURS: Readonly<Record<string, () => Promise<ModuleOutil>>> = {
   // Un registre composé par le modèle : même écran, même moteur, sa
   // configuration voyage simplement avec l'outil au lieu d'un squelette.
   compose: () => import('./outils/liste.js'),
+  'compose-calcul': () => import('./outils/calc.js'),
   devis: () => import('./outils/devis.js'),
   facture: () => import('./outils/facture.js'),
   njangi: () => import('./outils/njangi.js'),

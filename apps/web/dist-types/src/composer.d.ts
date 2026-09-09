@@ -1,4 +1,4 @@
-import type { RegistreDemande } from '@a237/engine';
+import type { CalculDemande, RegistreDemande } from '@a237/engine';
 /**
  * L'étage 2 : ce que l'étage 1 n'a pas su faire, on le fait composer.
  *
@@ -16,6 +16,10 @@ import type { RegistreDemande } from '@a237/engine';
 export type Composition = {
     readonly sorte: 'compose';
     readonly registre: RegistreDemande;
+    readonly fcfa: number;
+} | {
+    readonly sorte: 'calcule';
+    readonly calcul: CalculDemande;
     readonly fcfa: number;
 }
 /**

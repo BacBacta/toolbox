@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { lireReponseModele, verifierRegistre } from '../src/registre.js'
+import { lireReponseModele } from '../src/composition.js'
+import { verifierRegistre } from '../src/registre.js'
 
 /**
  * Ce fichier est la frontière du § 2.1 : rien de ce que le modèle a dit

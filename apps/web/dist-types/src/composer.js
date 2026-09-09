@@ -1,4 +1,4 @@
-import { verifierRegistre } from '@a237/engine';
+import { lireReponseModele } from '@a237/engine';
 export async function composer(demande, signal) {
     let reponse;
     try {
@@ -22,16 +22,23 @@ export async function composer(demande, signal) {
         };
     }
     const corps = (await reponse.json().catch(() => null));
+    const fcfa = typeof corps?.fcfa === 'number' ? corps.fcfa : 0;
+    /*
+     * Le refus se lit sur l'enveloppe, pas au validateur.
+     *
+     * L'enveloppe porte `fcfa` à côté de la charge utile, et le schéma de refus
+     * interdit tout champ supplémentaire : lui passer l'enveloppe entière faisait
+     * rejeter un refus parfaitement valide, et l'écran disait « je n'ai pas pu
+     * composer » à la place de la phrase du modèle.
+     */
     if (typeof corps?.impossible === 'string' && corps.impossible !== '') {
         return { sorte: 'hors-sujet', pourquoi: corps.impossible };
     }
-    const erreurs = verifierRegistre(corps?.registre);
-    if (erreurs.length > 0) {
-        return { sorte: 'echoue', pourquoi: 'la réponse ne décrit pas un registre valide' };
-    }
-    return {
-        sorte: 'compose',
-        registre: corps?.registre,
-        fcfa: typeof corps?.fcfa === 'number' ? corps.fcfa : 0,
-    };
+    // Le même lecteur que le serveur, sur la charge utile seule.
+    const lu = lireReponseModele(corps?.registre ?? corps?.calcul);
+    if (lu.sorte === 'registre')
+        return { sorte: 'compose', registre: lu.registre, fcfa };
+    if (lu.sorte === 'calcul')
+        return { sorte: 'calcule', calcul: lu.calcul, fcfa };
+    return { sorte: 'echoue', pourquoi: 'la réponse ne décrit pas un outil valide' };
 }

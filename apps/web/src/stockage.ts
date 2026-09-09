@@ -1,4 +1,4 @@
-import type { RegistreDemande } from '@a237/engine'
+import type { CalculDemande, RegistreDemande } from '@a237/engine'
 import { createStore, del, entries, get, set } from 'idb-keyval'
 
 /**
@@ -37,6 +37,8 @@ export interface OutilEnregistre {
    * Absent pour les outils bâtis sur un squelette, qui sont la règle.
    */
   readonly registre?: RegistreDemande
+  /** L'autre forme composable : quelques champs, une formule, un résultat. */
+  readonly calcul?: CalculDemande
   /**
    * Version monotone. Le serveur refusera une publication dont la version est
    * inférieure ou égale à celle qu'il détient : un vieux téléphone n'écrase pas
@@ -111,14 +113,15 @@ export async function creerOutil(
   nom: string,
   etat: unknown,
   maintenant: Date,
-  registre?: RegistreDemande,
+  compose?: { readonly registre?: RegistreDemande; readonly calcul?: CalculDemande },
 ): Promise<OutilEnregistre> {
   const outil: OutilEnregistre = {
     id: nouvelIdentifiant(),
     skeleton: skeletonId,
     nom,
     etat,
-    ...(registre !== undefined ? { registre } : {}),
+    ...(compose?.registre !== undefined ? { registre: compose.registre } : {}),
+    ...(compose?.calcul !== undefined ? { calcul: compose.calcul } : {}),
     version: 0,
     creeLe: maintenant.getTime(),
     majLe: maintenant.getTime(),

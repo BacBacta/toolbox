@@ -54,7 +54,7 @@ export const stock = squeletteListe({
   id: 'stock',
   title: 'Inventaire',
   group: 'registres',
-  keywords: ['stock', 'inventaire', 'magasin', 'reste', 'quantite', 'marchandise', 'ce qui me reste', 'reappro'],
+  keywords: ['stock', 'inventaire', 'magasin', 'quantite', 'marchandise', 'ce qui me reste', 'reappro'],
   titreNom: 'Nom du magasin',
   config: STOCK,
 })
@@ -97,7 +97,7 @@ export const prix = squeletteListe({
   id: 'prix',
   title: 'Liste de prix',
   group: 'registres',
-  keywords: ['prix', 'tarif', 'catalogue', 'boutique', 'combien', 'liste de prix', 'ce que je vends', 'mes articles', 'menu'],
+  keywords: ['prix', 'tarif', 'catalogue', 'boutique', 'ca coute combien', 'liste de prix', 'ce que je vends', 'mes articles', 'menu'],
   titreNom: 'Nom de la boutique',
   config: PRIX,
 })

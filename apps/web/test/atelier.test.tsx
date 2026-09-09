@@ -34,7 +34,7 @@ beforeEach(() => {
     monter(
       <Atelier
         fiches={CATALOGUE}
-        onCreer={(skeleton, _e, registre) => creations.push({ skeleton, registre })}
+        onCreer={(skeleton, _e, compose) => creations.push({ skeleton, registre: compose })}
       />,
       hote,
     )
@@ -99,7 +99,7 @@ describe('l’étage 2, quand on le demande', () => {
     cliquer('Compose-le pour moi')
     await attendre()
     expect(creations[0]?.skeleton).toBe('compose')
-    expect(creations[0]?.registre).toMatchObject({ titre: 'Suivi des livraisons' })
+    expect(creations[0]?.registre).toMatchObject({ registre: { titre: 'Suivi des livraisons' } })
   })
 
   it('dit que ce n’est pas encore ouvert, sans faire croire à une panne', async () => {
@@ -139,5 +139,50 @@ describe('quand la demande n’est pas un registre', () => {
     cliquer('Compose-le pour moi')
     await attendre()
     expect(hote.textContent).not.toContain('Réessaie')
+  })
+})
+
+describe('l’autre forme composable : une calculatrice', () => {
+  const CALCUL = {
+    titre: 'Reste à payer',
+    kicker: 'RESTE À PAYER',
+    titreNom: 'Nom de l’élève',
+    entrees: [
+      { clef: 'total', titre: 'Total dû', defaut: 0, unite: 'F' },
+      { clef: 'verse', titre: 'Déjà versé', defaut: 0, unite: 'F' },
+    ],
+    sortie: {
+      libelle: 'Reste à payer',
+      unite: 'F',
+      formule: { op: 'moins', gauche: { ref: 'total' }, droite: { ref: 'verse' } },
+    },
+  }
+
+  it('crée la calculatrice composée', async () => {
+    // Tout ce qui n'était pas une liste se heurtait à un refus, alors que le
+    // moteur savait déjà dessiner des calculatrices — seule la formule
+    // bloquait, parce qu'elle était écrite en TypeScript.
+    repond(200, { calcul: CALCUL, fcfa: 0.14 })
+    // Une demande que l'étage 1 ne connaît pas : sinon c'est lui qui répond,
+    // gratuitement, et on ne testerait pas la composition.
+    demander('ma marge sur chaque vente de telephone')
+    cliquer('Compose-le pour moi')
+    await attendre()
+    expect(creations[0]?.skeleton).toBe('compose-calcul')
+    expect(creations[0]?.registre).toMatchObject({ calcul: { titre: 'Reste à payer' } })
+  })
+
+  it('refuse une formule qui parle d’un champ inexistant', async () => {
+    // Elle rendrait zéro sans rien dire — le pire résultat pour une
+    // calculatrice, parce qu'un zéro ressemble à une réponse.
+    repond(200, {
+      calcul: { ...CALCUL, sortie: { ...CALCUL.sortie, formule: { ref: 'benefice' } } },
+      fcfa: 0.14,
+    })
+    demander('ma marge sur chaque vente de telephone')
+    cliquer('Compose-le pour moi')
+    await attendre()
+    expect(creations).toHaveLength(0)
+    expect(hote.textContent).toContain('ne décrit pas un outil valide')
   })
 })

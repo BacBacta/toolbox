@@ -210,44 +210,209 @@ function valider(schema, valeur, chemin = "$") {
 		}
 	}
 }
-var schemaRefus = {
+function noeud(profondeur) {
+	const sous = profondeur <= 1 ? {
+		type: "object",
+		additionalProperties: false,
+		properties: {
+			nombre: { type: "number" },
+			ref: {
+				type: "string",
+				maxLength: 24
+			}
+		}
+	} : noeud(profondeur - 1);
+	return {
+		type: "object",
+		additionalProperties: false,
+		description: "Soit { \"nombre\": 19.25 }, soit { \"ref\": \"total\" } qui reprend une entrée, soit { \"op\": …, \"gauche\": …, \"droite\": … }.",
+		properties: {
+			nombre: {
+				type: "number",
+				description: "Une constante."
+			},
+			ref: {
+				type: "string",
+				maxLength: 24,
+				description: "La clef d’une entrée déclarée."
+			},
+			op: {
+				type: "string",
+				enum: [
+					"plus",
+					"moins",
+					"fois",
+					"divise",
+					"pourcent",
+					"min",
+					"max"
+				],
+				description: "« pourcent » rend gauche × droite ÷ 100."
+			},
+			gauche: sous,
+			droite: sous
+		}
+	};
+}
+var schemaExpression = noeud(6);
+/**
+* Ce que le schéma ne dit pas : qu'un nœud est **exactement** l'une des trois
+* formes, et que chaque `ref` désigne une entrée qui existe.
+*
+* Un schéma d'union serait plus juste, mais `JsonSchema` ici n'a pas de
+* `oneOf` — et l'ajouter pour ce seul usage compliquerait un validateur écrit
+* à la main que tout le reste du moteur emploie. On le vérifie donc à côté.
+*/
+function verifierExpression(valeur, clefs, chemin = "$.formule") {
+	const erreurs = [...valider(schemaExpression, valeur)];
+	if (erreurs.length > 0) return erreurs;
+	return formes(valeur, clefs, chemin, 0);
+}
+function formes(e, clefs, chemin, niveau) {
+	const o = e;
+	const presents = [
+		"nombre",
+		"ref",
+		"op"
+	].filter((c) => o[c] !== void 0);
+	if (presents.length !== 1) return [{
+		chemin,
+		message: presents.length === 0 ? "un nœud vide : mets « nombre », « ref », ou « op » avec « gauche » et « droite »" : `« ${presents.join(" » et « ")} » ensemble : un nœud est une seule de ces trois formes`
+	}];
+	if (o["nombre"] !== void 0) return [];
+	if (o["ref"] !== void 0) return clefs.includes(String(o["ref"])) ? [] : [{
+		chemin,
+		message: `« ${String(o["ref"])} » ne désigne aucune entrée (elles s’appellent ${clefs.join(", ")})`
+	}];
+	if (niveau >= 6) return [{
+		chemin,
+		message: `formule trop profonde : 6 niveaux au plus`
+	}];
+	const erreurs = [];
+	for (const cote of ["gauche", "droite"]) if (o[cote] === void 0) erreurs.push({
+		chemin: `${chemin}.${cote}`,
+		message: `« ${String(o["op"])} » exige ${cote}`
+	});
+	else erreurs.push(...formes(o[cote], clefs, `${chemin}.${cote}`, niveau + 1));
+	return erreurs;
+}
+var schemaCalcul = {
 	type: "object",
 	additionalProperties: false,
-	required: ["impossible"],
-	properties: { impossible: {
-		type: "string",
-		minLength: 4,
-		maxLength: 160,
-		description: "Pourquoi la demande ne se range pas dans un registre. Une phrase, en français, adressée à l’utilisateur."
-	} }
+	required: [
+		"titre",
+		"kicker",
+		"titreNom",
+		"entrees",
+		"sortie"
+	],
+	properties: {
+		titre: {
+			type: "string",
+			minLength: 2,
+			maxLength: 40,
+			description: "Ce que la calculatrice répond. Ex. « Reste à payer »."
+		},
+		kicker: {
+			type: "string",
+			minLength: 2,
+			maxLength: 30,
+			description: "Le même, en capitales."
+		},
+		titreNom: {
+			type: "string",
+			minLength: 2,
+			maxLength: 40,
+			description: "Comment nommer cet outil-ci. Ex. « Nom de l’élève »."
+		},
+		entrees: {
+			type: "array",
+			minItems: 1,
+			maxItems: 5,
+			description: "Ce que l’utilisateur saisit. Des nombres, jamais du texte.",
+			items: {
+				type: "object",
+				additionalProperties: false,
+				required: [
+					"clef",
+					"titre",
+					"defaut",
+					"unite"
+				],
+				properties: {
+					clef: {
+						type: "string",
+						minLength: 1,
+						maxLength: 24,
+						description: "Identifiant : lettres non accentuées, chiffres, soulignés."
+					},
+					titre: {
+						type: "string",
+						minLength: 1,
+						maxLength: 32,
+						description: "Ex. « Déjà versé »."
+					},
+					defaut: {
+						type: "number",
+						minimum: 0,
+						description: "La valeur au départ. 0 si on ne sait pas."
+					},
+					unite: {
+						type: "string",
+						enum: ["F", ""],
+						description: "F pour des francs, vide sinon."
+					}
+				}
+			}
+		},
+		sortie: {
+			type: "object",
+			additionalProperties: false,
+			required: [
+				"libelle",
+				"unite",
+				"formule"
+			],
+			properties: {
+				libelle: {
+					type: "string",
+					minLength: 2,
+					maxLength: 32,
+					description: "Ex. « Reste à payer »."
+				},
+				unite: {
+					type: "string",
+					enum: ["F", ""]
+				},
+				formule: schemaExpression
+			}
+		}
+	}
 };
 /**
-* Lit ce que le modèle a répondu : un registre, un refus, ou rien de valable.
+* Ce que le schéma ne dit pas : que la formule ne parle que d'entrées
+* déclarées, et que deux entrées ne portent pas la même clef.
 *
-* Le refus se reconnaît d'abord. Un modèle qui dit « je ne peux pas » a bien
-* travaillé, et le reprendre pour non-conformité brûlerait un tour à lui faire
-* inventer ce qu'il vient justement de refuser d'inventer.
+* Une formule qui référence une entrée absente rendrait zéro sans rien dire —
+* le pire résultat possible pour une calculatrice, parce qu'un zéro ressemble
+* à une réponse.
 */
-function lireReponseModele(valeur) {
-	if (typeof valeur === "object" && valeur !== null && "impossible" in valeur) {
-		const erreurs = valider(schemaRefus, valeur);
-		if (erreurs.length > 0) return {
-			sorte: "invalide",
-			erreurs
-		};
-		return {
-			sorte: "refus",
-			pourquoi: valeur.impossible
-		};
-	}
-	const erreurs = verifierRegistre(valeur);
-	return erreurs.length > 0 ? {
-		sorte: "invalide",
-		erreurs
-	} : {
-		sorte: "registre",
-		registre: valeur
-	};
+function verifierCalcul(valeur) {
+	const erreurs = [...valider(schemaCalcul, valeur)];
+	if (erreurs.length > 0) return erreurs;
+	const c = valeur;
+	const clefs = c.entrees.map((e) => e.clef);
+	for (const [i, e] of c.entrees.entries()) if (!/^[a-z][a-zA-Z0-9_]*$/.test(e.clef)) erreurs.push({
+		chemin: `$.entrees[${i}].clef`,
+		message: `« ${e.clef} » : la clef ne prend que des lettres non accentuées, des chiffres et des soulignés, et commence par une minuscule`
+	});
+	const doublons = clefs.filter((c2, i) => clefs.indexOf(c2) !== i);
+	for (const d of new Set(doublons)) erreurs.push({
+		chemin: "$.entrees",
+		message: `la clef « ${d} » apparaît deux fois`
+	});
+	erreurs.push(...verifierExpression(c.sortie.formule, clefs, "$.sortie.formule"));
+	return erreurs;
 }
 /**
 * Le schéma que l'invite impose au modèle.
@@ -392,18 +557,17 @@ var schemaRegistre = {
 		}
 	}
 };
-/**
-* Ce que le schéma ne peut pas dire.
-*
-* JSON Schema vérifie des formes, pas des accords : que `total.clef` désigne
-* une colonne qui existe, qu'une seule bascule serve d'interrupteur, que la
-* première colonne nomme bien la ligne. Sans ces contrôles, une configuration
-* « valide » ferait un registre qui totalise une colonne absente — et
-* l'utilisateur verrait un zéro qu'il ne saurait pas expliquer.
-*
-* Un seul essai de reprise est prévu (§ 3) : ces messages repartent au modèle,
-* donc ils lui disent quoi corriger, pas seulement que c'est faux.
-*/
+var schemaRefus = {
+	type: "object",
+	additionalProperties: false,
+	required: ["impossible"],
+	properties: { impossible: {
+		type: "string",
+		minLength: 4,
+		maxLength: 160,
+		description: "Pourquoi la demande ne se range pas dans un registre. Une phrase, en français, adressée à l’utilisateur."
+	} }
+};
 function verifierRegistre(valeur) {
 	const erreurs = [...valider(schemaRegistre, valeur)];
 	if (erreurs.length > 0) return erreurs;
@@ -440,6 +604,45 @@ function verifierRegistre(valeur) {
 	return erreurs;
 }
 //#endregion
+//#region ../engine/src/composition.ts
+function lireReponseModele(valeur) {
+	if (typeof valeur !== "object" || valeur === null) return {
+		sorte: "invalide",
+		erreurs: [{
+			chemin: "$",
+			message: "la réponse n’est pas un objet"
+		}]
+	};
+	if ("impossible" in valeur) {
+		const erreurs = valider(schemaRefus, valeur);
+		return erreurs.length > 0 ? {
+			sorte: "invalide",
+			erreurs
+		} : {
+			sorte: "refus",
+			pourquoi: valeur.impossible
+		};
+	}
+	if ("entrees" in valeur) {
+		const erreurs = verifierCalcul(valeur);
+		return erreurs.length > 0 ? {
+			sorte: "invalide",
+			erreurs
+		} : {
+			sorte: "calcul",
+			calcul: valeur
+		};
+	}
+	const erreurs = verifierRegistre(valeur);
+	return erreurs.length > 0 ? {
+		sorte: "invalide",
+		erreurs
+	} : {
+		sorte: "registre",
+		registre: valeur
+	};
+}
+//#endregion
 //#region src/cout.ts
 function couter(jetons, prix, tauxFcfaParDollar) {
 	const dollars = (jetons.entree * prix.entree + jetons.sortie * prix.sortie) / 1e6;
@@ -464,24 +667,30 @@ function couter(jetons, prix, tauxFcfaParDollar) {
 */
 var CONSIGNES = `Tu configures un registre pour un petit commerçant camerounais.
 
-Un registre est un tableau de lignes qu'on tient à la main sur un téléphone :
-des ventes, des dettes, un stock, des présences, des cotisations.
+Tu sais fabriquer deux sortes d'outils, et choisir entre les deux.
+
+Un **registre** est un tableau de lignes qu'on tient à la main : des ventes,
+des dettes, un stock, des présences, des cotisations. Il répond à « qu'est-ce
+que j'ai noté ? ».
+
+Une **calculatrice** a quelques champs et un résultat. Elle répond à « combien
+ça fait ? » — ce qu'il reste à payer, la part de chacun, une marge, une remise.
+Sa formule se déclare en arbre, jamais en code.
 
 Réponds par un objet JSON seul, sans texte autour, sans bloc de code.
 
-**Si la demande ne décrit pas un registre, refuse.** Un site internet, une
-application, un logo, une traduction, un conseil, une question générale : rien
-de tout cela ne se range dans un tableau de lignes. Réponds alors par le schéma
-de refus, en disant en une phrase ce que tu ne peux pas faire. Ne fabrique
-jamais un registre plausible pour une demande qui n'en réclame pas : un outil
-inventé se remplit une fois, puis se referme pour toujours.
-
-Sinon, réponds par un registre conforme au schéma.
+**Si la demande n'est ni l'un ni l'autre, refuse.** Un site internet, une
+application, un logo, une traduction, un conseil : rien de tout cela ne se
+range dans un tableau ni dans une formule. Réponds alors par le schéma de
+refus, en disant en une phrase ce que tu ne peux pas faire, et ce que tu sais
+faire. Ne fabrique jamais un outil plausible pour une demande qui n'en réclame
+pas : un outil inventé se remplit une fois, puis se referme pour toujours.
 
 Règles :
 - Les montants sont en francs CFA, entiers, sans décimale.
 - Les libellés sont en français, courts, tutoiement, sans jargon comptable.
-- 6 colonnes au maximum : ça se lit sur un téléphone de 360 pixels.
+- 6 colonnes ou 5 champs au maximum : ça se lit sur un
+  téléphone de 360 pixels.
 - La première colonne nomme la ligne : mets devant celle qui l'identifie.
 - Au plus une colonne de type bascule.
 - N'invente pas de colonne que la demande ne réclame pas.
@@ -493,6 +702,9 @@ function batirInvite(demande) {
 
 Schéma d'un registre :
 ${JSON.stringify(schemaRegistre)}
+
+Schéma d'une calculatrice :
+${JSON.stringify(schemaCalcul)}
 
 Schéma d'un refus :
 ${JSON.stringify(schemaRefus)}
@@ -546,6 +758,12 @@ async function traiter(demande, fournisseur, tauxFcfaParDollar) {
 		if (lu.sorte === "registre") return {
 			sorte: "reussi",
 			registre: lu.registre,
+			cout: cout(),
+			essais: essai
+		};
+		if (lu.sorte === "calcul") return {
+			sorte: "calcule",
+			calcul: lu.calcul,
 			cout: cout(),
 			essais: essai
 		};
@@ -640,6 +858,13 @@ async function handler(req, res) {
 		if (resultat.sorte === "hors-sujet") {
 			res.status(200).json({
 				impossible: resultat.pourquoi,
+				fcfa: resultat.cout.fcfa
+			});
+			return;
+		}
+		if (resultat.sorte === "calcule") {
+			res.status(200).json({
+				calcul: resultat.calcul,
 				fcfa: resultat.cout.fcfa
 			});
 			return;

@@ -1,5 +1,6 @@
-import type { Extrait, FicheSquelette, RegistreDemande } from '@a237/engine';
+import type { Extrait, FicheSquelette } from '@a237/engine';
 import type { JSX } from 'preact';
+import type { Compose } from './outils.js';
 /**
  * L'atelier : on dit ce dont on a besoin, l'outil s'ouvre.
  *
@@ -22,6 +23,6 @@ import type { JSX } from 'preact';
  */
 export interface ProprietesAtelier {
     readonly fiches: readonly FicheSquelette[];
-    readonly onCreer: (skeleton: string, extrait: Extrait, registre?: RegistreDemande) => void;
+    readonly onCreer: (skeleton: string, extrait: Extrait, compose?: Compose) => void;
 }
 export declare function Atelier(props: ProprietesAtelier): JSX.Element;

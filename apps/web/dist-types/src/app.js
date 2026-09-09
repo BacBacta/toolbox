@@ -23,7 +23,7 @@ const DISPONIBLES = CATALOGUE.filter((f) => outilDisponible(f.id));
  * plus ancienne, faux pour un registre composé, qui est un cas normal.
  */
 function glyphePour(skeleton) {
-    if (skeleton === 'compose')
+    if (skeleton.startsWith('compose'))
         return '✳';
     return CATALOGUE.find((f) => f.id === skeleton)?.glyphe ?? '◇';
 }
@@ -61,13 +61,13 @@ export function App() {
             setErreur(`${quoi} : ${cause instanceof Error ? cause.message : String(cause)}`);
         });
     }
-    async function creer(skeleton, extrait, registre) {
+    async function creer(skeleton, extrait, compose) {
         const chargeur = CHARGEURS[skeleton];
         if (chargeur === undefined)
             throw new Error(`aucun écran pour « ${skeleton} »`);
         const maintenant = new Date();
-        const neuf = (await chargeur()).creer(skeleton, maintenant, extrait, registre);
-        const outil = await creerOutil(skeleton, neuf.nom, neuf.etat, maintenant, registre);
+        const neuf = (await chargeur()).creer(skeleton, maintenant, extrait, compose);
+        const outil = await creerOutil(skeleton, neuf.nom, neuf.etat, maintenant, compose);
         setOutils(await listerOutils());
         setOuvert(outil);
     }
@@ -86,7 +86,7 @@ export function App() {
         setOuvert(await lireOutil(id));
     }
     if (ouvert === null) {
-        return (_jsxs("main", { class: "app", children: [erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), _jsx(Accueil, { outils: outils, onCreer: (s, extrait, registre) => tenter(() => creer(s, extrait, registre), 'Création impossible'), onOuvrir: (id) => tenter(() => ouvrir(id), 'Ouverture impossible'), onSupprimer: (id) => tenter(() => supprimer(id), 'Suppression impossible') })] }));
+        return (_jsxs("main", { class: "app", children: [erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), _jsx(Accueil, { outils: outils, onCreer: (s, extrait, compose) => tenter(() => creer(s, extrait, compose), 'Création impossible'), onOuvrir: (id) => tenter(() => ouvrir(id), 'Ouverture impossible'), onSupprimer: (id) => tenter(() => supprimer(id), 'Suppression impossible') })] }));
     }
     /**
      * Le lien est vide tant que la publication n'existe pas.

@@ -60,7 +60,7 @@ export const CATALOGUE: readonly FicheSquelette[] = [
     glyphe: '≡',
     group: 'registres',
     title: 'Liste de prix',
-    keywords: ['prix', 'tarif', 'catalogue', 'boutique', 'combien', 'liste de prix', 'ce que je vends', 'mes articles', 'menu'],
+    keywords: ['prix', 'tarif', 'catalogue', 'boutique', 'ca coute combien', 'liste de prix', 'ce que je vends', 'mes articles', 'menu'],
   },
   {
     id: 'caisse',
@@ -74,7 +74,7 @@ export const CATALOGUE: readonly FicheSquelette[] = [
     glyphe: '▦',
     group: 'registres',
     title: 'Inventaire',
-    keywords: ['stock', 'inventaire', 'magasin', 'reste', 'quantite', 'marchandise', 'ce qui me reste', 'reappro'],
+    keywords: ['stock', 'inventaire', 'magasin', 'quantite', 'marchandise', 'ce qui me reste', 'reappro'],
   },
   {
     id: 'clients',

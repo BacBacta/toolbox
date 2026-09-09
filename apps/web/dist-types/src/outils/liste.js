@@ -49,7 +49,8 @@ export function Outil(props) {
         return _jsx(EtatInvalide, { erreurs: erreurs });
     return (_jsx(RegistreListe, { glyphe: props.glyphe, config: squelette.config, titre: squelette.title, etat: props.outil.etat, ctx: props.ctx, onChange: props.onChange, onDiffuser: props.onDiffuser, partage: squelette.share }));
 }
-export function creer(skeleton, _maintenant, _extrait, registre) {
+export function creer(skeleton, _maintenant, _extrait, compose) {
+    const registre = compose?.registre;
     const squelette = registre !== undefined ? squeletteCompose(registre) : PAR_ID.get(skeleton);
     if (squelette === undefined)
         throw new RangeError(`registre inconnu : ${skeleton}`);

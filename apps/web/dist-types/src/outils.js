@@ -10,6 +10,7 @@ export const CHARGEURS = {
     // Un registre composé par le modèle : même écran, même moteur, sa
     // configuration voyage simplement avec l'outil au lieu d'un squelette.
     compose: () => import('./outils/liste.js'),
+    'compose-calcul': () => import('./outils/calc.js'),
     devis: () => import('./outils/devis.js'),
     facture: () => import('./outils/facture.js'),
     njangi: () => import('./outils/njangi.js'),

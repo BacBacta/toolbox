@@ -1,6 +1,17 @@
-import type { Extrait, RegistreDemande, RenderContext, ShareSpec } from '@a237/engine';
+import type { CalculDemande, Extrait, RegistreDemande, RenderContext, ShareSpec } from '@a237/engine';
 import type { JSX } from 'preact';
 import type { OutilEnregistre } from './stockage.js';
+/**
+ * Ce que le modèle a composé, quand il a composé quelque chose.
+ *
+ * Deux formes, jamais les deux à la fois : un registre tient une liste, une
+ * calculatrice répond à une question. La coquille les transporte sans les
+ * comprendre — c'est le fragment de l'outil qui sait les dessiner.
+ */
+export interface Compose {
+    readonly registre?: RegistreDemande;
+    readonly calcul?: CalculDemande;
+}
 export interface ProprietesOutil {
     readonly outil: OutilEnregistre;
     /**
@@ -34,7 +45,7 @@ export interface ModuleOutil {
      * mois ». Le squelette en prend ce qu'il sait interpréter sans risque, et
      * ignore le reste.
      */
-    readonly creer: (skeleton: string, maintenant: Date, extrait: Extrait, registre?: RegistreDemande) => EtatNeuf;
+    readonly creer: (skeleton: string, maintenant: Date, extrait: Extrait, compose?: Compose) => EtatNeuf;
 }
 /**
  * Un import dynamique par squelette.

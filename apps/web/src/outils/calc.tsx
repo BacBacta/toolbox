@@ -1,17 +1,47 @@
-import type { EtatCalc } from '@a237/engine'
-import { CALCULATRICES, valider } from '@a237/engine'
+import type { CalculDemande, EtatCalc, Extrait, SqueletteCalc } from '@a237/engine'
+import { CALCULATRICES, evaluer, squeletteCalc, valider } from '@a237/engine'
 import { Calculatrice } from '@a237/render/registre'
 import type { JSX } from 'preact'
-import type { ProprietesOutil } from '../outils.js'
+import type { Compose, ProprietesOutil } from '../outils.js'
 import { EtatInvalide } from './commun.js'
-import type { Extrait } from '@a237/engine'
 
-/** L'adaptateur des calculatrices. Un fragment pour les deux. */
+/** L'adaptateur des calculatrices. Un fragment pour les deux, et pour les composées. */
 
 const PAR_ID = new Map(CALCULATRICES.map((s) => [s.id, s]))
 
+/** L'identifiant d'une calculatrice qui n'a pas de squelette. */
+export const ID_COMPOSE_CALCUL = 'compose-calcul'
+
+/**
+ * Une calculatrice composée par le modèle.
+ *
+ * Sa formule est un arbre déclaré, pas du code : `evaluer` l'interprète, et
+ * c'est ce qui permet au modèle de décrire un calcul sans jamais obtenir le
+ * droit d'en exécuter un (invariant § 2.1).
+ */
+function calculCompose(demande: CalculDemande): SqueletteCalc {
+  return squeletteCalc({
+    id: ID_COMPOSE_CALCUL,
+    title: demande.titre,
+    group: 'calculs',
+    keywords: [],
+    titreNom: demande.titreNom,
+    relancesVides: 'Une calculatrice se consulte, elle ne se relance pas.',
+    config: {
+      kicker: demande.kicker,
+      entrees: demande.entrees,
+      sortie: {
+        libelle: demande.sortie.libelle,
+        unite: demande.sortie.unite,
+        calcul: (val) => evaluer(demande.sortie.formule, val),
+      },
+    },
+  })
+}
+
 export function Outil(props: ProprietesOutil): JSX.Element {
-  const squelette = PAR_ID.get(props.outil.skeleton)
+  const compose = props.outil.calcul
+  const squelette = compose !== undefined ? calculCompose(compose) : PAR_ID.get(props.outil.skeleton)
   if (squelette === undefined) {
     return (
       <EtatInvalide
@@ -41,8 +71,10 @@ export function creer(
   skeleton: string,
   _maintenant: Date,
   _extrait: Extrait,
+  compose?: Compose,
 ): { nom: string; etat: unknown } {
-  const squelette = PAR_ID.get(skeleton)
+  const calcul = compose?.calcul
+  const squelette = calcul !== undefined ? calculCompose(calcul) : PAR_ID.get(skeleton)
   if (squelette === undefined) throw new RangeError(`calcul inconnu : ${skeleton}`)
   return { nom: squelette.title, etat: squelette.defaults }
 }

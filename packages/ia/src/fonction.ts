@@ -118,6 +118,11 @@ export default async function handler(req: RequeteEntrante, res: ReponseSortante
       return
     }
 
+    if (resultat.sorte === 'calcule') {
+      res.status(200).json({ calcul: resultat.calcul, fcfa: resultat.cout.fcfa })
+      return
+    }
+
     if (resultat.sorte !== 'reussi') {
       res.status(422).json({
         erreur: 'le modèle n’a pas produit un registre utilisable',

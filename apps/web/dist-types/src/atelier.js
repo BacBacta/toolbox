@@ -2,8 +2,9 @@ import { jsx as _jsx, jsxs as _jsxs } from "preact/jsx-runtime";
 import { EXTRAIT_VIDE, comprendre, montantF } from '@a237/engine';
 import { useState } from 'preact/hooks';
 import { composer } from './composer.js';
-/** L'identifiant d'un registre qui n'a pas de squelette. Voir `outils/liste.tsx`. */
-const ID_COMPOSE = 'compose';
+/** Les identifiants des outils qui n'ont pas de squelette. Voir `outils/`. */
+const ID_COMPOSE_REGISTRE = 'compose';
+const ID_COMPOSE_CALCUL = 'compose-calcul';
 /**
  * Des exemples qui montrent ce qu'une phrase peut porter, pas seulement le nom
  * d'un outil : le premier prouve qu'un montant et une période sont entendus.
@@ -41,7 +42,13 @@ export function Atelier(props) {
                 setComposition('repos');
                 setDemande('');
                 setReponse(null);
-                props.onCreer(ID_COMPOSE, EXTRAIT_VIDE, r.registre);
+                props.onCreer(ID_COMPOSE_REGISTRE, EXTRAIT_VIDE, { registre: r.registre });
+            }
+            else if (r.sorte === 'calcule') {
+                setComposition('repos');
+                setDemande('');
+                setReponse(null);
+                props.onCreer(ID_COMPOSE_CALCUL, EXTRAIT_VIDE, { calcul: r.calcul });
             }
             else if (r.sorte === 'pas-ouvert') {
                 setComposition('pas-ouvert');
@@ -66,7 +73,7 @@ export function Atelier(props) {
                     // chemin de quelqu'un qui sait ce qu'il veut et tape vite.
                     if (r?.sorte === 'sur')
                         ouvrir(r.fiche, r.extrait);
-                }, children: _jsxs("label", { class: "champ", for: "demande", children: [_jsx("span", { class: "champ-libelle", children: "De quoi as-tu besoin ?" }), _jsx("input", { id: "demande", type: "text", enterkeyhint: "go", autocomplete: "off", value: demande, placeholder: "njangi de 20 000 F par mois\u2026", onInput: (e) => repondre(e.target.value) })] }) }), reponse === null && (_jsx("div", { class: "atelier-exemples", children: EXEMPLES.map((e) => (_jsx("button", { type: "button", class: "atelier-exemple", onClick: () => repondre(e), children: e }, e))) })), reponse?.sorte === 'sur' && (_jsx(Proposition, { fiche: reponse.fiche, extrait: reponse.extrait, onOuvrir: ouvrir })), reponse?.sorte === 'ambigu' && (_jsxs("div", { class: "atelier-reponse", children: [_jsx("p", { class: "atelier-dit", children: "Lequel veux-tu ?" }), _jsx("div", { class: "atelier-choix", children: reponse.fiches.map((f) => (_jsxs("button", { type: "button", class: "atelier-option", onClick: () => ouvrir(f, reponse.extrait), children: [_jsx("span", { class: "marque", "aria-hidden": "true", children: f.glyphe }), _jsx("b", { children: f.title })] }, f.id))) })] })), reponse?.sorte === 'hors-portee' && (_jsxs("div", { class: "atelier-reponse", children: [_jsx("p", { class: "atelier-dit", children: "Aucun de mes outils ne correspond. Je peux essayer d\u2019en composer un \u2014 un registre avec les colonnes que tu d\u00E9cris." }), composition === 'repos' && (_jsxs("button", { type: "button", class: "atelier-option principale", onClick: faireComposer, children: [_jsx("span", { class: "marque", "aria-hidden": "true", children: "\u2733" }), _jsxs("span", { class: "texte", children: [_jsx("b", { children: "Compose-le pour moi" }), _jsx("span", { children: "demande le r\u00E9seau" })] })] })), composition === 'en-cours' && _jsx("p", { class: "note", children: "Je compose\u2026" }), composition === 'pas-ouvert' && (_jsx("p", { class: "note", children: "La composition n\u2019est pas encore ouverte. En attendant, prends l\u2019outil le plus proche dans la liste ci-dessous." })), typeof composition === 'object' && 'horsSujet' in composition && (_jsx("p", { class: "note", children: composition.horsSujet })), typeof composition === 'object' && 'echoue' in composition && (_jsxs("p", { class: "note", children: ["Je n\u2019ai pas pu composer \u2014 ", composition.echoue, ". R\u00E9essaie ?"] }))] }))] }));
+                }, children: _jsxs("label", { class: "champ", for: "demande", children: [_jsx("span", { class: "champ-libelle", children: "De quoi as-tu besoin ?" }), _jsx("input", { id: "demande", type: "text", enterkeyhint: "go", autocomplete: "off", value: demande, placeholder: "njangi de 20 000 F par mois\u2026", onInput: (e) => repondre(e.target.value) })] }) }), reponse === null && (_jsx("div", { class: "atelier-exemples", children: EXEMPLES.map((e) => (_jsx("button", { type: "button", class: "atelier-exemple", onClick: () => repondre(e), children: e }, e))) })), reponse?.sorte === 'sur' && (_jsx(Proposition, { fiche: reponse.fiche, extrait: reponse.extrait, onOuvrir: ouvrir })), reponse?.sorte === 'ambigu' && (_jsxs("div", { class: "atelier-reponse", children: [_jsx("p", { class: "atelier-dit", children: "Lequel veux-tu ?" }), _jsx("div", { class: "atelier-choix", children: reponse.fiches.map((f) => (_jsxs("button", { type: "button", class: "atelier-option", onClick: () => ouvrir(f, reponse.extrait), children: [_jsx("span", { class: "marque", "aria-hidden": "true", children: f.glyphe }), _jsx("b", { children: f.title })] }, f.id))) })] })), reponse?.sorte === 'hors-portee' && (_jsxs("div", { class: "atelier-reponse", children: [_jsx("p", { class: "atelier-dit", children: "Aucun de mes outils ne correspond. Je peux en composer un \u2014 un registre avec tes colonnes, ou une calculatrice avec tes champs." }), composition === 'repos' && (_jsxs("button", { type: "button", class: "atelier-option principale", onClick: faireComposer, children: [_jsx("span", { class: "marque", "aria-hidden": "true", children: "\u2733" }), _jsxs("span", { class: "texte", children: [_jsx("b", { children: "Compose-le pour moi" }), _jsx("span", { children: "demande le r\u00E9seau" })] })] })), composition === 'en-cours' && _jsx("p", { class: "note", children: "Je compose\u2026" }), composition === 'pas-ouvert' && (_jsx("p", { class: "note", children: "La composition n\u2019est pas encore ouverte. En attendant, prends l\u2019outil le plus proche dans la liste ci-dessous." })), typeof composition === 'object' && 'horsSujet' in composition && (_jsx("p", { class: "note", children: composition.horsSujet })), typeof composition === 'object' && 'echoue' in composition && (_jsxs("p", { class: "note", children: ["Je n\u2019ai pas pu composer \u2014 ", composition.echoue, ". R\u00E9essaie ?"] }))] }))] }));
 }
 /**
  * Ce qu'on a compris, dit avant d'ouvrir.

@@ -3,7 +3,7 @@ import type { RegistreDemande, SqueletteListe } from '@a237/engine'
 import { REGISTRES_LISTE, squeletteListe, valider } from '@a237/engine'
 import { RegistreListe } from '@a237/render/registre'
 import type { JSX } from 'preact'
-import type { ProprietesOutil } from '../outils.js'
+import type { Compose, ProprietesOutil } from '../outils.js'
 import { EtatInvalide } from './commun.js'
 import type { Extrait } from '@a237/engine'
 
@@ -80,8 +80,9 @@ export function creer(
   skeleton: string,
   _maintenant: Date,
   _extrait: Extrait,
-  registre?: RegistreDemande,
+  compose?: Compose,
 ): { nom: string; etat: unknown } {
+  const registre = compose?.registre
   const squelette = registre !== undefined ? squeletteCompose(registre) : PAR_ID.get(skeleton)
   if (squelette === undefined) throw new RangeError(`registre inconnu : ${skeleton}`)
   // Rien dans une phrase ne se transpose en lignes de registre sans inventer.

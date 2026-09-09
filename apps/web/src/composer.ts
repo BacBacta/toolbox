@@ -1,5 +1,5 @@
-import type { RegistreDemande } from '@a237/engine'
-import { verifierRegistre } from '@a237/engine'
+import type { CalculDemande, RegistreDemande } from '@a237/engine'
+import { lireReponseModele } from '@a237/engine'
 
 /**
  * L'étage 2 : ce que l'étage 1 n'a pas su faire, on le fait composer.
@@ -18,6 +18,7 @@ import { verifierRegistre } from '@a237/engine'
 
 export type Composition =
   | { readonly sorte: 'compose'; readonly registre: RegistreDemande; readonly fcfa: number }
+  | { readonly sorte: 'calcule'; readonly calcul: CalculDemande; readonly fcfa: number }
   /**
    * Le modèle a répondu que la demande n'est pas un registre. C'est une
    * réponse, pas une panne : on la montre telle quelle et on ne réessaie pas.
@@ -51,21 +52,26 @@ export async function composer(demande: string, signal?: AbortSignal): Promise<C
   }
 
   const corps = (await reponse.json().catch(() => null)) as
-    | { registre?: unknown; impossible?: unknown; fcfa?: unknown }
+    | { registre?: unknown; calcul?: unknown; impossible?: unknown; fcfa?: unknown }
     | null
 
+  const fcfa = typeof corps?.fcfa === 'number' ? corps.fcfa : 0
+
+  /*
+   * Le refus se lit sur l'enveloppe, pas au validateur.
+   *
+   * L'enveloppe porte `fcfa` à côté de la charge utile, et le schéma de refus
+   * interdit tout champ supplémentaire : lui passer l'enveloppe entière faisait
+   * rejeter un refus parfaitement valide, et l'écran disait « je n'ai pas pu
+   * composer » à la place de la phrase du modèle.
+   */
   if (typeof corps?.impossible === 'string' && corps.impossible !== '') {
     return { sorte: 'hors-sujet', pourquoi: corps.impossible }
   }
 
-  const erreurs = verifierRegistre(corps?.registre)
-  if (erreurs.length > 0) {
-    return { sorte: 'echoue', pourquoi: 'la réponse ne décrit pas un registre valide' }
-  }
-
-  return {
-    sorte: 'compose',
-    registre: corps?.registre as RegistreDemande,
-    fcfa: typeof corps?.fcfa === 'number' ? corps.fcfa : 0,
-  }
+  // Le même lecteur que le serveur, sur la charge utile seule.
+  const lu = lireReponseModele(corps?.registre ?? corps?.calcul)
+  if (lu.sorte === 'registre') return { sorte: 'compose', registre: lu.registre, fcfa }
+  if (lu.sorte === 'calcul') return { sorte: 'calcule', calcul: lu.calcul, fcfa }
+  return { sorte: 'echoue', pourquoi: 'la réponse ne décrit pas un outil valide' }
 }

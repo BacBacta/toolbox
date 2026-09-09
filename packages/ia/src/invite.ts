@@ -1,4 +1,4 @@
-import { MAX_COLONNES, schemaRefus, schemaRegistre } from '@a237/engine'
+import { MAX_COLONNES, MAX_ENTREES, schemaCalcul, schemaRefus, schemaRegistre } from '@a237/engine'
 
 /**
  * L'invite qui impose la sortie en JSON conforme au schéma (§ 3).
@@ -15,24 +15,30 @@ import { MAX_COLONNES, schemaRefus, schemaRegistre } from '@a237/engine'
 
 const CONSIGNES = `Tu configures un registre pour un petit commerçant camerounais.
 
-Un registre est un tableau de lignes qu'on tient à la main sur un téléphone :
-des ventes, des dettes, un stock, des présences, des cotisations.
+Tu sais fabriquer deux sortes d'outils, et choisir entre les deux.
+
+Un **registre** est un tableau de lignes qu'on tient à la main : des ventes,
+des dettes, un stock, des présences, des cotisations. Il répond à « qu'est-ce
+que j'ai noté ? ».
+
+Une **calculatrice** a quelques champs et un résultat. Elle répond à « combien
+ça fait ? » — ce qu'il reste à payer, la part de chacun, une marge, une remise.
+Sa formule se déclare en arbre, jamais en code.
 
 Réponds par un objet JSON seul, sans texte autour, sans bloc de code.
 
-**Si la demande ne décrit pas un registre, refuse.** Un site internet, une
-application, un logo, une traduction, un conseil, une question générale : rien
-de tout cela ne se range dans un tableau de lignes. Réponds alors par le schéma
-de refus, en disant en une phrase ce que tu ne peux pas faire. Ne fabrique
-jamais un registre plausible pour une demande qui n'en réclame pas : un outil
-inventé se remplit une fois, puis se referme pour toujours.
-
-Sinon, réponds par un registre conforme au schéma.
+**Si la demande n'est ni l'un ni l'autre, refuse.** Un site internet, une
+application, un logo, une traduction, un conseil : rien de tout cela ne se
+range dans un tableau ni dans une formule. Réponds alors par le schéma de
+refus, en disant en une phrase ce que tu ne peux pas faire, et ce que tu sais
+faire. Ne fabrique jamais un outil plausible pour une demande qui n'en réclame
+pas : un outil inventé se remplit une fois, puis se referme pour toujours.
 
 Règles :
 - Les montants sont en francs CFA, entiers, sans décimale.
 - Les libellés sont en français, courts, tutoiement, sans jargon comptable.
-- ${MAX_COLONNES} colonnes au maximum : ça se lit sur un téléphone de 360 pixels.
+- ${MAX_COLONNES} colonnes ou ${MAX_ENTREES} champs au maximum : ça se lit sur un
+  téléphone de 360 pixels.
 - La première colonne nomme la ligne : mets devant celle qui l'identifie.
 - Au plus une colonne de type bascule.
 - N'invente pas de colonne que la demande ne réclame pas.
@@ -45,6 +51,9 @@ export function batirInvite(demande: string): string {
 
 Schéma d'un registre :
 ${JSON.stringify(schemaRegistre)}
+
+Schéma d'une calculatrice :
+${JSON.stringify(schemaCalcul)}
 
 Schéma d'un refus :
 ${JSON.stringify(schemaRefus)}
