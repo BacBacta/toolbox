@@ -157,26 +157,36 @@ for (const requis of ['precache.json', 'sw.js']) {
 /*
  * La fonction serveur doit être assemblée, complète, et savoir lire sa clef.
  *
- * Elle s'est déjà déployée vide : Rollup avait élagué l'export par défaut, et
- * Vite, en mode navigateur, avait remplacé `process.env` par un objet vide.
- * Quarante octets sont partis en production sans qu'aucune construction
- * n'échoue — et la fonction aurait répondu « pas encore ouvert » pour
- * toujours, ce qui ressemble à un choix plutôt qu'à une panne.
+ * Elle s'est déjà déployée vide : Rollup avait élagué son export, et Vite, en
+ * mode navigateur, avait remplacé `process.env` par un objet vide. Quarante
+ * octets sont partis en production sans qu'aucune construction n'échoue — et
+ * la fonction aurait répondu « pas encore ouvert » pour toujours, ce qui
+ * ressemble à un choix plutôt qu'à une panne.
+ *
+ * Chez Cloudflare le piège change de forme et non de nature : un Worker n'a
+ * pas de `process`. Une fonction qui lirait `process.env` se déploierait sans
+ * broncher et ne verrait jamais sa clef. On exige donc l'inverse — la lecture
+ * passe par l'objet `env` reçu à chaque requête, et `process.env` ne doit pas
+ * y figurer du tout.
  */
+const FONCTION = 'functions/api/ai.js'
 try {
-  const fonction = readFileSync('api/ai.js', 'utf8')
+  const fonction = readFileSync(FONCTION, 'utf8')
   const exigences = [
-    ['export { handler as default }', 'l’export par défaut, sans quoi Vercel ne voit aucune fonction'],
-    ['process.env.A237_CLEF_IA', 'la lecture de la clef, que le mode navigateur remplacerait par {}'],
+    ['export { onRequest }', 'l’export nommé, sans quoi Pages ne voit aucune fonction'],
+    ['env.A237_CLEF_IA', 'la lecture de la clef dans l’environnement du Worker'],
     ['generativelanguage.googleapis.com', 'l’appel au fournisseur, preuve que tout est inclus'],
   ]
   for (const [marqueur, quoi] of exigences) {
     if (!fonction.includes(marqueur)) {
-      echecs.push(`api/ai.js n'a pas ${quoi}`)
+      echecs.push(`${FONCTION} n'a pas ${quoi}`)
     }
   }
+  if (/process\.env\.[A-Z]/.test(fonction)) {
+    echecs.push(`${FONCTION} lit process.env : un Worker n'a pas de process, la clef serait invisible`)
+  }
 } catch {
-  echecs.push('api/ai.js manquant : le proxy IA ne serait pas déployé')
+  echecs.push(`${FONCTION} manquant : le proxy IA ne serait pas déployé`)
 }
 
 /*

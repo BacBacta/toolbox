@@ -2,8 +2,8 @@ node_modules/
 dist/
 coverage/
 .wrangler/
+.vercel/
 .dev.vars
 *.local
 .DS_Store
-.vercel
 .env*

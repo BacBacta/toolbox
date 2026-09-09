@@ -201,7 +201,7 @@ function envoyer(clef: string, corps: unknown): Promise<Response> {
       'content-type': 'application/json',
       // OpenRouter s'en sert pour son classement public. Poli, et utile le
       // jour où il faut retrouver d'où vient une consommation.
-      'http-referer': 'https://atelier237.vercel.app',
+      'http-referer': 'https://atelier237.pages.dev',
       'x-title': 'Atelier 237',
     },
     body: JSON.stringify(corps),

@@ -36,7 +36,7 @@ inventaire, clients, frais scolaires, partage de course. Restent : CV,
 attestation, reconnaissance de dette, lettre de motivation, reçu, ardoise
 clients, feuille de présence, call-box.
 
-En ligne sur **https://atelier237.vercel.app**, et vérifié sur un vrai
+En ligne sur **https://atelier237.pages.dev**, et vérifié sur un vrai
 téléphone : l'application s'ouvre **données coupées**, et « Partager la carte »
 **ouvre WhatsApp avec l'image**. Cette dernière était le préalable posé par la
 section 6 du brief.

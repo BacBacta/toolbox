@@ -3,6 +3,7 @@ import { readFileSync, statSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
 // playwright-core est installé à part : voir README.md.
 import { chromium } from 'playwright-core'
+import { entetesDe } from './entetes.mjs'
 
 const DIST = '/home/user/toolbox/apps/web/dist'
 const TYPES = {
@@ -20,20 +21,13 @@ const serveur = createServer((req, res) => {
   }
   try {
     const corps = readFileSync(fichier)
-    // Les mêmes en-têtes que vercel.json : on éprouve ce qui sera servi.
-    const entetes = {
+    // Les en-têtes viennent de `_headers`, le fichier que Pages servira : les
+    // recopier ici en ferait une seconde source, et c'est celle du serveur qui
+    // décide.
+    res.writeHead(200, {
       'Content-Type': TYPES[extname(fichier)] ?? 'application/octet-stream',
-      'X-Content-Type-Options': 'nosniff',
-      'Referrer-Policy': 'strict-origin-when-cross-origin',
-      'Content-Security-Policy':
-        "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; " +
-        "font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; " +
-        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'",
-    }
-    if (chemin.startsWith('/assets/')) entetes['Cache-Control'] = 'public, max-age=31536000, immutable'
-    else entetes['Cache-Control'] = 'public, max-age=0, must-revalidate'
-    if (chemin === '/sw.js') entetes['Service-Worker-Allowed'] = '/'
-    res.writeHead(200, entetes)
+      ...entetesDe(DIST, chemin),
+    })
     res.end(corps)
   } catch {
     res.writeHead(404).end('non trouvé')

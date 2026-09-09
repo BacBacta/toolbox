@@ -12,37 +12,64 @@ n'existe pas, le bouton « Diffuser » produit la carte et le résumé, et
 **n'écrit aucun lien** : ni sur l'image, ni dans les relances. Une adresse
 inventée serait un lien mort envoyé par le trésorier à ses membres, sous son nom.
 
-## Vercel — en ligne
+## Cloudflare Pages — en ligne
 
 | | |
 |---|---|
-| Production | **https://atelier237.vercel.app** |
-| Projet | `atelier237`, équipe `lebbuilder16-5581s-projects` |
+| Production | **https://atelier237.pages.dev** |
+| Projet | `atelier237` |
 
-`vercel.json` est à la racine et porte tout : commande de construction,
-répertoire de sortie, en-têtes. Il n'y a rien à régler dans l'interface —
-**Root Directory** reste la racine du dépôt, les paquets de `packages/` étant
-compilés depuis leurs sources par Vite.
+`wrangler.toml` est à la racine et nomme le projet ; `apps/web/public/_headers`
+porte les en-têtes, et Vite le copie tel quel dans `dist/`. Il n'y a rien à
+régler dans l'interface.
 
 ```bash
-vercel deploy --prod --yes --archive=tgz
+pnpm build
+wrangler pages deploy apps/web/dist
 ```
 
-### Le dépôt n'est pas connecté
+Les fonctions vivent dans `functions/` : `functions/api/ai.js` répond sur
+`/api/ai`. Elles partent avec le même déploiement que les fichiers statiques —
+c'est tout l'intérêt d'un seul projet.
 
-`vercel link` n'a pas pu rattacher `BacBacta/toolbox` : le compte Vercel n'a
-pas d'accès en écriture au dépôt GitHub. Conséquence à connaître : **il n'y a
-pas de déploiement automatique à chaque poussée**. Chaque mise en ligne se fait
-à la main avec la commande ci-dessus. Pour l'automatiser, il faut connecter le
-dépôt depuis un compte qui a les droits, dans les réglages du projet Vercel.
+### Pourquoi Cloudflare, et pas là où c'était déjà
 
-### Deux embûches rencontrées, et leur cause
+L'atelier a d'abord tourné sur Vercel, parce que la PWA y était déployée en une
+commande. Le brief, lui, avait choisi Cloudflare (§ 3.2), et pour une raison
+qui n'est pas de goût : **R2 n'a pas de frais de sortie**. Or ce qu'on sert le
+plus, ce sont les cartes PNG — l'aperçu WhatsApp *est* le tableau de bord, et
+chaque carte partagée est une image téléchargée par le crawler puis par les
+lecteurs. Facturer cette bande passante, c'est facturer l'usage normal du
+produit.
 
-- Le CLI Vercel emploie le `fetch` natif de Node, qui **ignore `HTTPS_PROXY`**.
-  Derrière un proxy, il obtient un code d'appareil puis échoue en silence à
-  l'interrogation. `NODE_USE_ENV_PROXY=1` le règle (Node ≥ 22.21).
-- Sans `--archive=tgz`, l'envoi des fichiers un par un a échoué en cours de
-  route. L'archive n'envoie qu'un flux, et passe.
+Deux hébergeurs auraient voulu dire deux tableaux de bord, deux commandes de
+mise en ligne et un domaine à faire pointer aux deux. La page de lecture, le
+webhook de paiement et le proxy IA ont besoin des mêmes liaisons KV, R2 et D1 :
+ils vivent au même endroit.
+
+### Ce que le déménagement a coûté
+
+Trois fichiers, et pas une décision.
+
+- `packages/ia/src/fonction.ts` ne connaissait déjà pas son hébergeur : il
+  fallait seulement lui passer ses réglages en argument au lieu de les lire
+  dans `process.env`. **Un Worker n'a pas de `process`** — les lire au
+  chargement du module aurait marché sur Vercel et rendu partout `undefined`
+  ici, sans que rien n'échoue. Une garde du budget refuse désormais un
+  `process.env` dans le paquet déployé.
+- `packages/ia/src/worker.ts` est le nouvel adaptateur : trente lignes qui
+  lisent un `Request` et rendent un `Response`. C'est tout ce que le proxy sait
+  de Cloudflare.
+- Les en-têtes sont passés de `vercel.json` à `_headers`. Ils ne sont plus
+  recopiés dans les vérifications de bout en bout : `e2e/entetes.mjs` **lit le
+  fichier qui part en ligne**. Deux copies d'une même règle divergent toujours,
+  et celle qui compte est celle du serveur.
+
+### Une embûche à connaître
+
+Sans `--archive=tgz`, l'envoi Vercel des fichiers un par un échouait en cours
+de route. `wrangler` envoie une archive par défaut ; le problème ne se repose
+pas.
 
 ### Les en-têtes, et pourquoi ils comptent
 
@@ -58,42 +85,9 @@ de l'extérieur — aucune police web, aucune bibliothèque de graphiques, aucun
 balise tierce. `default-src 'self'`, et `object-src`, `base-uri`, `form-action`
 et `frame-ancestors` fermés. C'est l'invariant § 2.1 tenu jusqu'au serveur.
 
-Vérifié de deux façons :
-
-- La vérification de bout en bout (`e2e/`) sert l'application avec **ces
-  en-têtes exactement**, dans un vrai Chromium, et la chaîne complète passe,
-  mode avion compris.
-- Les en-têtes de la production ont été relevés un par un : `/assets/*`
-  immuable pour un an, `sw.js` et `precache.json` à revalider, CSP appliquée
-  partout, `Service-Worker-Allowed: /` sur le service worker.
-
-Et le paquet déployé a été inspecté : aucune adresse `atl.cm` codée en dur, la
-clause du lien est bien conditionnelle, et `precache.json` liste dix fichiers
-**sans doublon** — la condition qui rend l'installation du service worker
-possible.
-
-## Un point d'architecture à trancher
-
-**Le brief a choisi Cloudflare** (§ 3.2), et pas par hasard : la page de lecture,
-le webhook de paiement et le proxy IA sont censés vivre au même endroit que
-KV, R2 et D1 — et R2 est retenu parce qu'il n'a **pas de frais de sortie**, ce
-qui est décisif quand on sert des images.
-
-Héberger la PWA sur Vercel ne contredit aucun invariant : ce ne sont que des
-fichiers statiques, et c'est réversible en une commande. Mais à la phase 2, il
-faudra choisir :
-
-- **rester chez Cloudflare pour le reste** — deux hébergeurs, deux tableaux de
-  bord, un domaine à faire pointer aux deux ;
-- **tout mettre chez Vercel** — ce qui revient à rejuger la section 3.2 : les
-  équivalents de KV, R2 et D1 n'y ont ni la même forme, ni le même prix de
-  sortie ;
-- **basculer la PWA sur Cloudflare Pages** — même sortie statique, un seul
-  endroit. Les en-têtes ci-dessus s'y écrivent dans un fichier `_headers` plutôt
-  que dans `vercel.json`.
-
-Rien de tout ça n'est urgent aujourd'hui. Ça le devient le jour où on écrit le
-Worker.
+La vérification de bout en bout (`e2e/`) sert l'application avec **ces en-têtes
+exactement** — elle les lit dans `_headers` — dans un vrai Chromium, et la
+chaîne complète passe, mode avion compris.
 
 ## Ce qui reste à vérifier à la main
 
@@ -115,7 +109,15 @@ Ce qui reste, et qui compte plus que tout le reste :
 
 ## Ouvrir la composition par le modèle
 
-Quatre variables d'environnement, à poser dans Vercel — jamais dans le dépôt.
+Cinq variables d'environnement, à poser dans le projet Pages — jamais dans le
+dépôt. La clef est un secret et se pose comme tel :
+
+```bash
+wrangler pages secret put A237_CLEF_IA
+```
+
+Les quatre autres sont de la configuration, pas des secrets : elles se règlent
+dans les variables d'environnement du projet.
 
 | Variable | Rôle | Défaut |
 |---|---|---|

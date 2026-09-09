@@ -24,6 +24,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { extname, join, normalize } from 'node:path'
+import { entetesDe } from './entetes.mjs'
 
 const RACINE = new URL('..', import.meta.url).pathname
 const DIST = join(RACINE, 'apps/web/dist')
@@ -78,11 +79,9 @@ const serveur = createServer((req, res) => {
   }
   res.writeHead(200, {
     'Content-Type': TYPES[extname(f)] ?? 'application/octet-stream',
-    // Les en-têtes de `vercel.json` : ce sont elles qui décident si le
-    // navigateur relit `sw.js`.
-    'Cache-Control': chemin.startsWith('/assets/')
-      ? 'public, max-age=31536000, immutable'
-      : 'public, max-age=0, must-revalidate',
+    // Les en-têtes de `_headers` : ce sont elles qui décident si le navigateur
+    // relit `sw.js`, et elles se lisent au lieu de se recopier.
+    ...entetesDe(DIST, chemin),
   })
   res.end(corps)
 })

@@ -1,0 +1,15 @@
+# Atelier 237 sur Cloudflare Pages.
+#
+# Un seul projet sert la PWA et les fonctions : `dist/` porte les fichiers
+# statiques, `functions/` les points d'entrée serveur. C'est ce qui permet à
+# la page de lecture, au proxy IA et au webhook de paiement de partager les
+# liaisons KV, R2 et D1 — le choix du brief (§ 3.2), et la raison pour
+# laquelle R2 est retenu : pas de frais de sortie sur les cartes, qui sont ce
+# qu'on sert le plus puisque l'aperçu WhatsApp est le tableau de bord.
+#
+# Les secrets ne sont pas ici. `A237_CLEF_IA` se pose avec
+# `wrangler pages secret put`, et n'entre jamais dans le dépôt (invariant § 2.8).
+
+name = "atelier237"
+compatibility_date = "2026-01-01"
+pages_build_output_dir = "apps/web/dist"

@@ -12,23 +12,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const ENV = { ...process.env }
 
+/**
+ * On appelle `repondre` et non un adaptateur : les réglages arrivent en
+ * argument, ce qui laisse chaque cas poser son environnement sans toucher à
+ * celui du processus. L'adaptateur Cloudflare, lui, s'éprouve à part.
+ */
 async function appeler(
   req: { method?: string; body?: unknown },
 ): Promise<{ statut: number; corps: Record<string, unknown> }> {
-  const { default: handler } = await import('../src/fonction.js')
-  let statut = 0
-  let corps: unknown
-  const res = {
-    status(code: number) {
-      statut = code
-      return res
-    },
-    json(c: unknown) {
-      corps = c
-    },
+  const { reglagesDe, repondre } = await import('../src/fonction.js')
+  if (req.method !== undefined && req.method !== 'POST') {
+    return { statut: 405, corps: { erreur: 'méthode non permise' } }
   }
-  await handler(req, res)
-  return { statut, corps: (corps ?? {}) as Record<string, unknown> }
+  const { statut, corps } = await repondre(req.body, reglagesDe(process.env))
+  return { statut, corps }
 }
 
 /** La forme d'OpenRouter, qui est le fournisseur par défaut. */

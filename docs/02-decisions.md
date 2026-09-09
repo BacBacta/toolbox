@@ -149,7 +149,7 @@ production** à ce stade, `preact` — cinq étaient autorisées. La question de
 | L'application s'ouvre données coupées | **oui** | 9 septembre 2026 |
 | « Partager la carte » ouvre WhatsApp avec l'image | **oui** | 9 septembre 2026 |
 
-Sur https://atelier237.vercel.app, sur la cible et non sur une machine de
+Sur https://atelier237.pages.dev, sur la cible et non sur une machine de
 développement.
 
 La troisième ligne est celle qui comptait le plus : la section 6 du brief la
@@ -162,17 +162,25 @@ ne savent pas partager de fichier, mais il n'est plus le chemin principal.
 La deuxième valide l'invariant § 2.7 sur la cible, et coche un des quatre
 critères d'arrêt de la phase 1.
 
-## Où vit le proxy IA — tranché le 9 septembre 2026
+## Où vit le proxy IA — tranché le 9 septembre 2026, revenu au brief le même jour
 
 Le brief le place dans le Worker Cloudflare, au même endroit que le webhook de
-paiement et la page de lecture (§ 3.1). Il part d'abord en **fonction Vercel**,
-parce que l'application y est déjà déployée : l'étage 2 est joignable
-aujourd'hui plutôt qu'après une phase 2 complète.
+paiement et la page de lecture (§ 3.1). Il est d'abord parti en **fonction
+Vercel**, parce que l'application y était déjà déployée : l'étage 2 était
+joignable le jour même plutôt qu'après une phase 2 complète.
 
-L'écart est contenu par construction. Tout ce qui décide vit dans `@a237/ia` et
-`packages/engine/src/registre.ts`, purs et testés sans réseau ; le fichier
-déposé dans `api/` n'est que de la plomberie. Le déménagement vers Cloudflare
-déplacera un fichier, pas une couche.
+Le déménagement est fait, et il a coûté ce qui était annoncé : **un fichier,
+pas une couche**. Tout ce qui décide vit dans `@a237/ia` et
+`packages/engine/src/registre.ts`, purs et testés sans réseau ; ce qui a bougé,
+c'est l'adaptateur — `worker.ts`, trente lignes — et la façon dont les réglages
+arrivent. Ils se lisaient dans `process.env` ; ils arrivent maintenant en
+argument, parce qu'un Worker n'a pas de `process` et qu'une lecture au
+chargement du module aurait rendu `undefined` partout, sans que rien n'échoue.
+
+Ce qui a décidé du retour au brief : **R2 n'a pas de frais de sortie**. Ce
+qu'on sert le plus, ce sont les cartes PNG, puisque l'aperçu WhatsApp est le
+tableau de bord. Facturer cette bande passante reviendrait à facturer l'usage
+normal du produit. Le détail est dans `docs/03-deploiement.md`.
 
 Le taux USD → XAF est déjà en configuration (`A237_TAUX_FCFA`) et non en
 constante, comme la ligne reportée ci-dessous l'exigeait.

@@ -12,17 +12,16 @@ import { traiter } from './traiter.js'
  * et ne traverse pas la frontière. Le client ne reçoit qu'une configuration
  * déjà validée — jamais de HTML, jamais de code (§ 3, point 5).
  *
- * Le brief place ce proxy dans le Worker Cloudflare, au même endroit que le
- * webhook de paiement et la page de lecture. On le met d'abord sur Vercel
- * parce que l'application y est déjà déployée ; le déménager ne déplacera que
- * ce fichier, tout le reste étant pur et testé.
+ * Il ne connaît pas son hébergeur. `repondre` prend une demande et des
+ * réglages, et rend un code et un corps ; l'adaptateur qui la relie à un
+ * `Request` tient en dix lignes et vit ailleurs. C'est ce qui a permis de
+ * passer de Vercel à Cloudflare sans toucher à une seule décision — et ce qui
+ * permet d'éprouver tout ce fichier sans réseau, sans clef et sans serveur.
  *
- * Il vit ici et non dans `api/`, et il est **assemblé en un seul fichier
- * JavaScript** avant d'y être déposé. Vercel compile lui-même le TypeScript
- * qu'il trouve dans `api/`, avec sa propre résolution de modules — qui ne suit
- * pas les liens d'un espace de travail pnpm et échouait sur `@types/node`. On
- * ne lui donne donc plus de TypeScript : le service worker est bâti de la même
- * façon, et pour la même raison.
+ * Les réglages arrivent en argument et ne se lisent pas dans
+ * `process.env` : un Worker n'a pas de `process`, ses variables arrivent dans
+ * un objet passé à chaque requête. Les lire au chargement du module aurait
+ * marché sur Vercel et rendu partout `undefined` sur Cloudflare.
  *
  * **Ce qui manque encore, et qu'il faut savoir.** Le brief exige un quota par
  * compte (`credits > 0`, sinon 402) et un journal des coûts dans `ai_calls`.
@@ -32,21 +31,43 @@ import { traiter } from './traiter.js'
  * ouvrir un robinet qui coûte de l'argent à chaque appel ; il faut le vouloir.
  */
 
-interface RequeteEntrante {
-  readonly method?: string
-  readonly body?: unknown
-}
-
-interface ReponseSortante {
-  status: (code: number) => ReponseSortante
-  json: (corps: unknown) => void
-}
-
 /** Une demande plus longue qu'un paragraphe n'est pas une demande d'outil. */
 const MAX_DEMANDE = 400
 
-/** Le taux sert au journal des coûts. Une décision de gestion, pas une constante. */
-const TAUX_FCFA_PAR_DOLLAR = Number(process.env.A237_TAUX_FCFA ?? '600')
+/** Ce que l'environnement dit, une fois lu et interprété. */
+export interface Reglages {
+  readonly clef: string
+  /** Poser la clef ne suffit pas : il faut avoir voulu ouvrir. */
+  readonly ouverte: boolean
+  readonly fournisseur: string
+  readonly modele: string
+  readonly prixEntree: number
+  readonly prixSortie: number
+  /** Le taux sert au journal des coûts. Une décision de gestion, pas une constante. */
+  readonly tauxFcfa: number
+}
+
+/** Ce qu'un hébergeur nous tend : des chaînes, ou rien. */
+export type Environnement = Readonly<Record<string, string | undefined>>
+
+const MODELE_PAR_DEFAUT = 'google/gemini-2.5-flash-lite'
+
+function nombre(brut: string | undefined, defaut: number): number {
+  const n = Number(brut)
+  return Number.isFinite(n) ? n : defaut
+}
+
+export function reglagesDe(env: Environnement): Reglages {
+  return {
+    clef: env.A237_CLEF_IA ?? '',
+    ouverte: env.A237_IA_OUVERTE === '1',
+    fournisseur: env.A237_FOURNISSEUR ?? 'openrouter',
+    modele: env.A237_MODELE ?? MODELE_PAR_DEFAUT,
+    prixEntree: nombre(env.A237_PRIX_ENTREE, 0.1),
+    prixSortie: nombre(env.A237_PRIX_SORTIE, 0.4),
+    tauxFcfa: nombre(env.A237_TAUX_FCFA, 600),
+  }
+}
 
 /**
  * Le fournisseur et le modèle se choisissent dans l'environnement.
@@ -60,15 +81,10 @@ const TAUX_FCFA_PAR_DOLLAR = Number(process.env.A237_TAUX_FCFA ?? '600')
  * Le prix sert au journal quand le fournisseur ne dit pas ce qu'il a facturé.
  * OpenRouter, lui, le dit, et son chiffre l'emporte — il applique sa marge.
  */
-function fournisseurChoisi(clef: string): Fournisseur {
-  const modele = process.env.A237_MODELE
-  const prix = {
-    entree: Number(process.env.A237_PRIX_ENTREE ?? '0.1'),
-    sortie: Number(process.env.A237_PRIX_SORTIE ?? '0.4'),
-  }
-  return process.env.A237_FOURNISSEUR === 'gemini'
-    ? gemini(clef, modele ?? 'gemini-2.5-flash-lite')
-    : openrouter(clef, modele ?? 'google/gemini-2.5-flash-lite', prix)
+function fournisseurChoisi(r: Reglages): Fournisseur {
+  return r.fournisseur === 'gemini'
+    ? gemini(r.clef, r.modele === MODELE_PAR_DEFAUT ? 'gemini-2.5-flash-lite' : r.modele)
+    : openrouter(r.clef, r.modele, { entree: r.prixEntree, sortie: r.prixSortie })
 }
 
 /**
@@ -87,26 +103,26 @@ function abonne(): boolean {
   return false
 }
 
-export default async function handler(req: RequeteEntrante, res: ReponseSortante): Promise<void> {
-  if (req.method !== 'POST') {
-    res.status(405).json({ erreur: 'méthode non permise' })
-    return
-  }
+/** Ce que l'adaptateur d'un hébergeur doit renvoyer : un code et un corps. */
+export interface Reponse {
+  readonly statut: number
+  readonly corps: Record<string, unknown>
+}
 
-  const clef = process.env.A237_CLEF_IA ?? ''
-  const ouverte = process.env.A237_IA_OUVERTE === '1'
-  if (clef === '' || !ouverte) {
+export async function repondre(corpsRecu: unknown, r: Reglages): Promise<Reponse> {
+  if (r.clef === '' || !r.ouverte) {
     // 503 et non 500 : ce n'est pas cassé, ce n'est pas encore branché. Le
     // client le dit tel quel à l'utilisateur au lieu de tourner dans le vide.
-    res.status(503).json({ erreur: 'la composition par le modèle n’est pas encore ouverte' })
-    return
+    return {
+      statut: 503,
+      corps: { erreur: 'la composition par le modèle n’est pas encore ouverte' },
+    }
   }
 
-  const corps = req.body as { demande?: unknown } | undefined
-  const demande = typeof corps?.demande === 'string' ? corps.demande.trim() : ''
+  const recu = corpsRecu as { demande?: unknown } | undefined
+  const demande = typeof recu?.demande === 'string' ? recu.demande.trim() : ''
   if (demande === '' || demande.length > MAX_DEMANDE) {
-    res.status(400).json({ erreur: 'demande absente ou trop longue' })
-    return
+    return { statut: 400, corps: { erreur: 'demande absente ou trop longue' } }
   }
 
   /*
@@ -121,16 +137,18 @@ export default async function handler(req: RequeteEntrante, res: ReponseSortante
    * contourner avec les outils de développement n'est pas un prix.
    */
   if (etageDe(demande, CATALOGUE) === 3 && !abonne()) {
-    res.status(402).json({
-      erreur: 'abonnement-requis',
-      pourquoi:
-        'Cette demande vaut plusieurs outils d’un coup. Compose-les un par un, ou prends un abonnement.',
-    })
-    return
+    return {
+      statut: 402,
+      corps: {
+        erreur: 'abonnement-requis',
+        pourquoi:
+          'Cette demande vaut plusieurs outils d’un coup. Compose-les un par un, ou prends un abonnement.',
+      },
+    }
   }
 
   try {
-    const resultat = await traiter(demande, fournisseurChoisi(clef), TAUX_FCFA_PAR_DOLLAR)
+    const resultat = await traiter(demande, fournisseurChoisi(r), r.tauxFcfa)
 
     // Le coût part dans le journal du serveur en attendant `ai_calls` : la
     // promesse du brief est « moins d'un franc par génération », et une
@@ -138,7 +156,7 @@ export default async function handler(req: RequeteEntrante, res: ReponseSortante
     console.log(
       JSON.stringify({
         evenement: 'appel_ia',
-        modele: process.env.A237_MODELE ?? 'google/gemini-2.5-flash-lite',
+        modele: r.modele,
         essais: resultat.essais,
         fcfa: resultat.cout.fcfa,
         issue: resultat.sorte,
@@ -151,28 +169,28 @@ export default async function handler(req: RequeteEntrante, res: ReponseSortante
        * requête a abouti, la réponse est négative. Renvoyer une erreur ferait
        * réessayer le client, et repayer.
        */
-      res.status(200).json({ impossible: resultat.pourquoi, fcfa: resultat.cout.fcfa })
-      return
+      return { statut: 200, corps: { impossible: resultat.pourquoi, fcfa: resultat.cout.fcfa } }
     }
 
     if (resultat.sorte === 'calcule') {
-      res.status(200).json({ calcul: resultat.calcul, fcfa: resultat.cout.fcfa })
-      return
+      return { statut: 200, corps: { calcul: resultat.calcul, fcfa: resultat.cout.fcfa } }
     }
 
     if (resultat.sorte !== 'reussi') {
-      res.status(422).json({
-        erreur: 'le modèle n’a pas produit un registre utilisable',
-        details: resultat.erreurs.map((e) => `${e.chemin} : ${e.message}`),
-        // Un échec a coûté deux tours. L'omettre ferait sous-estimer la
-        // dépense réelle, et le brief demande le coût de chaque appel (§ 8).
-        fcfa: resultat.cout.fcfa,
-      })
-      return
+      return {
+        statut: 422,
+        corps: {
+          erreur: 'le modèle n’a pas produit un registre utilisable',
+          details: resultat.erreurs.map((e) => `${e.chemin} : ${e.message}`),
+          // Un échec a coûté deux tours. L'omettre ferait sous-estimer la
+          // dépense réelle, et le brief demande le coût de chaque appel (§ 8).
+          fcfa: resultat.cout.fcfa,
+        },
+      }
     }
 
     const registre: RegistreDemande = resultat.registre
-    res.status(200).json({ registre, fcfa: resultat.cout.fcfa })
+    return { statut: 200, corps: { registre, fcfa: resultat.cout.fcfa } }
   } catch (cause) {
     // Le message d'un fournisseur peut contenir la clef en écho : on ne le
     // propage pas au client, on le garde côté serveur.
@@ -184,10 +202,9 @@ export default async function handler(req: RequeteEntrante, res: ReponseSortante
        * compte est à recharger, et le dire autrement enverrait quelqu'un
        * chercher un problème qui n'existe pas.
        */
-      res.status(402).json({ erreur: 'plus de crédit pour composer' })
-      return
+      return { statut: 402, corps: { erreur: 'plus de crédit pour composer' } }
     }
 
-    res.status(502).json({ erreur: 'le modèle n’a pas répondu' })
+    return { statut: 502, corps: { erreur: 'le modèle n’a pas répondu' } }
   }
 }
