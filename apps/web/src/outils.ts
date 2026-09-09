@@ -79,6 +79,7 @@ export const CHARGEURS: Readonly<Record<string, () => Promise<ModuleOutil>>> = {
   dette: () => import('./outils/actes.js'),
   motivation: () => import('./outils/actes.js'),
   cv: () => import('./outils/cv.js'),
+  ardoise: () => import('./outils/ardoise.js'),
   njangi: () => import('./outils/njangi.js'),
   // Un seul fragment pour les quatre registres décrits par leurs colonnes, et
   // un pour les deux calculatrices : ils partagent leur écran et leur moteur.

@@ -1,6 +1,6 @@
 import { jsx as _jsx } from "preact/jsx-runtime";
 // @vitest-environment happy-dom
-import { EXTRAIT_VIDE, attestation, caisse, clients, course, cv, dette, devis, facture, motivation, njangi, prix, recu, scolarite, stock, valider, } from '@a237/engine';
+import { EXTRAIT_VIDE, ardoise, attestation, caisse, clients, course, cv, dette, devis, facture, motivation, njangi, prix, recu, scolarite, stock, valider, } from '@a237/engine';
 import { render as monter } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -46,9 +46,9 @@ function poser(module, o, onDiffuser = vi.fn()) {
 describe('le registre des outils', () => {
     it('couvre les squelettes qui ont un écran, et le dit', () => {
         expect(Object.keys(CHARGEURS).sort()).toEqual([
-            'attestation', 'caisse', 'clients', 'compose', 'compose-calcul', 'course',
-            'cv', 'dette', 'devis', 'facture', 'motivation', 'njangi', 'prix', 'recu',
-            'scolarite', 'stock',
+            'ardoise', 'attestation', 'caisse', 'clients', 'compose', 'compose-calcul',
+            'course', 'cv', 'dette', 'devis', 'facture', 'motivation', 'njangi', 'prix',
+            'recu', 'scolarite', 'stock',
         ]);
         expect(outilDisponible('njangi')).toBe(true);
         expect(outilDisponible('callbox')).toBe(false);
@@ -319,5 +319,30 @@ describe('le curriculum vitæ', () => {
     it('refuse de fabriquer autre chose qu’un CV', async () => {
         const module = await CHARGEURS.cv();
         expect(() => module.creer('facture', LE_9_SEPT, EXTRAIT_VIDE)).toThrow('ne sait faire qu’un CV');
+    });
+});
+describe('l’ardoise', () => {
+    it('s’ouvre sur l’encours et sait dire qu’elle est vide', async () => {
+        const module = await CHARGEURS.ardoise();
+        const neuf = module.creer('ardoise', LE_9_SEPT, EXTRAIT_VIDE);
+        expect(valider(ardoise.schema, neuf.etat)).toEqual([]);
+        poser(module, outil('ardoise', neuf.etat));
+        expect(hote.textContent).toContain('Encours');
+        expect(hote.textContent).toContain('Aucune dette pour l’instant');
+    });
+    it('refuse de dessiner un état qui n’est pas une ardoise', async () => {
+        const module = await CHARGEURS.ardoise();
+        poser(module, outil('ardoise', { nom: 'Bancal' }));
+        expect(hote.querySelector('.etat-invalide')).not.toBeNull();
+    });
+    it('avertit avant de diffuser, toujours', async () => {
+        // L'invariant § 2.5 ne dépend pas de l'état de l'ardoise : une ardoise
+        // vide qu'on publierait aujourd'hui sera pleine demain.
+        const module = await CHARGEURS.ardoise();
+        const neuf = module.creer('ardoise', LE_9_SEPT, EXTRAIT_VIDE);
+        const onDiffuser = poser(module, outil('ardoise', neuf.etat));
+        act(() => hote.querySelector('.outil-action.principale')?.click());
+        const partage = onDiffuser.mock.calls[0]?.[0];
+        expect(partage?.warn).toContain('pour toi, pas pour un groupe');
     });
 });

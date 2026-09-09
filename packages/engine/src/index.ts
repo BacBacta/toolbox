@@ -61,6 +61,13 @@ export {
   GABARITS, INTITULES, SIGNES_PAR_PAGE, controleCv, debordeUnePage, signesCv,
 } from './compute/cv.js'
 export { cv, cvCard, cvShare } from './skeletons/cv.js'
+export type { DetteClient, DetteVue, EtatArdoise, TotauxArdoise, Tranche } from './compute/ardoise.js'
+export {
+  JOURS_RETARD, MAX_DETTES, TRANCHES, ajouterDette, basculerReglee, chercher,
+  joursOuverts, ordonner, retirerDette, totaux, vieillissement, vueDettes,
+} from './compute/ardoise.js'
+export { AVERTISSEMENT_ARDOISE, ardoise, ardoiseCard, ardoiseShare } from './skeletons/ardoise.js'
+export { ardoiseSchema } from './schema/ardoise.js'
 export { cvSchema } from './schema/cv.js'
 export type { CalculDemande, EntreeDemandee } from './calcul.js'
 export { MAX_ENTREES, schemaCalcul, verifierCalcul } from './calcul.js'

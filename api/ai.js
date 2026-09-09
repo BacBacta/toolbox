@@ -110,6 +110,24 @@ var CATALOGUE = [
 		]
 	},
 	{
+		id: "ardoise",
+		glyphe: "◷",
+		group: "registres",
+		title: "Ardoise clients",
+		keywords: [
+			"ardoise",
+			"dette",
+			"credit",
+			"doit",
+			"creance",
+			"impaye",
+			"on me doit",
+			"qui me doit",
+			"carnet de dettes",
+			"recouvrement"
+		]
+	},
+	{
 		id: "njangi",
 		glyphe: "◉",
 		group: "registres",
