@@ -54,6 +54,7 @@ export const recuSchema: JsonSchema = {
     emetteur: emetteurSchema,
     recuDe: { type: 'string', maxLength: 80, title: 'Reçu de', description: 'Qui a payé.' },
     lignes: {
+  // Champs de ligne : jamais de `minLength`, voir `schema/commun.ts`.
       type: 'array', maxItems: 40, title: 'Ce qui est réglé',
       description: 'Sans TVA : la taxe a été traitée sur la facture, la répéter ferait croire à une seconde opération.',
       items: {
@@ -61,7 +62,7 @@ export const recuSchema: JsonSchema = {
         additionalProperties: false,
         required: ['designation', 'montant'],
         properties: {
-          designation: { type: 'string', minLength: 1, maxLength: 120, title: 'Désignation' },
+          designation: { type: 'string', maxLength: 120, title: 'Désignation' },
           montant: { type: 'integer', minimum: 0, maximum: 1_000_000_000, title: 'Montant (F CFA)' },
         },
       },

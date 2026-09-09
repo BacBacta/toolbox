@@ -59,7 +59,7 @@ export const njangiSchema: JsonSchema = {
         additionalProperties: false,
         required: ['nom', 'aVerse', 'aRecu', 'estAuTour', 'versements', 'tours'],
         properties: {
-          nom: { type: 'string', minLength: 1, maxLength: 40, title: 'Nom' },
+          nom: { type: 'string', maxLength: 40, title: 'Nom' },
           tel: { type: 'string', maxLength: 20, title: 'Téléphone', description: 'Pour la relance.' },
           aVerse: { type: 'boolean', title: 'A versé sa part', description: 'Pour le tour en cours.' },
           aRecu: { type: 'boolean', title: 'A déjà reçu la cagnotte', description: 'Dans le cycle en cours.' },

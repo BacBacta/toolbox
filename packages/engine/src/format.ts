@@ -87,6 +87,21 @@ export function dateLongue(d: Date): string {
   return `${p.jour} ${nom(p.mois)} ${p.annee}`
 }
 
+/**
+ * La date longue d'une chaîne ISO, ou `null` si elle n'en est pas une.
+ *
+ * `dateLongue` refuse une date invalide, et elle a raison : dessiner « Invalid
+ * Date » sur un document serait pire. Mais une date que l'utilisateur est en
+ * train de saisir n'est pas encore une date, et le rendu ne doit pas se
+ * casser en l'attendant. Le rendu choisit alors de ne rien écrire.
+ */
+export function dateLongueSiValide(iso: string): string | null {
+  if (iso.trim() === '') return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return dateLongue(d)
+}
+
 /** `dateCourte()` → `09/09/2026`. */
 export function dateCourte(d: Date): string {
   const p = partsWAT(d)

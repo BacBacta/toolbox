@@ -52,6 +52,20 @@ export const clientSchema: JsonSchema = {
   },
 }
 
+/*
+ * Aucun champ de ligne n'exige d'être non vide, et c'est délibéré.
+ *
+ * « Ajouter une ligne » insère une ligne neuve, donc vide, et l'état doit
+ * rester valide entre ce clic et la première lettre tapée. Un `minLength: 1`
+ * sur un champ de ligne décrit un état qui existe forcément, et le refuser
+ * remplaçait tout l'écran par « cet outil ne correspond pas à ce que
+ * l'application sait dessiner » — avant même la première frappe. La règle vaut
+ * pour toutes les listes de l'atelier, et une garde la tient.
+ *
+ * Le vide n'est pas une invalidité mais une incomplétude : il se dit dans
+ * l'encart des manquements et dans l'avertissement du partage, jamais en
+ * refusant de dessiner la page.
+ */
 export const lignesSchema: JsonSchema = {
   type: 'array',
   title: 'Lignes du document',
@@ -61,7 +75,7 @@ export const lignesSchema: JsonSchema = {
     additionalProperties: false,
     required: ['designation', 'quantite', 'prixUnitaire'],
     properties: {
-      designation: { type: 'string', minLength: 1, maxLength: 120, title: 'Désignation' },
+      designation: { type: 'string', maxLength: 120, title: 'Désignation' },
       quantite: { type: 'number', minimum: 0, maximum: 1_000_000, title: 'Quantité' },
       prixUnitaire: { type: 'integer', minimum: 0, maximum: 1_000_000_000, title: 'Prix unitaire (F CFA)' },
     },

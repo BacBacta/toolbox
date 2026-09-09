@@ -29,8 +29,8 @@ export {
 export { calculerLignes, montantAcompte } from './compute/tva.js'
 
 export {
-  anneeDe, arreteLe, dateCourte, dateLongue, ESPACE_INSECABLE, heureCourte,
-  initiales, joursEntre, montantF, nf, normaliser,
+  anneeDe, arreteLe, dateCourte, dateLongue, dateLongueSiValide, ESPACE_INSECABLE,
+  heureCourte, initiales, joursEntre, montantF, nf, normaliser,
 } from './format.js'
 
 export { lettres, montantEnLettres } from './lettres.js'

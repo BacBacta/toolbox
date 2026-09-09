@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { SQUELETTES, valider } from '@a237/engine'
 import type { JsonSchema } from '@a237/engine'
 import { render as monter } from 'preact'
 import { act } from 'preact/test-utils'
@@ -271,4 +272,42 @@ describe('valeurNeuve', () => {
   it('remplit tous les champs quand aucun n’est déclaré obligatoire', () => {
     expect(valeurNeuve({ type: 'object', properties: { a: { type: 'string' } } })).toEqual({ a: '' })
   })
+})
+
+describe('« Ajouter une ligne » ne doit jamais casser l’outil', () => {
+  /**
+   * `valeurNeuve` promet « une valeur neuve conforme au schéma ». Si elle ne
+   * l'est pas, l'état devient invalide au clic et tout l'écran est remplacé par
+   * « cet outil ne correspond pas à ce que l'application sait dessiner » —
+   * avant même que la personne ait tapé une lettre.
+   *
+   * La garde vaut pour les squelettes d'aujourd'hui comme pour ceux de demain :
+   * elle parcourt le catalogue, pas une liste écrite à la main.
+   */
+  /** Les schémas d'élément : les seuls que le bouton « Ajouter » fabrique. */
+  function elementsDeListe(schema: JsonSchema, chemin = '$'): [string, JsonSchema][] {
+    if (schema.type === 'array') {
+      return [
+        [`${chemin}[]`, schema.items],
+        ...elementsDeListe(schema.items, `${chemin}[]`),
+      ]
+    }
+    if (schema.type === 'object') {
+      return Object.entries(schema.properties).flatMap(([clef, sous]) =>
+        elementsDeListe(sous, `${chemin}.${clef}`),
+      )
+    }
+    return []
+  }
+
+  it.each(SQUELETTES.map((s) => [s.id, s.schema] as const))(
+    '« %s » : chaque valeur neuve satisfait son schéma',
+    (_id, schema) => {
+      const fautives = elementsDeListe(schema)
+        .map(([chemin, sous]) => [chemin, valider(sous, valeurNeuve(sous))] as const)
+        .filter(([, erreurs]) => erreurs.length > 0)
+        .map(([chemin, erreurs]) => `${chemin} — ${erreurs[0]?.message ?? ''}`)
+      expect(fautives).toEqual([])
+    },
+  )
 })

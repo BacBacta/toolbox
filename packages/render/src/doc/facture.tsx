@@ -1,6 +1,6 @@
 import type { EtatFacture } from '@a237/engine'
 import {
-  chiffrerFacture, dateEcheance, dateLongue, joursDeRetard, LIBELLE_MOYEN,
+  chiffrerFacture, dateEcheance, dateLongue, dateLongueSiValide, joursDeRetard, LIBELLE_MOYEN,
   montantEnLettres, montantF,
 } from '@a237/engine'
 import { dateEmission } from '@a237/engine'
@@ -90,12 +90,16 @@ export function DocumentFacture(props: {
           <p>
             Règlements reçus :{' '}
             {etat.reglements
-              .map(
-                (r) =>
-                  `${montantF(r.montant)} le ${dateLongue(new Date(r.date))} (${LIBELLE_MOYEN[r.moyen]}${
-                    r.reference !== undefined ? `, réf. ${r.reference}` : ''
-                  })`,
-              )
+              .map((r) => {
+                // La date d'un règlement qu'on est en train de saisir n'est pas
+                // encore une date : on écrit le montant sans elle plutôt que de
+                // faire échouer le rendu de toute la facture.
+                const quand = dateLongueSiValide(r.date)
+                const ref = r.reference === undefined || r.reference === ''
+                  ? ''
+                  : `, réf. ${r.reference}`
+                return `${montantF(r.montant)}${quand === null ? '' : ` le ${quand}`} (${LIBELLE_MOYEN[r.moyen]}${ref})`
+              })
               .join(' · ')}
             .
           </p>

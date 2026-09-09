@@ -6,10 +6,11 @@ export const MOYENS_PAIEMENT = ['momo', 'orange-money', 'especes', 'virement'] a
 
 export const reglementSchema: JsonSchema = {
   type: 'object',
+  // Champs de ligne : jamais de `minLength`, voir `schema/commun.ts`.
   additionalProperties: false,
   required: ['date', 'montant', 'moyen'],
   properties: {
-    date: { type: 'string', minLength: 10, maxLength: 32, title: 'Date du versement' },
+    date: { type: 'string', maxLength: 32, title: 'Date du versement' },
     montant: { type: 'integer', minimum: 0, maximum: 1_000_000_000, title: 'Montant (F CFA)' },
     moyen: { type: 'string', enum: [...MOYENS_PAIEMENT], title: 'Moyen' },
     reference: { type: 'string', maxLength: 60, title: 'Référence de la transaction' },
