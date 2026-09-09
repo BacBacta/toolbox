@@ -1,7 +1,8 @@
-import { formatNumero, numeroSuivant, piedLegal } from '@a237/legal-cm'
+import { piedLegal } from '@a237/legal-cm'
 import { chiffrer, controleLegal, dateEmission } from '../compute/devis.js'
+import { prochainNumero } from '../compute/numerotation.js'
 import type { EtatDevis } from '../compute/devis.js'
-import { anneeDe, arreteLe, dateLongue, montantF, nf } from '../format.js'
+import { arreteLe, dateLongue, montantF, nf } from '../format.js'
 import { devisSchema } from '../schema/devis.js'
 import type { CardSpec, RenderContext, ShareSpec, Skeleton } from '../types.js'
 
@@ -103,10 +104,10 @@ export const devis: Skeleton<EtatDevis> = {
   defaults,
   initialiser: (ctx) => ({
     ...defaults,
-    numero: formatNumero(numeroSuivant(null, anneeDe(ctx.maintenant), PREFIXE_DEVIS)),
+    numero: prochainNumero(PREFIXE_DEVIS, [], ctx.maintenant),
     emisLe: ctx.maintenant.toISOString(),
   }),
-  compute: { chiffrer, controleLegal, dateEmission, piedLegal },
+  compute: { chiffrer, controleLegal, dateEmission, prochainNumero, piedLegal },
   card: devisCard,
   share: devisShare,
 }
