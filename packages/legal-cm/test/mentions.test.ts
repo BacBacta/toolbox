@@ -76,6 +76,16 @@ describe('le B2B exige le NIU du client', () => {
 })
 
 describe('piedLegal', () => {
+  it('saute les mentions absentes plutôt que d’imprimer une étiquette orpheline', () => {
+    const vierge = { ...EMETTEUR, rccm: '', niu: '', forme: '', adresse: '' }
+    expect(piedLegal(vierge)).toBe('QUINCAILLERIE BÉPANDA')
+    expect(piedLegal({ ...EMETTEUR, niu: '' })).not.toContain('NIU')
+  })
+
+  it('ne rend rien du tout sur un émetteur entièrement vide', () => {
+    expect(piedLegal({ ...EMETTEUR, nom: '', forme: '', rccm: '', niu: '', adresse: '' })).toBe('')
+  })
+
   it('assemble la ligne imprimée sous le document', () => {
     expect(piedLegal(EMETTEUR)).toBe(
       'QUINCAILLERIE BÉPANDA — Ets — Établissement individuel · RCCM RC/DLA/2022/A/1487 · NIU M022114873829Y · Rue Bépanda-Omnisport, BP 4127 Douala',

@@ -105,7 +105,21 @@ export function peutEtreEmis(emetteur: Emetteur, client?: Client): boolean {
   return !mentionsManquantes(emetteur, client).some((x) => x.gravite === 'bloquant')
 }
 
-/** Le pied de page légal, tel qu'il s'imprime sous le document. */
+/**
+ * Le pied de page légal, tel qu'il s'imprime sous le document.
+ *
+ * Les mentions absentes sont sautées plutôt que d'imprimer une étiquette
+ * orpheline : sur un document qu'on vient d'ouvrir, « RCCM  · NIU  · » ne
+ * renseigne personne et donne l'air d'un bug. Ce qui manque est signalé par
+ * `mentionsManquantes`, à l'écran, pas sur le papier.
+ */
 export function piedLegal(e: Emetteur): string {
-  return `${e.nom} — ${e.forme} · RCCM ${e.rccm} · NIU ${e.niu} · ${e.adresse}`
+  return [
+    [e.nom, e.forme].filter((x) => !vide(x)).join(' — '),
+    vide(e.rccm) ? null : `RCCM ${e.rccm}`,
+    vide(e.niu) ? null : `NIU ${e.niu}`,
+    e.adresse,
+  ]
+    .filter((x): x is string => x !== null && !vide(x))
+    .join(' · ')
 }
