@@ -1,5 +1,5 @@
 import type { Comprehension, Extrait, FicheSquelette } from '@a237/engine'
-import { EXTRAIT_VIDE, comprendre, montantF } from '@a237/engine'
+import { CE_QUE_COUTE, EXTRAIT_VIDE, comprendre, etageDe, montantF } from '@a237/engine'
 import type { JSX } from 'preact'
 import { useState } from 'preact/hooks'
 import { composer } from './composer.js'
@@ -50,6 +50,7 @@ type Composition =
   | 'en-cours'
   | 'pas-ouvert'
   | 'sans-credit'
+  | { readonly abonnement: string }
   | { readonly echoue: string }
   | { readonly horsSujet: string }
 
@@ -105,6 +106,8 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
         setComposition('pas-ouvert')
       } else if (r.sorte === 'sans-credit') {
         setComposition('sans-credit')
+      } else if (r.sorte === 'abonnement-requis') {
+        setComposition({ abonnement: r.pourquoi })
       } else if (r.sorte === 'hors-sujet') {
         setComposition({ horsSujet: r.pourquoi })
       } else {
@@ -178,6 +181,15 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
         </div>
       )}
 
+      {reponse?.sorte === 'plusieurs' && (
+        <div class="atelier-reponse">
+          <p class="atelier-dit">
+            Ça fait plusieurs outils d’un coup. Demande-les un par un — chacun coûte
+            quelques centimes — ou prends un abonnement.
+          </p>
+        </div>
+      )}
+
       {reponse?.sorte === 'hors-portee' && (
         <div class="atelier-reponse">
           <p class="atelier-dit">
@@ -190,12 +202,28 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
               <span class="marque" aria-hidden="true">✳</span>
               <span class="texte">
                 <b>Compose-le pour moi</b>
-                <span>demande le réseau</span>
+                {/*
+                  * Le prix se dit avant le clic, pas après.
+                  *
+                  * L'étage se calcule ici, gratuitement et sans réseau : c'est
+                  * ce qui permet d'annoncer un prix plutôt qu'une facture. Le
+                  * serveur le recalcule et tranche — un prix qu'on peut
+                  * contourner depuis le navigateur n'est pas un prix.
+                  */}
+                <span>{CE_QUE_COUTE[etageDe(demande, props.fiches)]}</span>
               </span>
             </button>
           )}
 
           {composition === 'en-cours' && <p class="note">Je compose…</p>}
+
+          {typeof composition === 'object' && 'abonnement' in composition && (
+            <p class="note">
+              {composition.abonnement === ''
+                ? 'Cette demande vaut plusieurs outils d’un coup.'
+                : composition.abonnement}
+            </p>
+          )}
 
           {composition === 'sans-credit' && (
             <p class="note">

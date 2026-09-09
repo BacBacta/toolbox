@@ -251,3 +251,37 @@ describe('le crédit épuisé se dit proprement', () => {
     expect(JSON.stringify(r.corps)).not.toContain('une-clef')
   })
 })
+
+describe('l’étage 3 est fermé tant qu’il n’y a pas d’abonnement', () => {
+  beforeEach(() => {
+    process.env.A237_CLEF_IA = 'une-clef'
+    process.env.A237_IA_OUVERTE = '1'
+  })
+
+  it('refuse une demande qui vaut plusieurs outils, sans appeler le modèle', async () => {
+    // Le point du modèle hybride : reconnaître la grosse demande **avant** de
+    // la faire. Annoncer le prix après l'appel serait annoncer une facture.
+    const appels = vi.fn()
+    vi.stubGlobal('fetch', appels)
+    const r = await appeler({
+      method: 'POST',
+      body: { demande: 'il me faut tout ce qu il faut pour ma boutique' },
+    })
+    expect(r.statut).toBe(402)
+    expect(r.corps.erreur).toBe('abonnement-requis')
+    expect(appels).not.toHaveBeenCalled()
+  })
+
+  it('laisse passer une demande d’un seul outil', async () => {
+    const appels = vi.fn().mockResolvedValue(repondOpenrouter(JSON.stringify({
+      titre: 'Suivi', kicker: 'SUIVI', titreNom: 'Nom',
+      colonnes: [{ clef: 'client', titre: 'Client', type: 'texte' }],
+      libelleVide: 'Rien pour l’instant.', libelleAjout: 'Ajouter',
+      relancesVides: 'Un suivi se consulte.',
+    })))
+    vi.stubGlobal('fetch', appels)
+    const r = await appeler({ method: 'POST', body: { demande: 'suivre mes livraisons de gaz' } })
+    expect(r.statut).toBe(200)
+    expect(appels).toHaveBeenCalled()
+  })
+})

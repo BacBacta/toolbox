@@ -35,6 +35,8 @@ export {
 
 export { lettres, montantEnLettres } from './lettres.js'
 
+export type { Etage } from './etage.js'
+export { CE_QUE_COUTE, etageDe } from './etage.js'
 export type { Comprehension } from './comprendre.js'
 export { comprendre } from './comprendre.js'
 export type { Extrait } from './extraire.js'

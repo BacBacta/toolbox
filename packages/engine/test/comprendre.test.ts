@@ -138,3 +138,21 @@ describe('l’outil s’ouvre garni de ce que la phrase disait', () => {
     expect(etat?.lignes).toEqual([])
   })
 })
+
+describe('une demande qui vaut plusieurs outils se dit telle quelle', () => {
+  it.each([
+    'il me faut tout ce qu il faut pour ma boutique',
+    'un njangi, une liste de prix et un inventaire',
+    'je veux plusieurs outils',
+  ])('« %s » n’ouvre pas un outil au hasard', (demande) => {
+    expect(c(demande).sorte).toBe('plusieurs')
+  })
+
+  it('ne répond pas au dixième de la question sans le dire', () => {
+    // « Tout ce qu'il faut pour ma boutique » contient « boutique », donc se
+    // classe très bien en liste de prix. Ouvrir la liste de prix serait une
+    // réponse plausible à une question qu'on n'a pas écoutée.
+    const r = c('il me faut tout ce qu il faut pour ma boutique')
+    expect(r.sorte).not.toBe('sur')
+  })
+})

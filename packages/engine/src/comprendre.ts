@@ -1,6 +1,7 @@
 import type { FicheSquelette } from './catalogue.js'
 import type { Extrait } from './extraire.js'
 import { extraire } from './extraire.js'
+import { etageDe } from './etage.js'
 import { classer } from './match.js'
 
 /**
@@ -24,6 +25,16 @@ export type Comprehension =
   | { readonly sorte: 'ambigu'; readonly fiches: readonly FicheSquelette[]; readonly extrait: Extrait }
   /** Aucun mot-clef ne mord : il faut monter d'un étage, et ça coûte. */
   | { readonly sorte: 'hors-portee'; readonly extrait: Extrait }
+  /**
+   * La demande vaut plusieurs outils.
+   *
+   * Elle sera souvent classable — « tout ce qu'il faut pour ma boutique »
+   * contient « boutique » — et ouvrir la liste de prix serait répondre à un
+   * dixième de la question sans le dire. C'est la même faute que de fabriquer
+   * un registre pour qui demande un site : une réponse plausible à une
+   * question qu'on n'a pas écoutée.
+   */
+  | { readonly sorte: 'plusieurs'; readonly extrait: Extrait }
   /** Rien à comprendre. */
   | { readonly sorte: 'vide' }
 
@@ -47,6 +58,12 @@ export function comprendre(
   if (demande.trim() === '') return { sorte: 'vide' }
 
   const extrait = extraire(demande)
+
+  // L'étage se décide avant le classement : une liste de courses n'est pas
+  // une hésitation entre deux outils, et le premier mot reconnu ne doit pas
+  // répondre à la place des trois.
+  if (etageDe(demande, fiches) === 3) return { sorte: 'plusieurs', extrait }
+
   const classees = classer(demande, fiches)
 
   const premier = classees[0]

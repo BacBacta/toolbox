@@ -1,4 +1,5 @@
 import type { RegistreDemande } from '@a237/engine'
+import { CATALOGUE, etageDe } from '@a237/engine'
 import type { Fournisseur } from './fournisseur.js'
 import { ErreurFournisseur, gemini, openrouter } from './fournisseur.js'
 import { traiter } from './traiter.js'
@@ -70,6 +71,22 @@ function fournisseurChoisi(clef: string): Fournisseur {
     : openrouter(clef, modele ?? 'google/gemini-2.5-flash-lite', prix)
 }
 
+/**
+ * Le porteur d'abonnement, quand il y en aura.
+ *
+ * Il n'y a pas encore de comptes : ils vivent dans D1, qui arrive avec la
+ * phase 2. La fonction rend donc faux, et l'étage 3 est fermé à tout le monde
+ * — ce qui est la bonne valeur par défaut : on ne facture personne, et on ne
+ * dépense pas non plus.
+ *
+ * C'est une couture d'une ligne. Le jour où les comptes existent, elle lit le
+ * plan du compte ; rien d'autre ne bouge, parce que la décision de ce qui
+ * relève de l'abonnement est déjà prise ailleurs, gratuitement et sans réseau.
+ */
+function abonne(): boolean {
+  return false
+}
+
 export default async function handler(req: RequeteEntrante, res: ReponseSortante): Promise<void> {
   if (req.method !== 'POST') {
     res.status(405).json({ erreur: 'méthode non permise' })
@@ -89,6 +106,26 @@ export default async function handler(req: RequeteEntrante, res: ReponseSortante
   const demande = typeof corps?.demande === 'string' ? corps.demande.trim() : ''
   if (demande === '' || demande.length > MAX_DEMANDE) {
     res.status(400).json({ erreur: 'demande absente ou trop longue' })
+    return
+  }
+
+  /*
+   * Le modèle économique, appliqué **avant** de dépenser.
+   *
+   * Une petite tâche se paie à l'appel ; une demande qui en vaut plusieurs
+   * demande un abonnement. Pour que ça tienne, il faut reconnaître la grosse
+   * demande sans la faire — sinon on annonce une facture, pas un prix. C'est
+   * l'étage 1 qui tranche, et il ne coûte rien.
+   *
+   * Le contrôle est ici et non dans le navigateur : un prix qu'on peut
+   * contourner avec les outils de développement n'est pas un prix.
+   */
+  if (etageDe(demande, CATALOGUE) === 3 && !abonne()) {
+    res.status(402).json({
+      erreur: 'abonnement-requis',
+      pourquoi:
+        'Cette demande vaut plusieurs outils d’un coup. Compose-les un par un, ou prends un abonnement.',
+    })
     return
   }
 

@@ -192,6 +192,44 @@ Le coût réel part dans le journal du serveur en attendant sa table, parce que
 « moins d'un franc par génération » (§ 8) est un critère de réussite, et qu'un
 critère qu'on ne mesure pas est une croyance.
 
+## Le modèle économique est hybride — tranché le 9 septembre 2026
+
+Le brief prévoyait un abonnement mensuel de 2 000 F (§ 1). La décision le
+complète plutôt que de le remplacer :
+
+| Étage | Ce que c'est | Ce que ça coûte |
+|---|---|---|
+| 1 | Un squelette répond, par mots-clefs | **gratuit**, et hors ligne |
+| 2 | Un outil composé par le modèle | **à l'appel**, quelques centimes |
+| 3 | Plusieurs outils d'un coup | **abonnement** |
+
+**Le point qui fait tenir l'ensemble : l'étage se décide avant de dépenser.**
+`etageDe` ne coûte rien — c'est de la correspondance de mots-clefs, hors
+ligne — et c'est ce qui permet d'annoncer un prix plutôt qu'une facture.
+Reconnaître une grosse demande après l'avoir faite reviendrait à présenter
+l'addition en prétendant l'avoir annoncée.
+
+Le navigateur affiche le prix sous le bouton, avant le clic. Le serveur
+recalcule et tranche : un prix qu'on peut contourner depuis les outils de
+développement n'est pas un prix.
+
+Le doute penche du côté le moins cher. Sous-estimer coûte quelques centimes ;
+sur-estimer envoie vers un abonnement quelqu'un qui voulait un seul carnet, et
+celui-là ne revient pas. Les marques de pluralité sont donc peu nombreuses et
+sans ambiguïté, et une hésitation entre deux outils reste une question, pas un
+paiement.
+
+### Ce qui manque, et ce que la phase 2 doit livrer
+
+`abonne()` rend `false` : il n'y a pas de comptes, donc l'étage 3 est fermé à
+tout le monde. C'est la bonne valeur par défaut — on ne facture personne, et on
+ne dépense pas non plus. C'est une couture d'une ligne, à brancher sur le plan
+du compte quand D1 existera.
+
+La phase 2 doit donc livrer, en plus de ce que le brief prévoyait : un plan par
+compte lisible à chaque appel, et un compteur de consommation à l'appel pour
+l'étage 2 — le solde d'OpenRouter est global, il ne dit pas qui a dépensé quoi.
+
 ## Reportées, et à quel moment il faudra trancher
 
 | Sujet | Quand | Ce qui est déjà prêt |

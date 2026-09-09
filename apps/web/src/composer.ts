@@ -31,6 +31,11 @@ export type Composition =
    * réessayer ferait tourner quelqu'un en rond sur un mur.
    */
   | { readonly sorte: 'sans-credit' }
+  /**
+   * La demande vaut plusieurs outils. Elle relève de l'abonnement, et on le
+   * dit **avant** d'avoir dépensé quoi que ce soit.
+   */
+  | { readonly sorte: 'abonnement-requis'; readonly pourquoi: string }
   | { readonly sorte: 'echoue'; readonly pourquoi: string }
 
 export async function composer(demande: string, signal?: AbortSignal): Promise<Composition> {
@@ -48,7 +53,17 @@ export async function composer(demande: string, signal?: AbortSignal): Promise<C
   }
 
   if (reponse.status === 503) return { sorte: 'pas-ouvert' }
-  if (reponse.status === 402) return { sorte: 'sans-credit' }
+  if (reponse.status === 402) {
+    const corps = (await reponse.json().catch(() => null)) as
+      | { erreur?: unknown; pourquoi?: unknown }
+      | null
+    return corps?.erreur === 'abonnement-requis'
+      ? {
+          sorte: 'abonnement-requis',
+          pourquoi: typeof corps.pourquoi === 'string' ? corps.pourquoi : '',
+        }
+      : { sorte: 'sans-credit' }
+  }
 
   if (!reponse.ok) {
     return {

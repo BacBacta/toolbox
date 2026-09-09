@@ -15,8 +15,15 @@ export async function composer(demande, signal) {
     }
     if (reponse.status === 503)
         return { sorte: 'pas-ouvert' };
-    if (reponse.status === 402)
-        return { sorte: 'sans-credit' };
+    if (reponse.status === 402) {
+        const corps = (await reponse.json().catch(() => null));
+        return corps?.erreur === 'abonnement-requis'
+            ? {
+                sorte: 'abonnement-requis',
+                pourquoi: typeof corps.pourquoi === 'string' ? corps.pourquoi : '',
+            }
+            : { sorte: 'sans-credit' };
+    }
     if (!reponse.ok) {
         return {
             sorte: 'echoue',

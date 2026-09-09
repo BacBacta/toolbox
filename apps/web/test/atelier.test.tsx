@@ -208,3 +208,32 @@ describe('le crédit épuisé n’est pas une panne', () => {
     expect(hote.textContent).toContain('continuent de marcher')
   })
 })
+
+describe('le prix se dit avant le clic', () => {
+  it('annonce « quelques centimes » pour un outil', () => {
+    demander('je veux suivre mes livraisons de gaz')
+    expect(hote.textContent).toContain('quelques centimes')
+  })
+
+  it('annonce l’abonnement pour une demande qui vaut plusieurs outils', () => {
+    // Sans appeler personne : l'étage se calcule hors ligne, gratuitement.
+    // C'est ce qui permet d'annoncer un prix plutôt qu'une facture.
+    const appels = vi.fn()
+    vi.stubGlobal('fetch', appels)
+    demander('il me faut tout ce qu il faut pour ma boutique')
+    expect(hote.textContent).toContain('plusieurs outils')
+    expect(hote.textContent).toContain('abonnement')
+    expect(appels).not.toHaveBeenCalled()
+  })
+
+  it('rapporte le refus du serveur, qui a le dernier mot', async () => {
+    // Le navigateur annonce ; le serveur tranche. Un prix qu'on peut
+    // contourner depuis les outils de développement n'est pas un prix.
+    repond(402, { erreur: 'abonnement-requis', pourquoi: 'Cette demande vaut plusieurs outils.' })
+    demander('ma marge sur chaque vente de telephone')
+    cliquer('Compose-le pour moi')
+    await attendre()
+    expect(hote.textContent).toContain('vaut plusieurs outils')
+    expect(creations).toHaveLength(0)
+  })
+})

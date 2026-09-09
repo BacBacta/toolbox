@@ -1,155 +1,247 @@
-//#region src/fournisseur.ts
-/**
-* Une panne de fournisseur, nommée.
-*
-* Une seule distinction compte vraiment : **le crédit épuisé n'est pas une
-* panne**. C'est un compte à recharger, et le dire « le modèle n'a pas
-* répondu » envoie l'utilisateur chercher un problème qui n'existe pas
-* pendant que la vraie cause tient en une phrase. Le brief en fait un critère
-* d'arrêt : « le chemin plus de crédits est propre » (§ 8).
-*/
-var ErreurFournisseur = class extends Error {
-	sorte;
-	constructor(sorte, message) {
-		super(message);
-		this.sorte = sorte;
-		this.name = "ErreurFournisseur";
+//#region ../engine/src/catalogue.ts
+var CATALOGUE = [
+	{
+		id: "devis",
+		glyphe: "▤",
+		group: "documents",
+		title: "Devis",
+		keywords: [
+			"devis",
+			"proposition",
+			"chiffrage",
+			"estimation",
+			"cotation",
+			"pro forma",
+			"proforma",
+			"offre de prix",
+			"ca va couter"
+		]
+	},
+	{
+		id: "facture",
+		glyphe: "▥",
+		group: "documents",
+		title: "Facture",
+		keywords: [
+			"facture",
+			"facturation",
+			"note a payer",
+			"impaye",
+			"creance",
+			"facturer",
+			"reclamer mon argent",
+			"doit me payer"
+		]
+	},
+	{
+		id: "njangi",
+		glyphe: "◉",
+		group: "registres",
+		title: "Carnet de njangi",
+		keywords: [
+			"njangi",
+			"djangi",
+			"tontine",
+			"cotis",
+			"tour",
+			"membre",
+			"cagnotte",
+			"epargne",
+			"association",
+			"reunion"
+		]
+	},
+	{
+		id: "prix",
+		glyphe: "≡",
+		group: "registres",
+		title: "Liste de prix",
+		keywords: [
+			"prix",
+			"tarif",
+			"catalogue",
+			"boutique",
+			"ca coute combien",
+			"liste de prix",
+			"ce que je vends",
+			"mes articles",
+			"menu"
+		]
+	},
+	{
+		id: "caisse",
+		glyphe: "▣",
+		group: "registres",
+		title: "Livre de caisse",
+		keywords: [
+			"caisse",
+			"recette",
+			"depense",
+			"entree sortie",
+			"journal",
+			"argent du jour",
+			"ce que j ai vendu",
+			"livre de compte"
+		]
+	},
+	{
+		id: "stock",
+		glyphe: "▦",
+		group: "registres",
+		title: "Inventaire",
+		keywords: [
+			"stock",
+			"inventaire",
+			"magasin",
+			"quantite",
+			"marchandise",
+			"ce qui me reste",
+			"reappro"
+		]
+	},
+	{
+		id: "clients",
+		glyphe: "◇",
+		group: "registres",
+		title: "Clients",
+		keywords: [
+			"client",
+			"contact",
+			"annuaire",
+			"repertoire",
+			"numero",
+			"carnet d adresses",
+			"mes contacts"
+		]
+	},
+	{
+		id: "scolarite",
+		glyphe: "◪",
+		group: "calculs",
+		title: "Frais scolaires",
+		keywords: [
+			"scolarite",
+			"frais",
+			"ecole",
+			"pension",
+			"rentree",
+			"inscription",
+			"fournitures",
+			"eleve"
+		]
+	},
+	{
+		id: "course",
+		glyphe: "▲",
+		group: "calculs",
+		title: "Partage de course",
+		keywords: [
+			"course",
+			"moto",
+			"taxi",
+			"partage",
+			"diviser",
+			"benskin",
+			"chacun paye",
+			"partager la note",
+			"addition"
+		]
 	}
-};
+];
+//#endregion
+//#region ../engine/src/format.ts
 /**
-* Gemini 2.5 Flash-Lite, le choix par défaut du brief.
-*
-* `responseMimeType: application/json` fait produire du JSON par construction
-* plutôt que par prière. Ça ne dispense pas de valider — un JSON bien formé
-* peut décrire n'importe quoi — mais ça supprime la classe d'échec la plus
-* bête : la réponse enveloppée dans un bloc de code et des politesses.
+* Forme de comparaison : minuscules, sans accent, sans ponctuation.
+* Sert à l'étage 1 du moteur (correspondance de mots-clés, zéro jeton).
 */
-function gemini(clef, modele = "gemini-2.5-flash-lite") {
-	return {
-		nom: modele,
-		prix: {
-			entree: .1,
-			sortie: .4
-		},
-		async appeler(demande) {
-			const tours = [{
-				role: "user",
-				parts: [{ text: demande.invite }]
-			}];
-			if (demande.reprise !== void 0) {
-				tours.push({
-					role: "model",
-					parts: [{ text: demande.reprise.sortie }]
-				});
-				tours.push({
-					role: "user",
-					parts: [{ text: demande.reprise.reproches }]
-				});
-			}
-			const reponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modele}:generateContent`, {
-				method: "POST",
-				headers: {
-					"content-type": "application/json",
-					"x-goog-api-key": clef
-				},
-				body: JSON.stringify({
-					contents: tours,
-					generationConfig: {
-						responseMimeType: "application/json",
-						temperature: 0,
-						maxOutputTokens: 2048
-					}
-				})
-			});
-			if (!reponse.ok) throw new ErreurFournisseur(reponse.status === 429 ? "credit-epuise" : reponse.status === 403 ? "refuse" : "panne", `le modèle a répondu ${reponse.status}`);
-			const corps = await reponse.json();
-			return {
-				texte: corps.candidates?.[0]?.content?.parts?.[0]?.text ?? "",
-				jetonsEntree: corps.usageMetadata?.promptTokenCount ?? 0,
-				jetonsSortie: corps.usageMetadata?.candidatesTokenCount ?? 0
-			};
-		}
-	};
+function normaliser(s) {
+	return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 }
+//#endregion
+//#region ../engine/src/match.ts
+function classer(demande, squelettes) {
+	const texte = normaliser(demande);
+	if (texte === "") return [];
+	return squelettes.map((squelette) => {
+		const nom = normaliser(squelette.title ?? "");
+		const reconnus = squelette.keywords.filter((k) => texte.includes(normaliser(k)));
+		return {
+			squelette,
+			score: reconnus.reduce((a, k) => {
+				const plat = normaliser(k);
+				const nomme = nom !== "" && nom.includes(plat);
+				return a + k.length * (nomme ? 2 : 1) / (introduitParPreposition(texte, plat) ? 2 : 1);
+			}, 0),
+			reconnus
+		};
+	}).filter((c) => c.score > 0).sort((a, b) => b.score - a.score);
+}
+var PREPOSITION = "(?:pour|de|du|des|a|au|aux|avec|chez|sur|en|dans|par)\\s+(?:mon|ma|mes|le|la|les|un|une|des|ce|cette|ces|l)?\\s*";
 /**
-* OpenRouter : un routeur, pas un modèle.
-*
-* Il parle la forme d'API d'OpenAI et mène à des centaines de modèles, dont
-* celui du brief. L'intérêt ici n'est pas la variété — c'est qu'il permet de
-* changer de modèle **sans redéployer**, par une variable d'environnement.
-* Le brief pose un budget (moins d'un franc la génération, § 8) et non une
-* marque ; pouvoir en essayer un autre le lendemain vaut mieux que d'avoir
-* bien deviné le premier jour.
-*
-* Deux prudences.
-*
-* `response_format` n'est pas compris par tous les modèles du routeur. On le
-* demande — il réduit les reprises, et une reprise double le coût — mais si la
-* requête est refusée, on recommence **une fois sans lui** : l'invite exige
-* déjà du JSON nu et `lireJson` sait déshabiller un bloc de code. Ainsi
-* n'importe quel modèle reste utilisable, et le choix redevient une décision
-* de gestion plutôt qu'une contrainte technique.
-*
-* Et le coût vient du routeur quand il le donne (`usage.cost`), parce qu'il
-* applique sa marge et que notre table de prix ne la connaît pas.
+* Vrai si **toutes** les occurrences du mot sont introduites par une
+* préposition. Une seule occurrence en position de sujet suffit à ce que le
+* mot compte plein tarif : « prix, liste de prix » demande bien des prix.
 */
-function openrouter(clef, modele = "google/gemini-2.5-flash-lite", prix = {
-	entree: .1,
-	sortie: .4
-}) {
-	return {
-		nom: modele,
-		prix,
-		async appeler(demande) {
-			const messages = [{
-				role: "user",
-				content: demande.invite
-			}];
-			if (demande.reprise !== void 0) {
-				messages.push({
-					role: "assistant",
-					content: demande.reprise.sortie
-				});
-				messages.push({
-					role: "user",
-					content: demande.reprise.reproches
-				});
-			}
-			const base = {
-				model: modele,
-				messages,
-				temperature: 0,
-				max_tokens: 2048,
-				usage: { include: true }
-			};
-			let reponse = await envoyer(clef, {
-				...base,
-				response_format: { type: "json_object" }
-			});
-			if (reponse.status >= 400 && reponse.status < 500 && reponse.status !== 401) reponse = await envoyer(clef, base);
-			if (!reponse.ok) throw new ErreurFournisseur(reponse.status === 402 ? "credit-epuise" : reponse.status === 401 ? "refuse" : "panne", `le routeur a répondu ${reponse.status}`);
-			const corps = await reponse.json();
-			const dollars = corps.usage?.cost;
-			return {
-				texte: corps.choices?.[0]?.message?.content ?? "",
-				jetonsEntree: corps.usage?.prompt_tokens ?? 0,
-				jetonsSortie: corps.usage?.completion_tokens ?? 0,
-				...typeof dollars === "number" ? { dollars } : {}
-			};
-		}
-	};
+function introduitParPreposition(texte, mot) {
+	if (mot === "") return false;
+	const echappe = mot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const toutes = [...texte.matchAll(new RegExp(echappe, "g"))];
+	if (toutes.length === 0) return false;
+	const precede = new RegExp(`${PREPOSITION}${echappe}`, "g");
+	return [...texte.matchAll(precede)].length === toutes.length;
 }
-function envoyer(clef, corps) {
-	return fetch("https://openrouter.ai/api/v1/chat/completions", {
-		method: "POST",
-		headers: {
-			authorization: `Bearer ${clef}`,
-			"content-type": "application/json",
-			"http-referer": "https://atelier237.vercel.app",
-			"x-title": "Atelier 237"
-		},
-		body: JSON.stringify(corps)
-	});
+//#endregion
+//#region ../engine/src/etage.ts
+/**
+* Les marques d'une demande qui dépasse un outil.
+*
+* Elles sont volontairement peu nombreuses et sans ambiguïté. Un classement
+* trop zélé enverrait vers l'abonnement quelqu'un qui voulait un seul carnet,
+* et c'est le pire des deux échecs : refuser de vendre à quelqu'un qui payait.
+*/
+var PLURIEL = [
+	/\btout ce qu il faut\b/,
+	/\btout pour\b/,
+	/\btoute (?:ma|la) gestion\b/,
+	/\bplusieurs outils?\b/,
+	/\bles outils\b/,
+	/\bgerer (?:toute|tout)\b/,
+	/\bde a a z\b/,
+	/\bcomplet(?:e|s)?\b/
+];
+/**
+* Deux familles distinctes dans la même phrase, c'est deux outils.
+*
+* « un carnet de njangi et une liste de prix » n'est pas une demande ambiguë
+* qu'il faudrait faire trancher : c'est deux demandes, et les faire l'une
+* après l'autre coûte deux générations.
+*/
+/**
+* Le score en dessous duquel une famille n'a pas vraiment été nommée.
+*
+* Dix, c'est un mot de cinq lettres qui porte le nom de l'outil — « njangi »,
+* « devis », « stock ». En dessous, on a reconnu un mot qui gravite autour de
+* l'outil sans le désigner.
+*
+* Un seuil **absolu**, et non une fraction du meilleur score : le score mesure
+* la longueur des mots reconnus, pas la confiance. Dans « un njangi, une liste
+* de prix et un inventaire », les trois sont nommés sans ambiguïté et pèsent
+* pourtant 30, 20 et 12 — la moitié du meilleur écartait le troisième.
+*/
+var SCORE_NOMME = 10;
+function famillesDistinctes(demande, fiches) {
+	return classer(demande, fiches).filter((c) => c.score >= SCORE_NOMME).length;
+}
+function etageDe(demande, fiches) {
+	const plat = normaliser(demande);
+	if (plat === "") return 1;
+	if (PLURIEL.some((re) => re.test(plat))) return 3;
+	if (famillesDistinctes(demande, fiches) >= 3) return 3;
+	const classees = classer(demande, fiches);
+	const premier = classees[0];
+	const second = classees[1];
+	if (premier !== void 0 && (second === void 0 || premier.score >= second.score * 1.5)) return 1;
+	return premier === void 0 ? 2 : 1;
 }
 /**
 * La description que lit le modèle — en prose, pas en schéma.
@@ -677,6 +769,160 @@ function lireReponseModele(valeur) {
 	};
 }
 //#endregion
+//#region src/fournisseur.ts
+/**
+* Une panne de fournisseur, nommée.
+*
+* Une seule distinction compte vraiment : **le crédit épuisé n'est pas une
+* panne**. C'est un compte à recharger, et le dire « le modèle n'a pas
+* répondu » envoie l'utilisateur chercher un problème qui n'existe pas
+* pendant que la vraie cause tient en une phrase. Le brief en fait un critère
+* d'arrêt : « le chemin plus de crédits est propre » (§ 8).
+*/
+var ErreurFournisseur = class extends Error {
+	sorte;
+	constructor(sorte, message) {
+		super(message);
+		this.sorte = sorte;
+		this.name = "ErreurFournisseur";
+	}
+};
+/**
+* Gemini 2.5 Flash-Lite, le choix par défaut du brief.
+*
+* `responseMimeType: application/json` fait produire du JSON par construction
+* plutôt que par prière. Ça ne dispense pas de valider — un JSON bien formé
+* peut décrire n'importe quoi — mais ça supprime la classe d'échec la plus
+* bête : la réponse enveloppée dans un bloc de code et des politesses.
+*/
+function gemini(clef, modele = "gemini-2.5-flash-lite") {
+	return {
+		nom: modele,
+		prix: {
+			entree: .1,
+			sortie: .4
+		},
+		async appeler(demande) {
+			const tours = [{
+				role: "user",
+				parts: [{ text: demande.invite }]
+			}];
+			if (demande.reprise !== void 0) {
+				tours.push({
+					role: "model",
+					parts: [{ text: demande.reprise.sortie }]
+				});
+				tours.push({
+					role: "user",
+					parts: [{ text: demande.reprise.reproches }]
+				});
+			}
+			const reponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modele}:generateContent`, {
+				method: "POST",
+				headers: {
+					"content-type": "application/json",
+					"x-goog-api-key": clef
+				},
+				body: JSON.stringify({
+					contents: tours,
+					generationConfig: {
+						responseMimeType: "application/json",
+						temperature: 0,
+						maxOutputTokens: 2048
+					}
+				})
+			});
+			if (!reponse.ok) throw new ErreurFournisseur(reponse.status === 429 ? "credit-epuise" : reponse.status === 403 ? "refuse" : "panne", `le modèle a répondu ${reponse.status}`);
+			const corps = await reponse.json();
+			return {
+				texte: corps.candidates?.[0]?.content?.parts?.[0]?.text ?? "",
+				jetonsEntree: corps.usageMetadata?.promptTokenCount ?? 0,
+				jetonsSortie: corps.usageMetadata?.candidatesTokenCount ?? 0
+			};
+		}
+	};
+}
+/**
+* OpenRouter : un routeur, pas un modèle.
+*
+* Il parle la forme d'API d'OpenAI et mène à des centaines de modèles, dont
+* celui du brief. L'intérêt ici n'est pas la variété — c'est qu'il permet de
+* changer de modèle **sans redéployer**, par une variable d'environnement.
+* Le brief pose un budget (moins d'un franc la génération, § 8) et non une
+* marque ; pouvoir en essayer un autre le lendemain vaut mieux que d'avoir
+* bien deviné le premier jour.
+*
+* Deux prudences.
+*
+* `response_format` n'est pas compris par tous les modèles du routeur. On le
+* demande — il réduit les reprises, et une reprise double le coût — mais si la
+* requête est refusée, on recommence **une fois sans lui** : l'invite exige
+* déjà du JSON nu et `lireJson` sait déshabiller un bloc de code. Ainsi
+* n'importe quel modèle reste utilisable, et le choix redevient une décision
+* de gestion plutôt qu'une contrainte technique.
+*
+* Et le coût vient du routeur quand il le donne (`usage.cost`), parce qu'il
+* applique sa marge et que notre table de prix ne la connaît pas.
+*/
+function openrouter(clef, modele = "google/gemini-2.5-flash-lite", prix = {
+	entree: .1,
+	sortie: .4
+}) {
+	return {
+		nom: modele,
+		prix,
+		async appeler(demande) {
+			const messages = [{
+				role: "user",
+				content: demande.invite
+			}];
+			if (demande.reprise !== void 0) {
+				messages.push({
+					role: "assistant",
+					content: demande.reprise.sortie
+				});
+				messages.push({
+					role: "user",
+					content: demande.reprise.reproches
+				});
+			}
+			const base = {
+				model: modele,
+				messages,
+				temperature: 0,
+				max_tokens: 2048,
+				usage: { include: true }
+			};
+			let reponse = await envoyer(clef, {
+				...base,
+				response_format: { type: "json_object" }
+			});
+			if (reponse.status >= 400 && reponse.status < 500 && reponse.status !== 401) reponse = await envoyer(clef, base);
+			if (!reponse.ok) throw new ErreurFournisseur(reponse.status === 402 ? "credit-epuise" : reponse.status === 401 ? "refuse" : "panne", `le routeur a répondu ${reponse.status}`);
+			const corps = await reponse.json();
+			const dollars = corps.usage?.cost;
+			return {
+				texte: corps.choices?.[0]?.message?.content ?? "",
+				jetonsEntree: corps.usage?.prompt_tokens ?? 0,
+				jetonsSortie: corps.usage?.completion_tokens ?? 0,
+				...typeof dollars === "number" ? { dollars } : {}
+			};
+		}
+	};
+}
+function envoyer(clef, corps) {
+	return fetch("https://openrouter.ai/api/v1/chat/completions", {
+		method: "POST",
+		headers: {
+			authorization: `Bearer ${clef}`,
+			"content-type": "application/json",
+			"http-referer": "https://atelier237.vercel.app",
+			"x-title": "Atelier 237"
+		},
+		body: JSON.stringify(corps)
+	});
+}
+//#endregion
 //#region src/cout.ts
 function couter(jetons, prix, tauxFcfaParDollar) {
 	const dollars = (jetons.entree * prix.entree + jetons.sortie * prix.sortie) / 1e6;
@@ -863,6 +1109,21 @@ function fournisseurChoisi(clef) {
 	};
 	return process.env.A237_FOURNISSEUR === "gemini" ? gemini(clef, modele ?? "gemini-2.5-flash-lite") : openrouter(clef, modele ?? "google/gemini-2.5-flash-lite", prix);
 }
+/**
+* Le porteur d'abonnement, quand il y en aura.
+*
+* Il n'y a pas encore de comptes : ils vivent dans D1, qui arrive avec la
+* phase 2. La fonction rend donc faux, et l'étage 3 est fermé à tout le monde
+* — ce qui est la bonne valeur par défaut : on ne facture personne, et on ne
+* dépense pas non plus.
+*
+* C'est une couture d'une ligne. Le jour où les comptes existent, elle lit le
+* plan du compte ; rien d'autre ne bouge, parce que la décision de ce qui
+* relève de l'abonnement est déjà prise ailleurs, gratuitement et sans réseau.
+*/
+function abonne() {
+	return false;
+}
 async function handler(req, res) {
 	if (req.method !== "POST") {
 		res.status(405).json({ erreur: "méthode non permise" });
@@ -878,6 +1139,13 @@ async function handler(req, res) {
 	const demande = typeof corps?.demande === "string" ? corps.demande.trim() : "";
 	if (demande === "" || demande.length > MAX_DEMANDE) {
 		res.status(400).json({ erreur: "demande absente ou trop longue" });
+		return;
+	}
+	if (etageDe(demande, CATALOGUE) === 3 && !abonne()) {
+		res.status(402).json({
+			erreur: "abonnement-requis",
+			pourquoi: "Cette demande vaut plusieurs outils d’un coup. Compose-les un par un, ou prends un abonnement."
+		});
 		return;
 	}
 	try {

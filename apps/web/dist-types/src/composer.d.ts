@@ -40,6 +40,14 @@ export type Composition = {
  */
  | {
     readonly sorte: 'sans-credit';
+}
+/**
+ * La demande vaut plusieurs outils. Elle relève de l'abonnement, et on le
+ * dit **avant** d'avoir dépensé quoi que ce soit.
+ */
+ | {
+    readonly sorte: 'abonnement-requis';
+    readonly pourquoi: string;
 } | {
     readonly sorte: 'echoue';
     readonly pourquoi: string;
