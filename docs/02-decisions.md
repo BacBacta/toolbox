@@ -11,7 +11,7 @@ tous les trois mois.
 |---|---|---|
 | 1 | Racine du dépôt | Le dépôt **est** la racine, pas de dossier `atelier237/` intermédiaire. |
 | 2 | `facture` en v1 | **Oui, squelette à part entière**, et **écrite**. Elle partage `schema/commun.ts` avec le devis et s'en écarte sur ce qui l'engage : échéance au lieu de validité, règlements reçus au lieu d'acompte annoncé, statut de paiement. |
-| 3 | Budget de 120 Ko gzip | Porte sur **la coquille initiale** (html + fragment d'entrée + css préchargée). Chaque outil est un fragment chargé à la demande, plafonné à 25 Ko, mis en cache par le service worker. |
+| 3 | Budget de 120 Ko gzip | Porte sur **la coquille initiale** (html + fragment d'entrée + css préchargée), et il est **mesuré** : `scripts/budget.mjs` échoue au-delà. Coquille à 18,6 Ko, fragments d'outils sous 5 Ko chacun. |
 
 ---
 
@@ -87,6 +87,31 @@ Cent lignes, sans dépendance, en vocabulaire JSON Schema standard pour servir
 tel quel de schéma de réponse contrainte au modèle en phase 4. Une clef
 `__proto__` venue de `JSON.parse` est cherchée avec `Object.hasOwn` et non par
 accès direct, sinon elle remonterait la chaîne de prototypes. Testé.
+
+### Le formulaire d'édition se déduit du schéma
+Écrire un écran par squelette, ce serait dix-sept écrans à tenir à jour qui
+divergeraient du schéma au premier champ ajouté — et le schéma est ce que le
+modèle remplit, donc la divergence se paierait deux fois. Les libellés viennent
+de `title`, un mot-clef standard de JSON Schema : pas de table de traduction à
+côté, donc rien à oublier de traduire.
+
+### La coquille ne connaît aucun squelette
+Elle liste un catalogue de données pures, range des états, et charge à la
+demande le fragment qui sait dessiner l'outil qu'on ouvre. L'état d'un outil
+neuf vient de ce fragment, pas de la coquille. C'est ce qui fait que les
+quatorze squelettes restants n'alourdiront pas le départ : **18,6 Ko gzip**
+aujourd'hui, pour un plafond de 120.
+
+### Le service worker précharge toute l'application
+Y compris les fragments d'outils. C'est ce qui permet d'ouvrir n'importe quel
+outil en mode avion **dès la première visite**, et pas seulement ceux qu'on a
+déjà ouverts une fois. Vérifié dans un vrai navigateur, hors ligne.
+
+### Un rejet asynchrone s'affiche, il ne se tait pas
+`void promesse()` avalait les échecs : l'écran restait figé sans rien dire, ce
+qui est le pire comportement pour quelqu'un dont le réseau tombe et dont le
+téléphone est plein. Tout ce qui est asynchrone passe par un point unique qui
+affiche ce qui a raté.
 
 ### `zod` n'est pas entré
 Il n'a pas été nécessaire : le validateur écrit à la main fait le travail pour
