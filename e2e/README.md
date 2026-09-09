@@ -7,6 +7,12 @@ Deux scripts, deux choses qu'aucun test unitaire ne peut voir.
 par mots-clés, création d'un carnet de njangi, ajout de membres, versement,
 dessin de la carte, lien de relance `wa.me`, service worker, et **mode avion**.
 
+`compose.mjs` ouvre un registre **composé par le modèle** dans un vrai
+navigateur : la configuration vient du réseau, traverse le stockage, et c'est
+`RegistreListe` — écrit à la main — qui la dessine. La réponse est une vraie
+sortie de production capturée telle quelle, pas une réponse inventée : sa
+première colonne est de type `nombre`, ce qui a longtemps été interdit.
+
 `mise-a-jour.mjs` joue le scénario de la **deuxième** mise en ligne : il
 construit une version, l'installe dans le navigateur, construit une version
 modifiée, la met en ligne, et vérifie que l'utilisateur qui rouvre
@@ -43,6 +49,7 @@ phase 2, avec le Worker et la page de lecture. En attendant :
 
 ```bash
 pnpm build
+PLAYWRIGHT=/tmp/e2e/node_modules/playwright-core/index.mjs node e2e/compose.mjs
 mkdir -p /tmp/e2e && cd /tmp/e2e && npm install playwright-core --no-save
 cd /tmp/e2e && node /chemin/vers/atelier237/e2e/fumee.mjs
 

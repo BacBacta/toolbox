@@ -149,3 +149,26 @@ chaque appel est journalisé, et c'est celui qu'OpenRouter facture, pas notre
 estimation.
 
 Changer de modèle ne demande pas de redéploiement : la variable suffit.
+
+### Dix générations réelles, mesurées le 9 septembre 2026
+
+Le critère d'arrêt de la phase 4 (§ 8). Modèle `google/gemini-2.5-flash-lite`
+via OpenRouter, taux 600 F le dollar.
+
+| | |
+|---|---|
+| Réussites | **10 / 10** |
+| Coût moyen | **0,121 FCFA** par génération |
+| Budget du brief | < 1 FCFA — tenu, avec huit fois de marge |
+| Latence médiane | 1,16 s |
+
+Le coût affiché est celui qu'**OpenRouter facture**, pas une estimation : il
+remonte dans `usage.cost` et l'emporte sur notre table de prix.
+
+Deux échecs sur les premières séries venaient de règles à nous, pas du modèle :
+une clef en `nom_poule` refusée sans raison, et l'exigence qu'une première
+colonne soit du texte — qui rendait « combien d'œufs par jour et combien
+vendus » inexprimable. Les deux ont été levées.
+
+Ce qui manque encore au critère : le chemin « plus de crédits » (402), qui
+suppose les comptes de D1.
