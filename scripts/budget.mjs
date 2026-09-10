@@ -296,6 +296,38 @@ try {
   echecs.push('impossible de vérifier l’empreinte du service worker')
 }
 
+/**
+ * L'Établi, et son plafond à lui.
+ *
+ * C'est un environnement de développement entier — éditeur, exécution isolée,
+ * console, modèles, export. Le tenir sous trente kilo-octets n'est pas une
+ * coquetterie : c'est **l'argument du produit**. Les éditeurs qu'on installe
+ * ailleurs pèsent de deux cents kilo-octets à cinq mégaoctets pour la seule
+ * zone de saisie, et sur un forfait compté à l'octet c'est le prix du repas de
+ * midi pour ouvrir un fichier.
+ *
+ * Le jour où quelqu'un voudra la coloration syntaxique, ce chiffre-ci est ce
+ * qu'il faudra mettre en face — pas une opinion.
+ */
+const ETABLI = 'apps/etabli/dist'
+const PLAFOND_ETABLI = 30 * 1024
+
+try {
+  const page = readFileSync(join(ETABLI, 'index.html'), 'utf8')
+  const parts = [...page.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1])
+  const chemins = [join(ETABLI, 'index.html'), ...parts.map((r) => join(ETABLI, r))]
+  const poids = chemins.reduce((a, c) => a + poidsGzip(c), 0)
+
+  console.log('\nL’Établi (tout l’environnement, avant le premier affichage)')
+  for (const c of chemins) console.log(`  ${c.replace(`${ETABLI}/`, '')} — ${ko(poidsGzip(c))}`)
+  console.log(`  total : ${ko(poids)} / ${ko(PLAFOND_ETABLI)}`)
+  if (poids > PLAFOND_ETABLI) {
+    echecs.push(`Établi : ${ko(poids)} au-delà de ${ko(PLAFOND_ETABLI)}`)
+  }
+} catch {
+  echecs.push('l’Établi n’est pas construit : impossible de mesurer son poids')
+}
+
 if (echecs.length > 0) {
   console.error(`\n✗ Budget dépassé :\n  ${echecs.join('\n  ')}`)
   process.exit(1)

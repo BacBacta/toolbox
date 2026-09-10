@@ -49,7 +49,9 @@ export default defineConfig({
         'packages/ia/src/**',
         'packages/serveur/src/**',
         'packages/comptes/src/**',
+        'packages/etabli/src/**',
         'apps/web/src/**',
+        'apps/etabli/src/**',
       ],
       // Le service worker s'exécute dans une portée que Vitest ne fournit pas ;
       // sa logique de cache est testée à part, dans sw-strategie.ts.

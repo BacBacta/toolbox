@@ -23,7 +23,13 @@
       "path": "./packages/comptes"
     },
     {
+      "path": "./packages/etabli"
+    },
+    {
       "path": "./apps/web"
+    },
+    {
+      "path": "./apps/etabli"
     }
   ]
 }

@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "pnpm --filter @a237/web dev",
-    "build": "pnpm --filter @a237/web build && pnpm --filter @a237/web exec vite build --config vite.sw.config.ts && pnpm --filter @a237/ia exec vite build --config vite.chat.config.ts && pnpm --filter @a237/serveur exec vite build --config vite.publier.config.ts && pnpm --filter @a237/serveur exec vite build --config vite.lire.config.ts && pnpm --filter @a237/serveur exec vite build --config vite.carte.config.ts && pnpm --filter @a237/comptes exec vite build --config vite.compte.config.ts && pnpm --filter @a237/comptes exec vite build --config vite.pay.config.ts && pnpm --filter @a237/serveur exec vite build --config vite.pdf.config.ts && pnpm --filter @a237/serveur exec vite build --config vite.reponses.config.ts",
+    "build": "pnpm --filter @a237/etabli-web build && pnpm --filter @a237/web build && pnpm --filter @a237/web exec vite build --config vite.sw.config.ts && pnpm --filter @a237/ia exec vite build --config vite.chat.config.ts && pnpm --filter @a237/serveur exec vite build --config vite.publier.config.ts && pnpm --filter @a237/serveur exec vite build --config vite.lire.config.ts && pnpm --filter @a237/serveur exec vite build --config vite.carte.config.ts && pnpm --filter @a237/comptes exec vite build --config vite.compte.config.ts && pnpm --filter @a237/comptes exec vite build --config vite.pay.config.ts && pnpm --filter @a237/serveur exec vite build --config vite.pdf.config.ts && pnpm --filter @a237/serveur exec vite build --config vite.reponses.config.ts",
     "test": "vitest run",
     "test:cov": "vitest run --coverage",
     "typecheck": "tsc -b",

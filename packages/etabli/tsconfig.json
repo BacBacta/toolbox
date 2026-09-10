@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": [
+      "ES2022"
+    ],
+    "types": [
+      "node"
+    ],
+    "rootDir": ".",
+    "outDir": "dist"
+  },
+  "include": [
+    "src",
+    "test"
+  ],
+  "references": [
+    {
+      "path": "../outils-test"
+    }
+  ]
+}
