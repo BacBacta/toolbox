@@ -49,7 +49,7 @@ modifiée, la met en ligne, et vérifie que l'utilisateur qui rouvre
 l'application voit la nouvelle — sans rien faire, et sans perdre le mode
 avion.
 
-## Pourquoi elles existent, alors qu'il y a 1 525 tests unitaires
+## Pourquoi elles existent, alors qu'il y a 2 095 tests unitaires
 
 `fumee.mjs` a trouvé un bogue qu'aucun d'eux ne pouvait voir : `precache.json`
 contenait `/index.html` deux fois, `cache.addAll` rejette sur les doublons, et
@@ -69,7 +69,7 @@ coquille dans le cache courant y laissait une coquille neuve réclamant des
 fichiers que ce cache n'avait pas : le mode avion tombait. La mise à jour se
 fait donc là où elle est atomique — la réinstallation du service worker.
 
-`compose.mjs` a trouvé le pire des trois, et c'est le dernier maillon qui l'a
+`agent.mjs` a trouvé le pire des trois, et c'est le dernier maillon qui l'a
 révélé : la configuration d'un outil composé voyage avec lui au lieu de vivre
 dans un squelette, et le serveur, qui ne connaissait que les squelettes, ne
 trouvait rien à dessiner derrière le lien. La page répondait **200 avec « Ce
@@ -112,11 +112,11 @@ node e2e/fumee.mjs
 # mise-a-jour.mjs construit lui-même, deux fois : il se lance depuis le dépôt.
 node e2e/mise-a-jour.mjs
 
-# compose.mjs et hors-ligne.mjs ont besoin du Worker et de son KV : un serveur,
+# agent.mjs et hors-ligne.mjs ont besoin du Worker et de son KV : un serveur,
 # dans un autre terminal, puis les scripts. BASE change l'adresse si le port
 # est déjà pris.
 wrangler pages dev --port 8798 --ip 127.0.0.1
-node e2e/compose.mjs
+node e2e/agent.mjs
 node e2e/hors-ligne.mjs
 
 # comptes.mjs a besoin en plus du secret de paiement et de la base migrée.

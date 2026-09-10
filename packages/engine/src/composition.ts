@@ -1,11 +1,11 @@
 import type { CalculDemande } from './calcul.js'
-import { verifierCalcul } from './calcul.js'
+import { redresserCalcul, verifierCalcul } from './calcul.js'
 import type { FormulaireDemande } from './formulaire.js'
-import { verifierFormulaire } from './formulaire.js'
+import { redresserFormulaire, verifierFormulaire } from './formulaire.js'
 import type { PageDemande } from './page.js'
-import { verifierPage } from './page.js'
+import { redresserPage, verifierPage } from './page.js'
 import type { RefusModele, RegistreDemande } from './registre.js'
-import { MAX_REFUS, schemaRefus, verifierRegistre } from './registre.js'
+import { MAX_REFUS, redresserRegistre, schemaRefus, verifierRegistre } from './registre.js'
 import type { ErreurValidation } from './types.js'
 import { valider } from './valider.js'
 
@@ -115,28 +115,40 @@ export function lireReponseModele(valeur: unknown): ReponseModele {
   }
 
   if ('champs' in valeur) {
-    const erreurs = verifierFormulaire(valeur)
+    const redresse = redresserFormulaire(valeur)
+    const erreurs = verifierFormulaire(redresse)
     return erreurs.length > 0
       ? { sorte: 'invalide', erreurs }
-      : { sorte: 'formulaire', formulaire: valeur as FormulaireDemande }
+      : { sorte: 'formulaire', formulaire: redresse as FormulaireDemande }
   }
 
   if ('sections' in valeur) {
-    const erreurs = verifierPage(valeur)
+    /*
+     * Redressé avant d'être jugé, et c'est le redressé qu'on garde.
+     *
+     * Une section dont l'étiquette contredit le contenu se rattrape ; juger
+     * l'original puis publier l'original laisserait passer la contradiction
+     * jusqu'à l'écran. Redresser ne desserre rien : ce qui sort repasse entier
+     * devant le schéma, champs interdits compris.
+     */
+    const redressee = redresserPage(valeur)
+    const erreurs = verifierPage(redressee)
     return erreurs.length > 0
       ? { sorte: 'invalide', erreurs }
-      : { sorte: 'page', page: valeur as PageDemande }
+      : { sorte: 'page', page: redressee as PageDemande }
   }
 
   if ('entrees' in valeur) {
-    const erreurs = verifierCalcul(valeur)
+    const redresse = redresserCalcul(valeur)
+    const erreurs = verifierCalcul(redresse)
     return erreurs.length > 0
       ? { sorte: 'invalide', erreurs }
-      : { sorte: 'calcul', calcul: valeur as CalculDemande }
+      : { sorte: 'calcul', calcul: redresse as CalculDemande }
   }
 
-  const erreurs = verifierRegistre(valeur)
+  const redresse = redresserRegistre(valeur)
+  const erreurs = verifierRegistre(redresse)
   return erreurs.length > 0
     ? { sorte: 'invalide', erreurs }
-    : { sorte: 'registre', registre: valeur as RegistreDemande }
+    : { sorte: 'registre', registre: redresse as RegistreDemande }
 }

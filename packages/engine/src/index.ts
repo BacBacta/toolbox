@@ -109,14 +109,15 @@ export {
 export type { Ebauche, FamilleOutil, LectureTour, TourModele } from './agent.js'
 export { lireJsonPartiel } from './partiel.js'
 export { pourLeModele } from './schema-modele.js'
+export { clefPropre } from './clefs.js'
 export type { ReponseModele } from './composition.js'
 export { lireReponseModele } from './composition.js'
 export type { Expression, Operation } from './expression.js'
 export { DESCRIPTION_FORMULE, PROFONDEUR_MAX, evaluer, verifierExpression } from './expression.js'
 export {
   ID_COMPOSE_PAGE, MAX_LIGNES_SECTION, MAX_SECTIONS, SECTIONS_POUR_SOMMAIRE,
-  avecSommaire, carteDePage, direLeJour, partageDePage, schemaPage, sectionsAncrees,
-  verifierPage,
+  avecSommaire, carteDePage, direLeJour, partageDePage, redresserPage, schemaPage,
+  sectionsAncrees, verifierPage,
 } from './page.js'
 export type {
   JourDit, LigneSection, PageDemande, SectionAncree, SectionDemandee, SorteSection,

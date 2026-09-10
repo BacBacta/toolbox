@@ -3075,15 +3075,6 @@ var schemaFormulaire = {
 		}
 	}
 };
-/**
-* Vérifie ce que le modèle a rendu, au-delà de ce que le schéma sait dire.
-*
-* Deux incohérences que le schéma ne peut pas exprimer, et qui font toutes deux
-* un formulaire qu'on ne peut pas remplir : une clef en double — la seconde
-* réponse écraserait la première sans que rien ne le montre — et un champ
-* « choix » sans options, qui est une question dont aucune réponse n'est
-* possible.
-*/
 function verifierFormulaire(valeur) {
 	const erreurs = [...valider(schemaFormulaire, valeur)];
 	if (erreurs.length > 0) return erreurs;
@@ -3239,13 +3230,14 @@ var schemaPage = {
 							"prix"
 						],
 						title: "Sorte",
-						description: "texte : un paragraphe. liste : des noms. prix : des noms avec un montant."
+						description: "texte : un paragraphe, dans « texte ». liste : des noms, dans « lignes ». prix : des noms avec un montant, dans « lignes ». Choisis « texte » quand tu n’as pas la liste : une section porte toujours son contenu."
 					},
 					texte: {
 						type: "string",
+						minLength: 1,
 						maxLength: 400,
 						title: "Texte",
-						description: "Pour une section « texte ». Deux paragraphes au plus.",
+						description: "Obligatoire quand la sorte est « texte ». Deux paragraphes au plus.",
 						ecran: { montrerSi: {
 							champ: "sorte",
 							vaut: ["texte"]
@@ -3253,6 +3245,7 @@ var schemaPage = {
 					},
 					lignes: {
 						type: "array",
+						minItems: 1,
 						maxItems: 8,
 						items: {
 							type: "object",
@@ -3281,7 +3274,7 @@ var schemaPage = {
 							}
 						},
 						title: "Lignes",
-						description: "Pour « liste » ou « prix ».",
+						description: "Obligatoire quand la sorte est « liste » ou « prix ». Au moins une ligne.",
 						ecran: {
 							montrerSi: {
 								champ: "sorte",

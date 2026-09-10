@@ -1,4 +1,5 @@
 import type { ErreurValidation, JsonSchema } from './types.js'
+import { plierLesClefs } from './clefs.js'
 import { valider } from './valider.js'
 
 /**
@@ -147,6 +148,21 @@ export const schemaFormulaire: JsonSchema = {
  * « choix » sans options, qui est une question dont aucune réponse n'est
  * possible.
  */
+/**
+ * Les clefs des champs, pliées.
+ *
+ * Rien ne les désigne ailleurs — c'est au moment des réponses qu'elles servent,
+ * et à ce moment-là le formulaire est déjà publié avec les clefs pliées. Le
+ * pliage se fait donc ici une fois pour toutes, avant qu'une seule réponse
+ * existe : personne ne verra jamais deux orthographes de la même clef.
+ */
+export function redresserFormulaire(valeur: unknown): unknown {
+  if (typeof valeur !== 'object' || valeur === null) return valeur
+  const pliage = plierLesClefs((valeur as { champs?: unknown }).champs)
+  if (pliage === null || !pliage.change) return valeur
+  return { ...valeur, champs: pliage.liste }
+}
+
 export function verifierFormulaire(valeur: unknown): readonly ErreurValidation[] {
   const erreurs = [...valider(schemaFormulaire, valeur)]
   if (erreurs.length > 0) return erreurs

@@ -1,6 +1,7 @@
 import type { Expression } from './expression.js'
 import { DESCRIPTION_FORMULE, verifierExpression } from './expression.js'
 import type { ErreurValidation, JsonSchema } from './types.js'
+import { plierLesClefs } from './clefs.js'
 import { valider } from './valider.js'
 
 /**
@@ -101,6 +102,42 @@ export const schemaCalcul: JsonSchema = {
  * le pire résultat possible pour une calculatrice, parce qu'un zéro ressemble
  * à une réponse.
  */
+/**
+ * Les clefs des entrées pliées, et la formule qui les désigne avec elles.
+ *
+ * La formule est un arbre, et chaque feuille `{ ref }` nomme une entrée. Plier
+ * les entrées sans descendre l'arbre laisserait la formule montrer une entrée
+ * qui n'existe plus — « ne désigne aucune entrée », et le tour est perdu pareil.
+ */
+export function redresserCalcul(valeur: unknown): unknown {
+  if (typeof valeur !== 'object' || valeur === null) return valeur
+  const pliage = plierLesClefs((valeur as { entrees?: unknown }).entrees)
+  if (pliage === null || !pliage.change) return valeur
+
+  /*
+   * L'arbre est parcouru depuis la racine et non depuis `sortie.formule`.
+   * Suivre le chemin exact ferait de ce redressement un deuxième endroit à
+   * corriger le jour où la formule déménage — et ce jour-là, elle repointerait
+   * en silence vers des entrées disparues. Un `ref` ne veut dire qu'une chose
+   * dans ce contrat : le nom d'une entrée.
+   */
+  const suivi = suivreLesRefs(valeur, pliage.renommes) as Record<string, unknown>
+  return { ...suivi, entrees: pliage.liste }
+}
+
+/** L'arbre, recopié, avec les renvois mis à jour. */
+function suivreLesRefs(noeud: unknown, renommes: ReadonlyMap<string, string>): unknown {
+  if (Array.isArray(noeud)) return noeud.map((n) => suivreLesRefs(n, renommes))
+  if (typeof noeud !== 'object' || noeud === null) return noeud
+  return Object.fromEntries(
+    Object.entries(noeud as Record<string, unknown>).map(([champ, v]) =>
+      champ === 'ref' && typeof v === 'string'
+        ? [champ, renommes.get(v) ?? v]
+        : [champ, suivreLesRefs(v, renommes)],
+    ),
+  )
+}
+
 export function verifierCalcul(valeur: unknown): readonly ErreurValidation[] {
   const erreurs = [...valider(schemaCalcul, valeur)]
   if (erreurs.length > 0) return erreurs

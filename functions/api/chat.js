@@ -511,6 +511,69 @@ function formes(valeur, clefs, chemin, niveau) {
 	return erreurs;
 }
 //#endregion
+//#region ../engine/src/clefs.ts
+/**
+* Les clefs, pliées plutôt que refusées.
+*
+* Une colonne, une entrée et un champ portent chacun une `clef` : un nom
+* interne, qui sert de propriété d'objet et de nom de champ HTML, jamais
+* d'adresse et jamais d'affichage. Ce que la personne lit, c'est `titre`.
+* L'orthographe exacte de la clef n'intéresse donc personne.
+*
+* Le modèle, lui, écrit en français : il propose `montantDû`, `dateÉchéance`,
+* `nom d'élève`. La règle les refusait, et refuser coûte un tour entier — payé,
+* et pour un accent. Pire, la reprise repart du même modèle et du même
+* français : elle retombe souvent sur la même faute.
+*
+* C'est la deuxième fois que cette règle tue une génération réelle. La
+* première, `nom_poule`, avait été réglée en élargissant la règle. Élargir à
+* chaque surprise ne finit jamais ; plier ce qui arrive, si.
+*
+* On ne plie que ce qui garde un sens. Une clef qui ne commence pas par une
+* lettre n'a plus de nom une fois nettoyée — lui en inventer un ferait perdre
+* le lien avec ce que le modèle voulait dire, et le reproche, lui, sait le
+* nommer.
+*/
+/** La forme qu'une clef doit avoir : c'est celle que les trois familles exigent. */
+var BONNE_CLEF = /^[a-z][a-zA-Z0-9_]*$/;
+/**
+* La clef, pliée. `null` quand plier n'a pas de sens.
+*
+* Rend la chaîne d'origine, à l'identique, quand elle était déjà bonne : les
+* appelants comparent par identité pour savoir s'il y a eu changement.
+*/
+function clefPropre(brut) {
+	if (typeof brut !== "string") return null;
+	if (BONNE_CLEF.test(brut)) return brut;
+	const plie = brut.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9_]/g, "");
+	const premiere = plie[0];
+	if (premiere === void 0 || !/[A-Za-z]/.test(premiere)) return null;
+	const propre = premiere.toLowerCase() + plie.slice(1);
+	return BONNE_CLEF.test(propre) ? propre : null;
+}
+function plierLesClefs(brut) {
+	if (!Array.isArray(brut)) return null;
+	const renommes = /* @__PURE__ */ new Map();
+	let change = false;
+	return {
+		liste: brut.map((item) => {
+			if (typeof item !== "object" || item === null) return item;
+			const objet = item;
+			const avant = objet["clef"];
+			const apres = clefPropre(avant);
+			if (apres === null || apres === avant) return item;
+			change = true;
+			if (typeof avant === "string") renommes.set(avant, apres);
+			return {
+				...objet,
+				clef: apres
+			};
+		}),
+		renommes,
+		change
+	};
+}
+//#endregion
 //#region ../engine/src/valider.ts
 /**
 * Validateur du sous-ensemble de JSON Schema retenu par le produit.
@@ -691,6 +754,28 @@ var schemaCalcul = {
 * le pire résultat possible pour une calculatrice, parce qu'un zéro ressemble
 * à une réponse.
 */
+/**
+* Les clefs des entrées pliées, et la formule qui les désigne avec elles.
+*
+* La formule est un arbre, et chaque feuille `{ ref }` nomme une entrée. Plier
+* les entrées sans descendre l'arbre laisserait la formule montrer une entrée
+* qui n'existe plus — « ne désigne aucune entrée », et le tour est perdu pareil.
+*/
+function redresserCalcul(valeur) {
+	if (typeof valeur !== "object" || valeur === null) return valeur;
+	const pliage = plierLesClefs(valeur.entrees);
+	if (pliage === null || !pliage.change) return valeur;
+	return {
+		...suivreLesRefs(valeur, pliage.renommes),
+		entrees: pliage.liste
+	};
+}
+/** L'arbre, recopié, avec les renvois mis à jour. */
+function suivreLesRefs(noeud, renommes) {
+	if (Array.isArray(noeud)) return noeud.map((n) => suivreLesRefs(n, renommes));
+	if (typeof noeud !== "object" || noeud === null) return noeud;
+	return Object.fromEntries(Object.entries(noeud).map(([champ, v]) => champ === "ref" && typeof v === "string" ? [champ, renommes.get(v) ?? v] : [champ, suivreLesRefs(v, renommes)]));
+}
 function verifierCalcul(valeur) {
 	const erreurs = [...valider(schemaCalcul, valeur)];
 	if (erreurs.length > 0) return erreurs;
@@ -846,6 +931,23 @@ var schemaFormulaire = {
 * « choix » sans options, qui est une question dont aucune réponse n'est
 * possible.
 */
+/**
+* Les clefs des champs, pliées.
+*
+* Rien ne les désigne ailleurs — c'est au moment des réponses qu'elles servent,
+* et à ce moment-là le formulaire est déjà publié avec les clefs pliées. Le
+* pliage se fait donc ici une fois pour toutes, avant qu'une seule réponse
+* existe : personne ne verra jamais deux orthographes de la même clef.
+*/
+function redresserFormulaire(valeur) {
+	if (typeof valeur !== "object" || valeur === null) return valeur;
+	const pliage = plierLesClefs(valeur.champs);
+	if (pliage === null || !pliage.change) return valeur;
+	return {
+		...valeur,
+		champs: pliage.liste
+	};
+}
 function verifierFormulaire(valeur) {
 	const erreurs = [...valider(schemaFormulaire, valeur)];
 	if (erreurs.length > 0) return erreurs;
@@ -955,13 +1057,14 @@ var schemaPage = {
 							"prix"
 						],
 						title: "Sorte",
-						description: "texte : un paragraphe. liste : des noms. prix : des noms avec un montant."
+						description: "texte : un paragraphe, dans « texte ». liste : des noms, dans « lignes ». prix : des noms avec un montant, dans « lignes ». Choisis « texte » quand tu n’as pas la liste : une section porte toujours son contenu."
 					},
 					texte: {
 						type: "string",
+						minLength: 1,
 						maxLength: 400,
 						title: "Texte",
-						description: "Pour une section « texte ». Deux paragraphes au plus.",
+						description: "Obligatoire quand la sorte est « texte ». Deux paragraphes au plus.",
 						ecran: { montrerSi: {
 							champ: "sorte",
 							vaut: ["texte"]
@@ -969,6 +1072,7 @@ var schemaPage = {
 					},
 					lignes: {
 						type: "array",
+						minItems: 1,
 						maxItems: 8,
 						items: {
 							type: "object",
@@ -997,7 +1101,7 @@ var schemaPage = {
 							}
 						},
 						title: "Lignes",
-						description: "Pour « liste » ou « prix ».",
+						description: "Obligatoire quand la sorte est « liste » ou « prix ». Au moins une ligne.",
 						ecran: {
 							montrerSi: {
 								champ: "sorte",
@@ -1046,6 +1150,77 @@ var schemaPage = {
 		}
 	}
 };
+/**
+* L'étiquette contre le contenu : c'est le contenu qui gagne.
+*
+* Une section annonce sa `sorte` et porte l'un des deux contenus. Le modèle se
+* trompe parfois d'étiquette — il écrit un paragraphe et l'appelle « liste »,
+* ou aligne des prix sous « texte ». Ce qu'il a écrit est bon ; seul le mot
+* qui le nomme est faux, et refuser la page entière pour ce mot-là fait
+* recommencer un tour payé pour rien.
+*
+* Redresser n'est pas inventer. Une section qui ne porte **aucun** contenu ne
+* se répare pas : elle s'en va, parce qu'un titre suivi de rien n'aide
+* personne. Si toutes s'en vont, la page reste refusée — c'est `minItems` qui
+* le dira, et c'est bien qu'il le dise.
+*
+* La fonction est pure et tolère n'importe quoi : elle reçoit ce que le modèle
+* a rendu, pas une page. Ce qui n'a pas la forme d'une page ressort tel quel,
+* et le schéma s'expliquera mieux qu'elle.
+*/
+function redresserPage(valeur) {
+	if (typeof valeur !== "object" || valeur === null) return valeur;
+	const page = valeur;
+	if (!Array.isArray(page.sections)) return valeur;
+	const redressees = [];
+	let change = false;
+	for (const brute of page.sections) {
+		if (typeof brute !== "object" || brute === null) {
+			redressees.push(brute);
+			continue;
+		}
+		const section = brute;
+		const declaree = section["sorte"];
+		if (declaree !== "texte" && declaree !== "liste" && declaree !== "prix") {
+			redressees.push(brute);
+			continue;
+		}
+		const texte = typeof section["texte"] === "string" ? section["texte"].trim() : "";
+		const lignes = Array.isArray(section["lignes"]) ? section["lignes"] : [];
+		if (texte === "" && lignes.length === 0) {
+			change = true;
+			continue;
+		}
+		const sorte = lignes.length === 0 ? "texte" : declaree !== "texte" ? declaree : texte === "" ? sorteDesLignes(lignes) : "texte";
+		const propre = {};
+		for (const [clef, v] of Object.entries(section)) {
+			if (clef === "texte" || clef === "lignes" || clef === "sorte") continue;
+			propre[clef] = v;
+		}
+		propre["sorte"] = sorte;
+		if (sorte === "texte") propre["texte"] = section["texte"];
+		else propre["lignes"] = section["lignes"];
+		if (!memeSection(section, propre)) change = true;
+		redressees.push(propre);
+	}
+	return change ? {
+		...page,
+		sections: redressees
+	} : valeur;
+}
+/** « prix » dès qu'une ligne porte un montant ; « liste » sinon. */
+function sorteDesLignes(lignes) {
+	return lignes.some((l) => {
+		if (typeof l !== "object" || l === null) return false;
+		const valeur = l.valeur;
+		return typeof valeur === "string" && valeur.trim() !== "";
+	}) ? "prix" : "liste";
+}
+function memeSection(avant, apres) {
+	const clefs = /* @__PURE__ */ new Set([...Object.keys(avant), ...Object.keys(apres)]);
+	for (const clef of clefs) if (avant[clef] !== apres[clef]) return false;
+	return true;
+}
 /**
 * Vérifie ce que le modèle a rendu, au-delà de ce que le schéma sait dire.
 *
@@ -1232,6 +1407,30 @@ var schemaRefus = {
 		description: "Pourquoi la demande ne se range pas dans un registre. Une phrase, en français, adressée à l’utilisateur."
 	} }
 };
+/**
+* Les clefs pliées, et le total qui les désigne suivi avec elles.
+*
+* `montantDû` devient `montantDu` ; si le total additionnait `montantDû`, il
+* additionne désormais `montantDu`. Renommer les colonnes sans suivre le total
+* échangerait une faute contre une autre — « ne désigne aucune colonne » — et
+* la génération mourrait tout autant.
+*
+* Pure, et tolérante à ce qui n'est pas un registre : elle reçoit ce que le
+* modèle a rendu, et le schéma s'expliquera mieux qu'elle.
+*/
+function redresserRegistre(valeur) {
+	if (typeof valeur !== "object" || valeur === null) return valeur;
+	const r = valeur;
+	const pliage = plierLesClefs(r.colonnes);
+	if (pliage === null || !pliage.change) return valeur;
+	const suivre = (clef) => typeof clef === "string" ? pliage.renommes.get(clef) ?? clef : clef;
+	const total = typeof r.total === "object" && r.total !== null ? Object.fromEntries(Object.entries(r.total).map(([champ, v]) => champ === "clef" || champ === "plus" || champ === "moins" ? [champ, suivre(v)] : [champ, v])) : r.total;
+	return {
+		...valeur,
+		colonnes: pliage.liste,
+		...r.total === void 0 ? {} : { total }
+	};
+}
 function verifierRegistre(valeur) {
 	const erreurs = [...valider(schemaRegistre, valeur)];
 	if (erreurs.length > 0) return erreurs;
@@ -1327,42 +1526,46 @@ function lireReponseModele(valeur) {
 		};
 	}
 	if ("champs" in valeur) {
-		const erreurs = verifierFormulaire(valeur);
+		const redresse = redresserFormulaire(valeur);
+		const erreurs = verifierFormulaire(redresse);
 		return erreurs.length > 0 ? {
 			sorte: "invalide",
 			erreurs
 		} : {
 			sorte: "formulaire",
-			formulaire: valeur
+			formulaire: redresse
 		};
 	}
 	if ("sections" in valeur) {
-		const erreurs = verifierPage(valeur);
+		const redressee = redresserPage(valeur);
+		const erreurs = verifierPage(redressee);
 		return erreurs.length > 0 ? {
 			sorte: "invalide",
 			erreurs
 		} : {
 			sorte: "page",
-			page: valeur
+			page: redressee
 		};
 	}
 	if ("entrees" in valeur) {
-		const erreurs = verifierCalcul(valeur);
+		const redresse = redresserCalcul(valeur);
+		const erreurs = verifierCalcul(redresse);
 		return erreurs.length > 0 ? {
 			sorte: "invalide",
 			erreurs
 		} : {
 			sorte: "calcul",
-			calcul: valeur
+			calcul: redresse
 		};
 	}
-	const erreurs = verifierRegistre(valeur);
+	const redresse = redresserRegistre(valeur);
+	const erreurs = verifierRegistre(redresse);
 	return erreurs.length > 0 ? {
 		sorte: "invalide",
 		erreurs
 	} : {
 		sorte: "registre",
-		registre: valeur
+		registre: redresse
 	};
 }
 //#endregion
@@ -1959,6 +2162,11 @@ Règles :
   qu’on appellera.
 - N’invente pas de colonne, de section ni de question que la demande ne
   réclame pas.
+- **Une section porte toujours son contenu.** Laisser un *champ* vide est bien ;
+  laisser une *section* vide ne l’est pas — un titre suivi de rien n’aide
+  personne. Si tu ne sais pas encore ce qu’il vend, n’ouvre pas une liste vide :
+  écris ce que tu sais dans une section « texte », et demande le reste dans ton
+  mot. On complétera au tour suivant.
 - Si la demande décrit une dette entre personnes, ne mets aucun montant en
   sur-titre : ça se partage, et humilier quelqu’un fait perdre le client avec
   l’argent.`;
@@ -2411,6 +2619,11 @@ async function* jouerLeTour(accord, fournisseur, seance, reglages) {
 		return;
 	}
 	const tour = lireLaFin(texte, demande);
+	if (tour !== null && tour.sorte === "outil" && tour.outil.sorte === "invalide") console.error(JSON.stringify({
+		evenement: "outil_invalide",
+		erreurs: tour.outil.erreurs.slice(0, 6).map((e) => `${e.chemin} : ${e.message}`),
+		rendu: texte.slice(0, 600)
+	}));
 	if (tour === null) console.error(JSON.stringify({
 		evenement: "tour_illisible",
 		debut: texte.slice(0, 300)

@@ -76,6 +76,11 @@ Règles :
   qu’on appellera.
 - N’invente pas de colonne, de section ni de question que la demande ne
   réclame pas.
+- **Une section porte toujours son contenu.** Laisser un *champ* vide est bien ;
+  laisser une *section* vide ne l’est pas — un titre suivi de rien n’aide
+  personne. Si tu ne sais pas encore ce qu’il vend, n’ouvre pas une liste vide :
+  écris ce que tu sais dans une section « texte », et demande le reste dans ton
+  mot. On complétera au tour suivant.
 - Si la demande décrit une dette entre personnes, ne mets aucun montant en
   sur-titre : ça se partage, et humilier quelqu’un fait perdre le client avec
   l’argent.`

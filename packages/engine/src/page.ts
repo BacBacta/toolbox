@@ -127,7 +127,10 @@ const schemaSection: JsonSchema = {
     },
     sorte: {
       type: 'string', enum: ['texte', 'liste', 'prix'], title: 'Sorte',
-      description: 'texte : un paragraphe. liste : des noms. prix : des noms avec un montant.',
+      description:
+        'texte : un paragraphe, dans « texte ». liste : des noms, dans « lignes ». ' +
+        'prix : des noms avec un montant, dans « lignes ». ' +
+        'Choisis « texte » quand tu n’as pas la liste : une section porte toujours son contenu.',
     },
     /*
      * Une section porte l'un ou l'autre, jamais les deux : `montrerSi` dit à
@@ -136,13 +139,13 @@ const schemaSection: JsonSchema = {
      * champs à l'écran ne menaient nulle part.
      */
     texte: {
-      type: 'string', maxLength: 400, title: 'Texte',
-      description: 'Pour une section « texte ». Deux paragraphes au plus.',
+      type: 'string', minLength: 1, maxLength: 400, title: 'Texte',
+      description: 'Obligatoire quand la sorte est « texte ». Deux paragraphes au plus.',
       ecran: { montrerSi: { champ: 'sorte', vaut: ['texte'] } },
     },
     lignes: {
-      type: 'array', maxItems: MAX_LIGNES_SECTION, items: schemaLigne, title: 'Lignes',
-      description: 'Pour « liste » ou « prix ».',
+      type: 'array', minItems: 1, maxItems: MAX_LIGNES_SECTION, items: schemaLigne, title: 'Lignes',
+      description: 'Obligatoire quand la sorte est « liste » ou « prix ». Au moins une ligne.',
       ecran: {
         montrerSi: { champ: 'sorte', vaut: ['liste', 'prix'] },
         ajout: 'Ajouter une ligne', retrait: 'Retirer la ligne',
@@ -216,6 +219,110 @@ export const schemaPage: JsonSchema = {
         'Vrai quand la demande dit « un site » : un menu saute d’une section à l’autre. Faux pour une simple page.',
     },
   },
+}
+
+/**
+ * L'étiquette contre le contenu : c'est le contenu qui gagne.
+ *
+ * Une section annonce sa `sorte` et porte l'un des deux contenus. Le modèle se
+ * trompe parfois d'étiquette — il écrit un paragraphe et l'appelle « liste »,
+ * ou aligne des prix sous « texte ». Ce qu'il a écrit est bon ; seul le mot
+ * qui le nomme est faux, et refuser la page entière pour ce mot-là fait
+ * recommencer un tour payé pour rien.
+ *
+ * Redresser n'est pas inventer. Une section qui ne porte **aucun** contenu ne
+ * se répare pas : elle s'en va, parce qu'un titre suivi de rien n'aide
+ * personne. Si toutes s'en vont, la page reste refusée — c'est `minItems` qui
+ * le dira, et c'est bien qu'il le dise.
+ *
+ * La fonction est pure et tolère n'importe quoi : elle reçoit ce que le modèle
+ * a rendu, pas une page. Ce qui n'a pas la forme d'une page ressort tel quel,
+ * et le schéma s'expliquera mieux qu'elle.
+ */
+export function redresserPage(valeur: unknown): unknown {
+  if (typeof valeur !== 'object' || valeur === null) return valeur
+  const page = valeur as { sections?: unknown }
+  if (!Array.isArray(page.sections)) return valeur
+
+  const redressees: unknown[] = []
+  let change = false
+
+  for (const brute of page.sections) {
+    if (typeof brute !== 'object' || brute === null) {
+      redressees.push(brute)
+      continue
+    }
+    const section = brute as Record<string, unknown>
+    const declaree = section['sorte']
+
+    /*
+     * Une sorte que le contrat ne connaît pas n'est pas une étiquette de
+     * travers : c'est une section qu'on ne sait pas dessiner. La corriger
+     * d'office ferait passer par la fenêtre ce que l'énumération tient à la
+     * porte — on la laisse donc telle quelle, et le schéma dira le mot juste.
+     */
+    if (declaree !== 'texte' && declaree !== 'liste' && declaree !== 'prix') {
+      redressees.push(brute)
+      continue
+    }
+
+    const texte = typeof section['texte'] === 'string' ? section['texte'].trim() : ''
+    const lignes = Array.isArray(section['lignes']) ? section['lignes'] : []
+
+    if (texte === '' && lignes.length === 0) {
+      change = true
+      continue
+    }
+
+    /*
+     * Un montant quelque part fait une grille de prix ; des noms seuls font une
+     * liste. C'est la seule différence entre les deux à l'écran, et elle se lit
+     * dans les lignes — inutile de la demander deux fois.
+     */
+    const sorte: SorteSection =
+      lignes.length === 0 ? 'texte'
+      : declaree !== 'texte' ? declaree
+      : texte === '' ? sorteDesLignes(lignes)
+      : 'texte'
+
+    const propre: Record<string, unknown> = {}
+    for (const [clef, v] of Object.entries(section)) {
+      if (clef === 'texte' || clef === 'lignes' || clef === 'sorte') continue
+      propre[clef] = v
+    }
+    propre['sorte'] = sorte
+    if (sorte === 'texte') propre['texte'] = section['texte']
+    else propre['lignes'] = section['lignes']
+
+    if (!memeSection(section, propre)) change = true
+    redressees.push(propre)
+  }
+
+  return change ? { ...page, sections: redressees } : valeur
+}
+
+/** « prix » dès qu'une ligne porte un montant ; « liste » sinon. */
+function sorteDesLignes(lignes: readonly unknown[]): SorteSection {
+  return lignes.some((l) => {
+    if (typeof l !== 'object' || l === null) return false
+    const valeur = (l as { valeur?: unknown }).valeur
+    return typeof valeur === 'string' && valeur.trim() !== ''
+  })
+    ? 'prix'
+    : 'liste'
+}
+
+/*
+ * Rendre l'objet d'origine quand rien ne bouge évite de réécrire une page juste
+ * pour la rendre différente d'elle-même : l'écran compare, et une page neuve à
+ * chaque lecture ferait clignoter ce qui n'a pas changé.
+ */
+function memeSection(avant: Record<string, unknown>, apres: Record<string, unknown>): boolean {
+  const clefs = new Set([...Object.keys(avant), ...Object.keys(apres)])
+  for (const clef of clefs) {
+    if (avant[clef] !== apres[clef]) return false
+  }
+  return true
 }
 
 /**

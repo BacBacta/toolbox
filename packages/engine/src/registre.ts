@@ -1,5 +1,6 @@
 import type { TypeColonne } from './compute/liste.js'
 import type { ErreurValidation, JsonSchema } from './types.js'
+import { plierLesClefs } from './clefs.js'
 import { valider } from './valider.js'
 
 /**
@@ -172,6 +173,40 @@ export const schemaRefus: JsonSchema = {
         'Pourquoi la demande ne se range pas dans un registre. Une phrase, en français, adressée à l’utilisateur.',
     },
   },
+}
+
+/**
+ * Les clefs pliées, et le total qui les désigne suivi avec elles.
+ *
+ * `montantDû` devient `montantDu` ; si le total additionnait `montantDû`, il
+ * additionne désormais `montantDu`. Renommer les colonnes sans suivre le total
+ * échangerait une faute contre une autre — « ne désigne aucune colonne » — et
+ * la génération mourrait tout autant.
+ *
+ * Pure, et tolérante à ce qui n'est pas un registre : elle reçoit ce que le
+ * modèle a rendu, et le schéma s'expliquera mieux qu'elle.
+ */
+export function redresserRegistre(valeur: unknown): unknown {
+  if (typeof valeur !== 'object' || valeur === null) return valeur
+  const r = valeur as { colonnes?: unknown; total?: unknown }
+  const pliage = plierLesClefs(r.colonnes)
+  if (pliage === null || !pliage.change) return valeur
+
+  const suivre = (clef: unknown): unknown =>
+    typeof clef === 'string' ? (pliage.renommes.get(clef) ?? clef) : clef
+
+  const total =
+    typeof r.total === 'object' && r.total !== null
+      ? Object.fromEntries(
+          Object.entries(r.total as Record<string, unknown>).map(([champ, v]) =>
+            champ === 'clef' || champ === 'plus' || champ === 'moins'
+              ? [champ, suivre(v)]
+              : [champ, v],
+          ),
+        )
+      : r.total
+
+  return { ...valeur, colonnes: pliage.liste, ...(r.total === undefined ? {} : { total }) }
 }
 
 export function verifierRegistre(valeur: unknown): readonly ErreurValidation[] {

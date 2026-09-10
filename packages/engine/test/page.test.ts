@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_LIGNES_SECTION, MAX_SECTIONS, avecSommaire, carteDePage, direLeJour, partageDePage,
-  schemaPage, sectionsAncrees, verifierPage,
+  redresserPage, schemaPage, sectionsAncrees, verifierPage,
 } from '../src/page.js'
+import type { JsonSchema } from '../src/types.js'
 import type { PageDemande } from '../src/page.js'
 
 /**
@@ -432,5 +433,151 @@ describe('les champs qui désignent une personne ou un lieu', () => {
       items: { properties: { lignes: { items: { properties: { valeur: { description: string } } } } } }
     }
     expect(sections.items.properties.lignes.items.properties.valeur.description).toContain('Ex.')
+  })
+})
+
+/**
+ * Ce que le modèle a réellement rendu, en production, trois fois de suite.
+ *
+ * `{ titre, sorte: 'liste' }` — les deux champs `required` du schéma, et rien
+ * d'autre. Le modèle n'avait pas tort : `lignes` y était facultatif. C'est le
+ * contrat qui mentait, et le contrôle de cohérence rejetait ensuite une page
+ * que le schéma venait d'accepter. Un modèle ne peut pas deviner une exigence
+ * qu'on écrit dans du code qu'il ne voit pas.
+ */
+describe('une section qui dit une sorte et en porte une autre', () => {
+  it('« liste » sans lignes mais avec un texte : c’est une section texte', () => {
+    const rendu = redresserPage({
+      ...BONNE,
+      sections: [{ titre: 'La livraison', sorte: 'liste', texte: 'Sur tout Douala.' }],
+    }) as PageDemande
+    expect(rendu.sections[0]?.sorte).toBe('texte')
+    expect(verifierPage(rendu)).toEqual([])
+  })
+
+  it('« texte » sans texte mais avec des lignes chiffrées : c’est une section prix', () => {
+    const rendu = redresserPage({
+      ...BONNE,
+      sections: [{ titre: 'Mes prix', sorte: 'texte', lignes: [{ nom: 'Ciment', valeur: '5 800 F' }] }],
+    }) as PageDemande
+    expect(rendu.sections[0]?.sorte).toBe('prix')
+    expect(verifierPage(rendu)).toEqual([])
+  })
+
+  it('« texte » sans texte mais avec des lignes sans montant : c’est une liste', () => {
+    const rendu = redresserPage({
+      ...BONNE,
+      sections: [{ titre: 'Ce que je vends', sorte: 'texte', lignes: [{ nom: 'Ciment' }] }],
+    }) as PageDemande
+    expect(rendu.sections[0]?.sorte).toBe('liste')
+  })
+
+  it('une section qui ne porte rien s’en va, plutôt que de faire tomber la page', () => {
+    const rendu = redresserPage({
+      ...BONNE,
+      sections: [BONNE.sections[0], { titre: 'Ce que je vends', sorte: 'liste' }],
+    }) as PageDemande
+    expect(rendu.sections).toHaveLength(1)
+    expect(verifierPage(rendu)).toEqual([])
+  })
+
+  it('le champ qui ne sert pas s’en va avec : la page publiée se paie à l’octet', () => {
+    const rendu = redresserPage({
+      ...BONNE,
+      sections: [{ titre: 'Mes prix', sorte: 'prix', lignes: [{ nom: 'Ciment' }], texte: 'restant' }],
+    }) as PageDemande
+    expect(rendu.sections[0]).not.toHaveProperty('texte')
+  })
+
+  it('une page dont aucune section ne porte rien reste refusée : redresser n’est pas inventer', () => {
+    const rendu = redresserPage({ ...BONNE, sections: [{ titre: 'Ce que je vends', sorte: 'liste' }] })
+    expect(verifierPage(rendu).length).toBeGreaterThan(0)
+  })
+
+  it('une bonne page traverse sans être touchée', () => {
+    expect(redresserPage(BONNE)).toEqual(BONNE)
+  })
+
+  it('ce qui n’est pas une page ressort tel quel, et le schéma dira pourquoi', () => {
+    expect(redresserPage(null)).toBe(null)
+    expect(redresserPage({ sections: 'deux' })).toEqual({ sections: 'deux' })
+    expect(redresserPage({ ...BONNE, sections: [7] })).toEqual({ ...BONNE, sections: [7] })
+  })
+})
+
+/**
+ * Le schéma doit porter l'exigence lui-même.
+ *
+ * Redresser rattrape une étiquette qui contredit un contenu ; ça ne rattrape
+ * pas une section vide. Pour celle-là, il n'y a que ce que le modèle lit — la
+ * description des champs — et c'est le seul endroit où l'écrire.
+ */
+describe('le contrat de section, tel que le modèle le lit', () => {
+  /* Le schéma est une union discriminée : on descend en la resserrant. */
+  const champ = (nom: string): JsonSchema => {
+    if (schemaPage.type !== 'object') throw new Error('la page n’est pas un objet')
+    const sections = schemaPage.properties['sections']
+    if (sections?.type !== 'array' || sections.items.type !== 'object') {
+      throw new Error('les sections ne sont pas un tableau d’objets')
+    }
+    const trouve = sections.items.properties[nom]
+    if (trouve === undefined) throw new Error(`la section n’a pas de « ${nom} »`)
+    return trouve
+  }
+
+  it('« lignes » refuse le tableau vide', () => {
+    const lignes = champ('lignes')
+    expect(lignes.type === 'array' ? lignes.minItems : undefined).toBe(1)
+  })
+
+  it('dit à quelle sorte chaque contenu appartient, et qu’il est obligatoire', () => {
+    expect(champ('lignes').description).toMatch(/oblig/i)
+    expect(champ('texte').description).toMatch(/oblig/i)
+  })
+})
+
+/**
+ * Redresser ne doit rien blanchir.
+ *
+ * C'est la frontière du § 2.1 : ce que le modèle rend ne devient pas de
+ * l'écran sans passer par le schéma. Une fonction qui recopie les champs d'une
+ * section aurait pu, en recopiant, laisser tomber celui qui gênait — et le
+ * champ interdit serait alors sorti par la porte de service.
+ */
+describe('redresser passe la frontière, il ne la déplace pas', () => {
+  it('un champ que le contrat ignore survit au redressement, et fait tomber la page', () => {
+    const rendu = redresserPage({
+      ...BONNE,
+      sections: [{ titre: 'Ce que je vends', sorte: 'texte', lignes: [{ nom: 'Ciment' }], script: 'alert(1)' }],
+    })
+    expect(JSON.stringify(rendu)).toContain('script')
+    expect(verifierPage(rendu).length).toBeGreaterThan(0)
+  })
+
+  it('une ligne qui n’est pas un objet n’est pas prise pour un prix', () => {
+    const rendu = redresserPage({
+      ...BONNE,
+      sections: [{ titre: 'Ce que je vends', sorte: 'texte', lignes: ['Ciment'] }],
+    }) as PageDemande
+    expect(rendu.sections[0]?.sorte).toBe('liste')
+    expect(verifierPage(rendu).length).toBeGreaterThan(0)
+  })
+
+  /*
+   * Une sorte inventée n'est pas une étiquette de travers : c'est une section
+   * qu'on ne sait pas dessiner. Rabattre « vidéo » sur « texte » parce qu'il
+   * s'y trouve une phrase ferait entrer par la fenêtre ce que l'énumération
+   * tient à la porte, et personne ne saurait que le modèle a inventé une
+   * sorte — c'est le reproche qui sert à corriger l'invite.
+   */
+  it('une sorte que le contrat ignore n’est pas corrigée d’office', () => {
+    for (const section of [
+      { titre: 'Vidéo', sorte: 'video', texte: 'Regarde ma chaîne.' },
+      { titre: 'Vidéo', sorte: 'video', lignes: [{ nom: 'Ma chaîne' }] },
+      { titre: 'Vidéo', texte: 'Regarde ma chaîne.' },
+    ]) {
+      const rendu = redresserPage({ ...BONNE, sections: [section] })
+      expect(verifierPage(rendu).length, JSON.stringify(section)).toBeGreaterThan(0)
+    }
   })
 })

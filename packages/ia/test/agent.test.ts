@@ -47,6 +47,18 @@ describe('le prix d’un tour', () => {
 })
 
 describe('ce que l’invite dit', () => {
+  /*
+   * Le modèle a rendu, trois fois de suite en production, une section
+   * « liste » sans lignes — les deux seuls champs obligatoires du schéma.
+   * Il obéissait : la règle d'à côté lui dit de laisser vide ce qu'il ignore.
+   * Elle parlait des champs ; il l'a appliquée à la section.
+   */
+  it('distingue un champ qu’on laisse vide d’une section qu’on n’ouvre pas', () => {
+    const invite = batirInviteAgent('page')
+    expect(invite).toContain('Une section porte toujours son contenu')
+    expect(invite).toMatch(/n’ouvre pas une liste vide/)
+  })
+
   it('donne le droit de ne rendre qu’un mot', () => {
     // Personne ne décrit du premier coup l'outil qu'il veut, et une question
     // coûte le même tour qu'un outil inventé.

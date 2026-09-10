@@ -164,6 +164,25 @@ export async function* jouerLeTour(
 
   const tour = lireLaFin(texte, demande)
 
+  if (tour !== null && tour.sorte === 'outil' && tour.outil.sorte === 'invalide') {
+    /*
+     * Le modèle a bien rendu un outil, mais il ne tient pas le contrat.
+     *
+     * Sans ce journal, on sait qu'un tour a échoué et pas contre quoi — et le
+     * client, lui, n'a que « je n'ai pas su répondre ». Les reproches sont
+     * exactement ce qu'il faudrait pour corriger l'invite ou le schéma, et ils
+     * n'existent qu'ici.
+     */
+    console.error(
+      JSON.stringify({
+        evenement: 'outil_invalide',
+        erreurs: tour.outil.erreurs.slice(0, 6).map((e) => `${e.chemin} : ${e.message}`),
+        // Le reproche dit où ça casse, pas ce que le modèle avait mis là.
+        rendu: texte.slice(0, 600),
+      }),
+    )
+  }
+
   if (tour === null) {
     /*
      * Ce que le modèle a réellement dit part dans le journal du serveur.

@@ -125,3 +125,33 @@ describe('un refus trop long', () => {
     expect(lireReponseModele({ impossible: 42 }).sorte).toBe('invalide')
   })
 })
+
+/**
+ * Le lecteur rend la page redressée, et pas celle qu'il a jugée.
+ *
+ * Juger la redressée puis publier l'originale serait pire que ne rien
+ * redresser : la contradiction passerait le contrôle et ressortirait entière à
+ * l'écran, avec un « liste » qui ne montre aucune ligne. C'est ce que la
+ * frontière est là pour empêcher.
+ */
+describe('une page dont une étiquette contredisait son contenu', () => {
+  const RENDU = {
+    titre: 'Quincaillerie Bépanda',
+    kicker: 'QUINCAILLERIE',
+    accroche: 'Tôles, ciment et outillage, à Bépanda depuis 2012.',
+    sections: [{ titre: 'La livraison', sorte: 'liste', texte: 'Sur tout Douala.' }],
+  }
+
+  it('ressort lisible, et c’est la version corrigée qu’on garde', () => {
+    const lu = lireReponseModele(RENDU)
+    expect(lu.sorte).toBe('page')
+    if (lu.sorte !== 'page') return
+    expect(lu.page.sections[0]?.sorte).toBe('texte')
+    expect(lu.page.sections[0]?.texte).toBe('Sur tout Douala.')
+  })
+
+  it('mais une section qui ne porte rien du tout ne s’invente pas', () => {
+    expect(lireReponseModele({ ...RENDU, sections: [{ titre: 'Ce que je vends', sorte: 'liste' }] }).sorte)
+      .toBe('invalide')
+  })
+})
