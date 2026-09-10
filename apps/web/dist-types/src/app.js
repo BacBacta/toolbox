@@ -34,6 +34,15 @@ function glyphePour(skeleton) {
 function Accueil(props) {
     return (_jsxs(_Fragment, { children: [_jsxs("header", { class: "app-entete", children: [_jsx("h1", { class: "titre-app", children: "Atelier 237" }), _jsx("span", { class: "app-baseline", children: "hors ligne, sur ton t\u00E9l\u00E9phone" })] }), _jsx(Atelier, { fiches: DISPONIBLES, onCreer: props.onCreer, onDiscuter: props.onDiscuter }), _jsx("h2", { class: "outil-surtitre", children: "Tous les outils" }), _jsx("div", { class: "grille", children: DISPONIBLES.map((s) => (_jsxs("button", { type: "button", class: "carte-squelette", onClick: () => props.onCreer(s.id, EXTRAIT_VIDE), children: [_jsx("span", { class: "marque", "aria-hidden": "true", children: s.glyphe }), _jsxs("span", { class: "texte", children: [_jsx("b", { children: s.title }), _jsx("span", { children: s.group })] })] }, s.id))) }), _jsx("h2", { class: "outil-surtitre", children: "Mes outils" }), props.outils.length === 0 ? (_jsx("p", { class: "note", children: "Rien pour l\u2019instant. Choisis un outil ci-dessus." })) : (_jsx("div", { class: "outil-rangees", children: props.outils.map((o) => (_jsxs("div", { class: "outil-rangee", children: [_jsx("button", { type: "button", class: "identite lien-outil", onClick: () => props.onOuvrir(o.id), children: _jsxs("span", { class: "nom", children: [_jsx("span", { class: "n1", children: o.nom }), _jsx("span", { class: "n2", children: o.skeleton })] }) }), _jsx("button", { type: "button", class: "outil-retirer", "aria-label": `Supprimer ${o.nom}`, onClick: () => props.onSupprimer(o.id), children: "\u00D7" })] }, o.id))) }))] }));
 }
+/**
+ * L'adresse de l'Établi.
+ *
+ * Écrite ici et pas dans un fichier de configuration : il n'y a qu'un seul
+ * endroit qui en a besoin, et un réglage qu'on ne change jamais coûte plus
+ * cher à chercher qu'à lire. Elle changera le jour où un vrai nom de domaine
+ * existera — et ce jour-là, l'atelier en changera aussi.
+ */
+const ADRESSE_ETABLI = 'https://etabli237.pages.dev';
 export function App() {
     const [outils, setOutils] = useState([]);
     const [compte, setCompte] = useState(null);
@@ -240,7 +249,7 @@ export function App() {
                         ? `Atelier · ${compte.credits} compositions`
                         : compte.credits === 0
                             ? 'Essai · plus de composition'
-                            : `Essai · ${compte.credits} composition${compte.credits > 1 ? 's' : ''}` }))] }));
+                            : `Essai · ${compte.credits} composition${compte.credits > 1 ? 's' : ''}` })), _jsx("a", { class: "etabli-ligne", href: ADRESSE_ETABLI, target: "_blank", rel: "noopener noreferrer", children: "\u00C9crire du code ? L\u2019\u00C9tabli s\u2019ouvre \u00E0 c\u00F4t\u00E9, hors ligne aussi." })] }));
     }
     /**
      * Le lien de l'outil ouvert, ou rien.

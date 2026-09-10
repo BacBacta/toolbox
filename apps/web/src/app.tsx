@@ -113,6 +113,16 @@ function Accueil(props: {
   )
 }
 
+/**
+ * L'adresse de l'Établi.
+ *
+ * Écrite ici et pas dans un fichier de configuration : il n'y a qu'un seul
+ * endroit qui en a besoin, et un réglage qu'on ne change jamais coûte plus
+ * cher à chercher qu'à lire. Elle changera le jour où un vrai nom de domaine
+ * existera — et ce jour-là, l'atelier en changera aussi.
+ */
+const ADRESSE_ETABLI = 'https://etabli237.pages.dev'
+
 export function App(): JSX.Element {
   const [outils, setOutils] = useState<readonly OutilEnregistre[]>([])
   const [compte, setCompte] = useState<EtatCompte | null>(null)
@@ -391,6 +401,21 @@ export function App(): JSX.Element {
                 : `Essai · ${compte.credits} composition${compte.credits > 1 ? 's' : ''}`}
           </button>
         )}
+        {/*
+          * L'Établi, sur son propre domaine.
+          *
+          * Il y vit pour une raison qui ne se négocie pas : il exécute du code
+          * écrit par quelqu'un, et ce code ne doit jamais tourner sur l'origine
+          * qui porte les comptes, les paiements et les publications. Un lien
+          * plutôt qu'un écran de plus, donc — et il faut bien que quelqu'un le
+          * pose, sans quoi l'Établi n'existe que pour qui connaît son adresse.
+          *
+          * En bas, comme la ligne du compte : hors du chemin de quelqu'un venu
+          * faire une facture.
+          */}
+        <a class="etabli-ligne" href={ADRESSE_ETABLI} target="_blank" rel="noopener noreferrer">
+          Écrire du code ? L’Établi s’ouvre à côté, hors ligne aussi.
+        </a>
       </main>
     )
   }
