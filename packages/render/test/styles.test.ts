@@ -21,12 +21,24 @@ import type { Palette } from '../src/jetons.js'
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', 'src')
 const STYLES = join(SRC, 'styles')
 
+/*
+ * L'application entre dans le contrôle, et pas seulement le moteur de rendu.
+ *
+ * La garde ne regardait que `packages/render`. `apps/web` — l'accueil, l'écran
+ * du compte, l'agent — lui échappait entièrement, et sept classes de l'écran
+ * du compte n'avaient aucun style : le bouton du bas de l'accueil s'affichait
+ * en bouton natif gris. Personne ne l'avait vu, parce qu'un HTML sans style
+ * sort correct de tous les essais de rendu.
+ */
+const APP = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'apps', 'web', 'src')
+
 const A4 = readFileSync(join(STYLES, 'a4.css'), 'utf8')
 const OUTIL = readFileSync(join(STYLES, 'outil.css'), 'utf8')
 // La vitrine a sa feuille : elle sert l'aperçu dans l'application et la page
 // publiée, et n'entre donc pas dans la coquille de l'outil.
 const VITRINE = readFileSync(join(STYLES, 'vitrine.css'), 'utf8')
-const CSS = `${A4}\n${OUTIL}\n${VITRINE}`
+const APP_CSS = readFileSync(join(APP, 'app.css'), 'utf8')
+const CSS = `${A4}\n${OUTIL}\n${VITRINE}\n${APP_CSS}`
 
 const DECLAREES = new Set([...CSS.matchAll(/\.([a-z][a-z0-9-]*)/g)].map((m) => m[1] ?? ''))
 
@@ -42,7 +54,11 @@ function classesEmployees(source: string): string[] {
 }
 
 const EMPLOYEES = [
-  ...new Set(fichiersSources(SRC).flatMap((f) => classesEmployees(readFileSync(f, 'utf8')))),
+  ...new Set(
+    [...fichiersSources(SRC), ...fichiersSources(APP)].flatMap((f) =>
+      classesEmployees(readFileSync(f, 'utf8')),
+    ),
+  ),
 ].sort()
 
 /** `accentSombre` → `--accent-sombre`, `encre2` → `--encre-2`. */

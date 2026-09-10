@@ -193,6 +193,37 @@ describe('l’atelier comprend la demande, sans appeler personne', () => {
     expect(parler?.textContent).toContain('centimes')
   })
 
+  /*
+   * L'Établi existait, en ligne, et personne ne pouvait le trouver.
+   *
+   * Deux fois de suite, le même signalement : « le changement n'est pas
+   * visible sur l'application ». Il l'était encore moins que je ne croyais —
+   * l'Établi vit sur son propre sous-domaine, pour que du code écrit par
+   * n'importe qui ne s'exécute jamais à côté des comptes, et rien ici n'y
+   * menait. Un produit qu'on ne peut atteindre qu'en connaissant son adresse
+   * n'est pas livré.
+   *
+   * En bas, comme la ligne du compte : hors du chemin de quelqu'un venu faire
+   * une facture, mais présent pour qui descend.
+   */
+  it('mène à l’Établi, sur son propre domaine', () => {
+    const lien = hote.querySelector('a.etabli-ligne') as HTMLAnchorElement | null
+    expect(lien).not.toBe(null)
+    expect(lien?.getAttribute('href')).toBe('https://etabli237.pages.dev')
+    expect(lien?.textContent).toMatch(/code/i)
+  })
+
+  /*
+   * `target="_blank"` sans `rel="noopener"` donne à la page ouverte le droit
+   * de rediriger celle-ci par `window.opener`. Ici la page ouverte est la
+   * nôtre, mais la règle ne se relâche pas selon qui est au bout : c'est le
+   * genre d'exception qu'on oublie d'annuler.
+   */
+  it('et ne laisse pas la page ouverte reprendre la main sur celle-ci', () => {
+    const lien = hote.querySelector('a.etabli-ligne') as HTMLAnchorElement
+    expect(lien.getAttribute('rel')).toContain('noopener')
+  })
+
   it('garde la grille complète sous la main', () => {
     // La demande ne cache pas les autres outils : on peut toujours parcourir.
     demander('devis')

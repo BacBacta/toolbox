@@ -892,3 +892,77 @@ body {
 .fenetre-vue .vitrine {
   padding: 0;
 }
+
+/* ─────────────────────────── le compte et l'Établi ─────────────────────────── */
+
+/*
+ * Ces classes existaient dans le JSX depuis l'écran du compte, et n'avaient
+ * aucun style : la garde des feuilles ne regardait que `packages/render`, pas
+ * `apps/web`. Le bouton du bas s'affichait donc en bouton natif gris, sur
+ * l'écran d'accueil, sous la grille des outils. Elle regarde les deux
+ * maintenant.
+ */
+
+.compte { display: block; }
+
+.compte-etat {
+  margin: var(--pas-3) 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.compte-choix { display: grid; gap: var(--pas-2); margin-top: var(--pas-4); }
+
+/*
+ * Le code de récupération : montré une fois, recopié sur un cahier.
+ *
+ * C'est la seule chose qui rend un abonnement récupérable après la perte du
+ * téléphone. Il se lit à voix haute et se recopie à la main — d'où les groupes
+ * de quatre, l'espacement des lettres, et une boîte qui dit « note-moi ».
+ */
+.compte-code {
+  margin: var(--pas-4) 0;
+  padding: var(--pas-4);
+  border: 1px solid var(--accent);
+  border-radius: var(--rond-m);
+  background: var(--surface);
+}
+
+.compte-code-valeur {
+  margin: var(--pas-2) 0;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  color: var(--accent-sombre);
+  word-break: break-all;
+}
+
+.compte-saisie { display: grid; gap: var(--pas-2); margin-top: var(--pas-4); }
+
+/*
+ * La ligne du compte, en bas de l'accueil, et celle de l'Établi sous elle.
+ *
+ * Discrètes toutes les deux : quelqu'un venu faire une facture ne doit pas les
+ * rencontrer en chemin, et quelqu'un qui descend doit les trouver.
+ */
+.compte-ligne,
+.etabli-ligne {
+  display: block;
+  width: 100%;
+  margin-top: var(--pas-4);
+  padding: var(--pas-3);
+  min-height: var(--cible);
+  border: 0;
+  border-top: 1px solid var(--trait);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--encre-3);
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+.etabli-ligne { margin-top: 0; border-top: 0; }
+.compte-ligne:active,
+.etabli-ligne:active { color: var(--accent); }
