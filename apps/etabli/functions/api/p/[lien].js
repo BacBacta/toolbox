@@ -3,7 +3,8 @@ var EXTENSIONS = {
 	html: "html",
 	htm: "html",
 	css: "css",
-	js: "js"
+	js: "js",
+	py: "py"
 };
 function sorteDuFichier(nom) {
 	const point = nom.lastIndexOf(".");
@@ -16,7 +17,7 @@ var REPROCHES = {
 		espace: () => "Un nom ne commence ni ne finit par une espace.",
 		dossier: () => "Pas de dossiers ici : un nom simple, comme « page.html ».",
 		caracteres: () => "Lettres, chiffres, points, tirets et soulignés seulement.",
-		extension: () => "Termine par .html, .css ou .js — ce sont les trois que je sais exécuter.",
+		extension: () => "Termine par .html, .css, .js ou .py — ce sont les quatre que je sais exécuter.",
 		pris: (nom) => `« ${nom} » existe déjà dans ce projet.`
 	},
 	en: {
@@ -24,7 +25,7 @@ var REPROCHES = {
 		espace: () => "A name cannot start or end with a space.",
 		dossier: () => "No folders here: a plain name, like \"page.html\".",
 		caracteres: () => "Letters, digits, dots, dashes and underscores only.",
-		extension: () => "End it with .html, .css or .js — those are the three I can run.",
+		extension: () => "End it with .html, .css, .js or .py — those are the four I can run.",
 		pris: (nom) => `"${nom}" already exists in this project.`
 	}
 };

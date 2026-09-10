@@ -7,3 +7,7 @@ coverage/
 *.local
 .DS_Store
 .env*
+
+# Pyodide : douze mégaoctets récupérés par « node scripts/pyodide.mjs ».
+# Versionnés, ils rendraient le dépôt pénible à cloner pour rien.
+apps/etabli/public/pyodide/

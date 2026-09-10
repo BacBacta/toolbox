@@ -134,7 +134,14 @@ describe('le nom d’un fichier', () => {
   })
 
   it('refuse une extension qu’on ne sait pas exécuter, plutôt que de faire semblant', () => {
-    expect(verifierNomDeFichier('script.py', [])).toMatch(/html|css|js/i)
+    expect(verifierNomDeFichier('notes.txt', [])).toMatch(/html|css|js|py/i)
+    expect(verifierNomDeFichier('image.png', [])).toMatch(/html|css|js|py/i)
+  })
+
+  // Python est arrivé : ce nom-là était refusé, il ne l'est plus.
+  it('accepte le Python', () => {
+    expect(verifierNomDeFichier('script.py', [])).toBe(null)
+    expect(sorteDuFichier('script.py')).toBe('py')
   })
 })
 

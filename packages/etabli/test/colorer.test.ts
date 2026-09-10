@@ -25,7 +25,7 @@ import type { SorteJeton } from '../src/colorer.js'
  * cesse d'être alignée sur la zone de saisie — le curseur se met alors à
  * mentir de plus en plus à mesure qu'on descend.
  */
-function recolle(texte: string, sorte: 'js' | 'css' | 'html'): string {
+function recolle(texte: string, sorte: 'js' | 'css' | 'html' | 'py'): string {
   return colorer(texte, sorte).map((j) => j.texte).join('')
 }
 
@@ -60,7 +60,7 @@ describe('recoller les jetons rend le texte d’origine', () => {
 })
 
 /** Ce qu'on attend de voir coloré, langage par langage. */
-function sortes(texte: string, sorte: 'js' | 'css' | 'html'): Set<SorteJeton> {
+function sortes(texte: string, sorte: 'js' | 'css' | 'html' | 'py'): Set<SorteJeton> {
   return new Set(colorer(texte, sorte).map((j) => j.sorte))
 }
 
@@ -207,5 +207,81 @@ describe('le garde-fou d’avancement', () => {
       return i + 1
     })
     expect(jetons).toEqual([{ texte: 'abc', sorte: 'motcle' }])
+  })
+})
+
+/**
+ * Le Python.
+ *
+ * Il arrive avec un piège que les trois autres langages n'ont pas : la chaîne
+ * à triple guillemet. Scannée naïvement, ses deux premiers guillemets ouvrent
+ * une chaîne ordinaire, le troisième la referme aussitôt — et tout le texte qui
+ * suit part en couleur de chaîne jusqu'à la fin du fichier. Sur une aide-
+ * mémoire écrite en tête de programme, c'est tout le programme qui s'éteint.
+ */
+const PYTHON: readonly string[] = [
+  '# le sac de ciment\nprix = 5800\nprint("Total :", prix * 3)',
+  'def calculer(a, b):\n    return a * b',
+  "'''trois guillemets\n  sur plusieurs lignes'''\nx = 1",
+  '"""la même chose, avec les autres"""\ny = 2',
+  's = "chaîne jamais fermée',
+  'texte = """jamais refermé',
+  'if x is not None and y in liste:\n    pass',
+]
+
+describe('le Python', () => {
+  it.each(PYTHON)('recoller rend le texte d’origine : « %s »', (texte) => {
+    expect(recolle(texte, 'py')).toBe(texte)
+  })
+
+  it('distingue les mots-clefs, les chaînes, les nombres et les commentaires', () => {
+    const vus = sortes('# le sac\nprix = 5800\ndef f():\n    return "Ndolé"', 'py')
+    expect(vus).toContain('commentaire')
+    expect(vus).toContain('nombre')
+    expect(vus).toContain('motcle')
+    expect(vus).toContain('chaine')
+  })
+
+  /*
+   * « print » n'est pas un mot-clef, c'est une fonction. Le colorer comme
+   * « def » apprendrait une grammaire fausse, qu'il faudrait désapprendre le
+   * jour où on écrit sa propre fonction.
+   */
+  it('ne fait pas passer « print » pour un mot du langage', () => {
+    const jetons = colorer('print(prix)', 'py')
+    expect(jetons.filter((j) => j.sorte === 'motcle')).toHaveLength(0)
+  })
+
+  it('mais reconnaît « def », « return », « None », « True »', () => {
+    for (const mot of ['def', 'return', 'None', 'True', 'elif', 'lambda']) {
+      expect(colorer(mot, 'py')[0]?.sorte, mot).toBe('motcle')
+    }
+  })
+
+  /*
+   * L'essai doit porter sur un cas où les deux comportements diffèrent.
+   *
+   * Le premier essai écrit ici ne gardait rien : sur « \u0022\u0022\u0022aide\u0022\u0022\u0022 », un
+   * scanner sans branche pour les triples produit « \u0022\u0022 », puis « \u0022aide\u0022 », puis
+   * « \u0022\u0022 » — trois chaînes voisines que le ramasseur recolle en une seule,
+   * identique au bon résultat. Le sabotage passait donc sans rien casser.
+   *
+   * Il faut un guillemet **à l'intérieur**. Une apostrophe française dans une
+   * aide-mémoire suffit, et c'est le cas qu'on rencontrera pour de vrai.
+   */
+  it('la chaîne à triple guillemet garde ce qu’elle contient', () => {
+    const texte = "'''Le prix d'un sac'''"
+    expect(colorer(texte, 'py')).toEqual([{ texte, sorte: 'chaine' }])
+  })
+
+  it('et ce qui suit reprend ses couleurs normales', () => {
+    const jetons = colorer('"""aide"""\nprix = 5800', 'py')
+    expect(jetons.some((j) => j.sorte === 'nombre' && j.texte === '5800')).toBe(true)
+  })
+
+  it('le « # » commente jusqu’au bout de la ligne, pas au-delà', () => {
+    const jetons = colorer('# un mot\nprix = 1', 'py')
+    expect(jetons[0]).toEqual({ texte: '# un mot', sorte: 'commentaire' })
+    expect(jetons.some((j) => j.sorte === 'nombre' && j.texte === '1')).toBe(true)
   })
 })

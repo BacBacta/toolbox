@@ -306,8 +306,10 @@ try {
  * zone de saisie, et sur un forfait compté à l'octet c'est le prix du repas de
  * midi pour ouvrir un fichier.
  *
- * Le jour où quelqu'un voudra la coloration syntaxique, ce chiffre-ci est ce
- * qu'il faudra mettre en face — pas une opinion.
+ * Ce chiffre a déjà servi deux fois à trancher : la coloration syntaxique est
+ * entrée pour un kilo-octet et six cents là où les bibliothèques du métier en
+ * demandent deux cents, et Python est resté **dehors** — ses cinq mégaoctets se
+ * téléchargent à la demande, après que la personne a vu le prix.
  */
 const ETABLI = 'apps/etabli/dist'
 const PLAFOND_ETABLI = 30 * 1024
@@ -326,6 +328,27 @@ try {
   }
 } catch {
   echecs.push('l’Établi n’est pas construit : impossible de mesurer son poids')
+}
+
+/*
+ * Les fonctions de l'Établi ne contiennent que ses fonctions.
+ *
+ * Vite recopie `public/` dans `outDir` ; `outDir` étant ici le dossier des
+ * fonctions, les douze mégaoctets de Pyodide s'y sont retrouvés une fois — dans
+ * le paquet des fonctions Pages, qui n'a rien à en faire. La construction
+ * réussissait sans rien dire, et c'est cette famille de faute qui a déjà mis
+ * les liaisons de l'atelier, dont la base des comptes, sur le projet de
+ * l'Établi.
+ */
+const FONCTIONS = 'apps/etabli/functions/api/p'
+try {
+  const dedans = readdirSync(FONCTIONS)
+  const intrus = dedans.filter((n) => n !== '[lien].js')
+  if (intrus.length > 0) {
+    echecs.push(`les fonctions de l’Établi contiennent autre chose : ${intrus.join(', ')}`)
+  }
+} catch {
+  echecs.push('les fonctions de l’Établi ne sont pas construites')
 }
 
 if (echecs.length > 0) {
