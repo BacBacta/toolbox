@@ -235,6 +235,45 @@ fournisseur peut accepter un versement partiel.
 Un rappel qu'on ne reconnaît pas reçoit **200 et non 404** : un fournisseur qui
 reçoit une erreur réessaie en boucle.
 
+## Le PDF
+
+| | |
+|---|---|
+| `GET /p/:lien` | le document, en PDF |
+| Browser Run | liaison `NAVIGATEUR` |
+
+Le brief prévoyait un service Playwright sur un petit VPS (§ 7, phase 5).
+Cloudflare rend le même service par une liaison — `quickAction('pdf', …)` —
+sans second hébergeur à tenir, à mettre à jour et à surveiller, et **sans aucun
+paquet** : ni `puppeteer`, ni jeton d'API. Le support sur Pages n'est pas
+documenté ; il a été éprouvé en production plutôt que supposé.
+
+Le rendu se fait **une fois, sur le serveur**, et c'est tout l'intérêt : le
+fichier porte ses glyphes, et la machine qui l'ouvre n'a plus rien à décider.
+Un `window.print()` sur le téléphone du client donnerait autant de PDF
+différents que de navigateurs. Mesuré sur les sept écrits A4 : une page,
+210 × 297 mm, trois polices embarquées.
+
+La police est **nommée** et non devinée. À l'écran, `system-ui` est le bon
+choix — c'est la police que le téléphone a déjà. Sur le serveur, `system-ui`
+est ce que l'image du jour contient, et le jour où elle change, tous les devis
+changeraient d'allure sans que personne ait rien demandé.
+
+### Le débit, qui décide du plan
+
+Le plan gratuit admet **une impression toutes les dix secondes pour tout le
+compte**, et dix minutes de navigateur par jour — deux à trois cents feuilles.
+C'est assez pour commencer, et ce n'est pas assez pour deux clients qui
+impriment en même temps : le second reçoit « L'impression est occupée ».
+
+Le plan payant (5 $/mois) monte à trente par seconde et dix heures par mois
+incluses, puis 0,09 $ l'heure — environ **0,05 F CFA la feuille**.
+
+`quickAction` **avale le 429** : il rend une poignée d'octets qui ne sont pas
+un PDF, sans lever d'exception. C'est la vérification de la signature `%PDF-`,
+et elle seule, qui distingue une limitation d'un fichier valable. Sans elle, le
+Worker renvoyait ces octets étiquetés `application/pdf`.
+
 ## Ce qui reste à vérifier à la main
 
 Le navigateur de l'environnement de développement ne peut pas atteindre
@@ -255,6 +294,10 @@ Ce qui reste, et qui compte plus que tout le reste :
 3. **Recevoir un lien dans WhatsApp et l'ouvrir**, dans le navigateur intégré
    de WhatsApp et non dans Chrome : c'est là que la page publiée sera lue, et
    c'est le seul endroit qui dira si l'aperçu s'affiche vraiment.
+4. **Faire imprimer un devis chez un imprimeur de quartier.** C'est la seconde
+   moitié du critère de la phase 5, et elle ne se vérifie pas d'ici : le PDF
+   est identique partout — une page, A4, polices embarquées, tout se mesure —
+   mais qu'il sorte sans surprise d'une machine de Douala demande du papier.
 
 ## La publication
 

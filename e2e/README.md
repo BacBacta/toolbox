@@ -1,6 +1,6 @@
 # Vérification de bout en bout
 
-Cinq scripts, cinq choses qu'aucun test unitaire ne peut voir.
+Six scripts, six choses qu'aucun test unitaire ne peut voir.
 
 `fumee.mjs` ouvre l'application **construite** dans un vrai Chromium, sur un
 écran de 360 × 740 avec le tactile, et vérifie la chaîne complète : recherche
@@ -24,6 +24,12 @@ sans navigateur. Le § 7 fait de l'idempotence le critère d'arrêt de la phase 
 les essais unitaires le prouvent sur la logique et sur la base, celui-ci sur la
 chaîne entière — le Worker, sa liaison D1, la vérification de signature, et le
 compte tel que l'écran le lit ensuite.
+
+`pdf.mjs` lit le fichier produit, et non le fait qu'il en sorte un. Une page
+de 210 × 297 mm qui **porte ses polices** n'a plus rien à décider au moment de
+l'ouverture : c'est la moitié du critère de la phase 5 qui se mesure. L'autre
+moitié — « un imprimeur de quartier l'imprime sans surprise » — demande du
+papier.
 
 `mise-a-jour.mjs` joue le scénario de la **deuxième** mise en ligne : il
 construit une version, l'installe dans le navigateur, construit une version
@@ -105,6 +111,10 @@ node e2e/hors-ligne.mjs
 printf 'A237_PAIEMENT_SECRET=secret-local-essai\n' > .dev.vars
 wrangler d1 execute COMPTES --local --file=packages/comptes/migrations/0001-comptes.sql
 WRANGLER=/chemin/vers/wrangler node e2e/comptes.mjs
+
+# pdf.mjs a besoin de Browser Run, qui n'existe pas en développement local :
+# il vise la production par défaut. `quickAction` demande `--remote` sinon.
+node e2e/pdf.mjs
 ```
 
 Chacun sort en code 1 s'il échoue : ils s'enchaînent avec `&&`.
