@@ -160,12 +160,26 @@ Le détournement de `fetch` seul ne suffisait pas : le compteur montrait
 par `fetch`. Un mégaoctet à chaque lancement, que personne n'aurait vu passer.
 Avec les trois accroches : **zéro requête** au second lancement.
 
-Le prix annoncé n'est pas une constante tapée à la main. `scripts/pyodide.mjs`
-le mesure à la construction, sur le `content-length` de la réponse compressée
-qu'un vrai serveur envoie. Comprimer nous-mêmes donnait un chiffre plus
-flatteur — quatre mégaoctets et demi contre cinq — parce qu'on peut choisir le
-réglage le plus lent. Annoncer moins que le vrai prix est exactement l'erreur
-que tout ceci existe pour ne pas commettre.
+Le prix annoncé n'est pas une constante tapée à la main, et il a fallu trois
+tours pour qu'il soit vrai.
+
+Comprimer les fichiers nous-mêmes donnait un chiffre flatteur — quatre
+mégaoctets et demi contre cinq — parce qu'on peut choisir le réglage le plus
+lent. Prendre celui que la source annonce était mieux, mais la source n'est pas
+le serveur qui sert : Cloudflare envoie **5 401 584** octets là où jsDelivr en
+annonçait 5 304 678, surtout parce qu'il ne comprime pas le `.zip` du tout. On
+annonçait un dixième de mégaoctet de moins que le prix payé.
+
+`--mesurer <origine>` remesure donc après la mise en ligne, sur le serveur qui
+sert vraiment, et vérifie chaque empreinte avant d'inscrire une taille. La
+mesure passe par `curl` : Cloudflare répond en morceaux, donc sans
+`content-length`, et `fetch` décompresse sans jamais dire combien d'octets sont
+passés — un premier essai croyait mesurer et rendait onze mégaoctets et demi au
+lieu de cinq, son repli s'étant déclenché en silence.
+
+Annoncer moins que le vrai prix est l'erreur que tout ceci existe pour ne pas
+commettre. Tant que la remesure n'a pas eu lieu, l'estimation de construction
+ne prend jamais le chiffre le plus bas.
 
 Les douze mégaoctets ne sont pas versionnés : `pnpm pyodide` les récupère. Une
 installation qui ne l'a pas fait marche exactement comme avant, sans proposer
@@ -187,6 +201,12 @@ pnpm --filter @a237/etabli-web build    # dist/ et functions/
 node scripts/budget.mjs                 # le poids, mesuré et bloquant
 
 # La mise en ligne se lance **depuis apps/etabli**, jamais depuis la racine.
+npx wrangler pages deploy dist --cwd apps/etabli --branch main
+
+# Puis remesurer le prix de Python sur le serveur qui le sert vraiment,
+# et redéployer le manifeste corrigé.
+node scripts/pyodide.mjs --mesurer https://etabli237.pages.dev
+pnpm --filter @a237/etabli-web build
 npx wrangler pages deploy dist --cwd apps/etabli --branch main
 ```
 
