@@ -64,7 +64,7 @@ describe('le registre des outils', () => {
   it('couvre les squelettes qui ont un écran, et le dit', () => {
     expect(Object.keys(CHARGEURS).sort()).toEqual([
       'ardoise', 'attestation', 'caisse', 'callbox', 'clients', 'compose',
-      'compose-calcul', 'course', 'cv', 'dette', 'devis', 'facture', 'motivation',
+      'compose-calcul', 'compose-page', 'course', 'cv', 'dette', 'devis', 'facture', 'motivation',
       'njangi', 'presence', 'prix', 'recu', 'scolarite', 'stock',
     ])
     expect(outilDisponible('njangi')).toBe(true)

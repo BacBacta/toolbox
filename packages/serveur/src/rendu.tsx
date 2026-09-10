@@ -1,7 +1,9 @@
-import type { CardSpec, Instantane, RenderContext } from '@a237/engine'
+import type { CardSpec, Instantane, PageDemande, RenderContext } from '@a237/engine'
 import {
-  limiterItems, squeletteDeCalcul, squeletteDeRegistre, squeletteParId, texteReste,
+  ID_COMPOSE_PAGE, carteDePage, limiterItems, squeletteDeCalcul, squeletteDeRegistre,
+  squeletteParId, texteReste, verifierPage,
 } from '@a237/engine'
+import { PageVitrine } from '@a237/render/page'
 import {
   DocumentAttestation, DocumentCv, DocumentDette, DocumentDevis, DocumentFacture,
   DocumentMotivation, DocumentRecu,
@@ -20,6 +22,10 @@ import type { JSX } from 'preact'
  * on rend leur **carte**, que chaque squelette sait déjà produire et qui est
  * déjà éprouvée. Elle dit l'essentiel — un titre, un grand chiffre, une liste —
  * et ne prétend pas être l'outil.
+ *
+ * Une page composée est le cas le plus simple des trois : elle **est** faite
+ * pour être lue derrière un lien. Rien à résumer, rien à rejouer — on la
+ * dessine, avec le composant que l'aperçu de l'application emploie déjà.
  */
 
 const DOCUMENTS: Readonly<Record<string, (p: { etat: never }) => JSX.Element>> = {
@@ -32,12 +38,27 @@ const DOCUMENTS: Readonly<Record<string, (p: { etat: never }) => JSX.Element>> =
   cv: DocumentCv as never,
 }
 
+/**
+ * La page que porte l'instantané, si c'en est une et qu'elle tient debout.
+ *
+ * Le contrôle est refait ici et pas seulement à la publication : ce qui est
+ * déjà dans KV a pu être déposé par une version plus ancienne du contrôle, et
+ * une page à trous vaut mieux refusée qu'affichée sous le nom de quelqu'un.
+ */
+export function pageDe(instantane: Instantane): PageDemande | null {
+  if (instantane.skeleton !== ID_COMPOSE_PAGE) return null
+  return verifierPage(instantane.etat).length > 0 ? null : (instantane.etat as PageDemande)
+}
+
 /** La facture a besoin de l'instant pour dire son retard ; les autres non. */
 function estFacture(skeleton: string): boolean {
   return skeleton === 'facture'
 }
 
 export function documentDe(instantane: Instantane, ctx: RenderContext): JSX.Element | null {
+  const page = pageDe(instantane)
+  if (page !== null) return <PageVitrine page={page} />
+
   const Composant = Object.hasOwn(DOCUMENTS, instantane.skeleton)
     ? DOCUMENTS[instantane.skeleton]
     : undefined
@@ -60,6 +81,9 @@ export function documentDe(instantane: Instantane, ctx: RenderContext): JSX.Elem
  * était le seul qu'on ne pouvait pas partager.
  */
 export function carteDe(instantane: Instantane, ctx: RenderContext): CardSpec | null {
+  const page = pageDe(instantane)
+  if (page !== null) return carteDePage(page, ctx)
+
   const squelette = squeletteCompose(instantane) ?? squeletteParId(instantane.skeleton)
   if (squelette === null) return null
   try {

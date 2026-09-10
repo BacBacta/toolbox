@@ -1,4 +1,4 @@
-import type { CalculDemande, RegistreDemande } from '@a237/engine'
+import type { CalculDemande, PageDemande, RegistreDemande } from '@a237/engine'
 import { lireReponseModele } from '@a237/engine'
 import { entetesDAppareil } from './appareil.js'
 import { noterApresComposition } from './compte.js'
@@ -21,6 +21,11 @@ import { noterApresComposition } from './compte.js'
 export type Composition =
   | { readonly sorte: 'compose'; readonly registre: RegistreDemande; readonly fcfa: number }
   | { readonly sorte: 'calcule'; readonly calcul: CalculDemande; readonly fcfa: number }
+  /**
+   * Une page à publier. C'est la réponse à « je veux un site internet », qui
+   * était jusqu'ici la demande la plus refusée de toutes.
+   */
+  | { readonly sorte: 'page'; readonly page: PageDemande; readonly fcfa: number }
   /**
    * Le modèle a répondu que la demande n'est pas un registre. C'est une
    * réponse, pas une panne : on la montre telle quelle et on ne réessaie pas.
@@ -80,7 +85,7 @@ export async function composer(demande: string, signal?: AbortSignal): Promise<C
 
   const corps = (await reponse.json().catch(() => null)) as
     | {
-        registre?: unknown; calcul?: unknown; impossible?: unknown; fcfa?: unknown
+        registre?: unknown; calcul?: unknown; page?: unknown; impossible?: unknown; fcfa?: unknown
         plan?: unknown; credits?: unknown
       }
     | null
@@ -104,8 +109,9 @@ export async function composer(demande: string, signal?: AbortSignal): Promise<C
   }
 
   // Le même lecteur que le serveur, sur la charge utile seule.
-  const lu = lireReponseModele(corps?.registre ?? corps?.calcul)
+  const lu = lireReponseModele(corps?.registre ?? corps?.calcul ?? corps?.page)
   if (lu.sorte === 'registre') return { sorte: 'compose', registre: lu.registre, fcfa }
   if (lu.sorte === 'calcul') return { sorte: 'calcule', calcul: lu.calcul, fcfa }
+  if (lu.sorte === 'page') return { sorte: 'page', page: lu.page, fcfa }
   return { sorte: 'echoue', pourquoi: 'la réponse ne décrit pas un outil valide' }
 }

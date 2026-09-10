@@ -23,7 +23,10 @@ const STYLES = join(SRC, 'styles')
 
 const A4 = readFileSync(join(STYLES, 'a4.css'), 'utf8')
 const OUTIL = readFileSync(join(STYLES, 'outil.css'), 'utf8')
-const CSS = `${A4}\n${OUTIL}`
+// La vitrine a sa feuille : elle sert l'aperçu dans l'application et la page
+// publiée, et n'entre donc pas dans la coquille de l'outil.
+const VITRINE = readFileSync(join(STYLES, 'vitrine.css'), 'utf8')
+const CSS = `${A4}\n${OUTIL}\n${VITRINE}`
 
 const DECLAREES = new Set([...CSS.matchAll(/\.([a-z][a-z0-9-]*)/g)].map((m) => m[1] ?? ''))
 

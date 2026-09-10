@@ -1,0 +1,82 @@
+/*
+ * La carte dessinée en HTML, pour un registre publié.
+ *
+ * Elle vit dans sa propre feuille parce qu'elle ne sert qu'à un tiers des
+ * pages : un écrit A4 dessine son document, une page composée dessine sa
+ * vitrine, et ni l'un ni l'autre n'a de carte. Inliner ces règles partout
+ * mettait deux kilo-octets de style mort dans chaque page — sur un plafond de
+ * 25 Ko (§ 8), c'est un douzième dépensé à ne rien dessiner.
+ */
+.lecture-carte {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 20px;
+  border: 1px solid var(--trait);
+  border-radius: 18px;
+  background: var(--surface);
+}
+.lecture-carte .kicker {
+  margin: 0;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.lecture-carte h1 { margin: 4px 0 0; font-size: 22px; line-height: 1.2; }
+.lecture-carte .sous { margin: 2px 0 0; color: var(--encre-3); font-size: 13px; }
+.lecture-carte .grand { margin-top: 20px; }
+.lecture-carte .etiquette {
+  margin: 0;
+  color: var(--encre-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.lecture-carte .chiffre {
+  margin: 2px 0 0;
+  color: var(--accent);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.lecture-carte .barre {
+  height: 10px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: #edf1e9;
+  overflow: hidden;
+}
+.lecture-carte .barre i { display: block; height: 100%; background: var(--accent); }
+.lecture-carte .ligne { margin: 8px 0 0; color: var(--encre-2); font-size: 13px; }
+.lecture-carte .detail { margin-top: 20px; }
+.lecture-carte ul { margin: 8px 0 0; padding: 0; list-style: none; }
+.lecture-carte li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-top: 1px solid var(--trait);
+  font-size: 14px;
+}
+/*
+ * Le nom cède, le montant non.
+ *
+ * Sans `min-width: 0`, un article au nom long et insécable — une référence de
+ * pièce, un numéro de série — pousse le montant hors de la rangée : le chiffre
+ * qu'on cherche du regard est le seul à disparaître. C'est la même règle que
+ * la vitrine applique à ses lignes de prix.
+ */
+.lecture-carte .quoi { min-width: 0; }
+.lecture-carte li.alerte .combien { color: var(--alerte); font-weight: 700; }
+.lecture-carte li.fait .combien { color: var(--accent); }
+.lecture-carte .combien { white-space: nowrap; }
+/* « + 47 autres » : la carte est un résumé, elle dit ce qu'elle ne montre pas. */
+.lecture-carte .reste {
+  margin: 10px 0 0;
+  padding-top: 7px;
+  border-top: 1px solid var(--trait);
+  color: var(--encre-2);
+  font-size: 13px;
+}

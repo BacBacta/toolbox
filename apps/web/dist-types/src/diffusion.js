@@ -1,7 +1,7 @@
 import { Fragment as _Fragment, jsx as _jsx, jsxs as _jsxs } from "preact/jsx-runtime";
+import { lienWhatsApp } from '@a237/engine';
 import { cartePng, dessinerCarte } from '@a237/render/carte';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { lienWhatsApp } from './whatsapp.js';
 /**
  * La feuille de diffusion.
  *

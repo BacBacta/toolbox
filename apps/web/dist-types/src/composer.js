@@ -49,10 +49,12 @@ export async function composer(demande, signal) {
         return { sorte: 'hors-sujet', pourquoi: corps.impossible };
     }
     // Le même lecteur que le serveur, sur la charge utile seule.
-    const lu = lireReponseModele(corps?.registre ?? corps?.calcul);
+    const lu = lireReponseModele(corps?.registre ?? corps?.calcul ?? corps?.page);
     if (lu.sorte === 'registre')
         return { sorte: 'compose', registre: lu.registre, fcfa };
     if (lu.sorte === 'calcul')
         return { sorte: 'calcule', calcul: lu.calcul, fcfa };
+    if (lu.sorte === 'page')
+        return { sorte: 'page', page: lu.page, fcfa };
     return { sorte: 'echoue', pourquoi: 'la réponse ne décrit pas un outil valide' };
 }

@@ -1,4 +1,4 @@
-import type { CalculDemande, ErreurValidation, RegistreDemande } from '@a237/engine'
+import type { CalculDemande, ErreurValidation, PageDemande, RegistreDemande } from '@a237/engine'
 import { lireReponseModele } from '@a237/engine'
 import { couter } from './cout.js'
 import type { Cout } from './cout.js'
@@ -35,6 +35,18 @@ export type Resultat =
   | {
       readonly sorte: 'calcule'
       readonly calcul: CalculDemande
+      readonly cout: Cout
+      readonly essais: number
+    }
+  /**
+   * Une page à envoyer sur WhatsApp — ce que « je veux un site internet »
+   * demande vraiment neuf fois sur dix. C'était jusqu'ici la demande la plus
+   * refusée de toutes, et le refus était juste tant qu'il n'y avait rien
+   * derrière : il ne l'est plus.
+   */
+  | {
+      readonly sorte: 'page'
+      readonly page: PageDemande
       readonly cout: Cout
       readonly essais: number
     }
@@ -108,6 +120,9 @@ export async function traiter(
     }
     if (lu.sorte === 'calcul') {
       return { sorte: 'calcule', calcul: lu.calcul, cout: cout(), essais: essai }
+    }
+    if (lu.sorte === 'page') {
+      return { sorte: 'page', page: lu.page, cout: cout(), essais: essai }
     }
     if (lu.sorte === 'refus') {
       // On ne reprend pas un refus : ce serait payer un tour pour lui faire

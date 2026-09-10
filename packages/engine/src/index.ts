@@ -99,7 +99,21 @@ export type { ReponseModele } from './composition.js'
 export { lireReponseModele } from './composition.js'
 export type { Expression, Operation } from './expression.js'
 export { DESCRIPTION_FORMULE, PROFONDEUR_MAX, evaluer, verifierExpression } from './expression.js'
+export {
+  ID_COMPOSE_PAGE, MAX_LIGNES_SECTION, MAX_SECTIONS, SECTIONS_POUR_SOMMAIRE,
+  avecSommaire, carteDePage, partageDePage, schemaPage, sectionsAncrees, verifierPage,
+} from './page.js'
+export type {
+  LigneSection, PageDemande, SectionAncree, SectionDemandee, SorteSection,
+} from './page.js'
 export { ID_COMPOSE } from './registre.js'
+/*
+ * Les liens `wa.me` vivent dans le moteur et non dans l'application : le
+ * serveur en a besoin aussi, pour le bouton d'une page publiée. C'est du calcul
+ * sur des chaînes — aucune API de navigateur — et deux copies finiraient par ne
+ * plus accepter les mêmes numéros.
+ */
+export { INDICATIF_CM, lienWhatsApp, numeroInternational } from './whatsapp.js'
 export type { ColonneDemandee, RefusModele, RegistreDemande } from './registre.js'
 export { MAX_COLONNES, schemaRefus, schemaRegistre, verifierRegistre } from './registre.js'
 export type { AvecMotsClefs, Correspondance } from './match.js'

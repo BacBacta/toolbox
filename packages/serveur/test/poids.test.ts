@@ -1,5 +1,5 @@
-import { REGISTRES_LISTE, SQUELETTES, publiable } from '@a237/engine'
-import type { Instantane, RenderContext } from '@a237/engine'
+import { ID_COMPOSE_PAGE, MAX_LIGNES_SECTION, MAX_SECTIONS, REGISTRES_LISTE, SQUELETTES, publiable } from '@a237/engine'
+import type { Instantane, PageDemande, RenderContext } from '@a237/engine'
 import { gzipSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
 import { pageDeLecture } from '../src/html.js'
@@ -69,6 +69,39 @@ describe('le poids de la page publiée', () => {
     console.log(`  200 lignes : ${ko(octets(page))} — ${ko(octetsComprimes(page))} comprimée`)
     expect(octets(page), `200 lignes : ${ko(octets(page))}`).toBeLessThanOrEqual(PLAFOND)
     expect(page).toContain('autres')
+  })
+
+  /**
+   * Une page composée est la seule des trois formes qui porte du contenu écrit
+   * pour être lu, et non résumé. Elle est donc la plus exposée au plafond :
+   * huit sections de huit lignes, chacune remplie jusqu'à sa borne, c'est
+   * exactement ce que le contrat autorise de plus lourd.
+   */
+  it('tient aussi pour la page la plus chargée que le contrat autorise', () => {
+    const ligne = {
+      nom: 'Un article au libellé aussi long que le contrat le permet.',
+      valeur: '1 250 000 F CFA',
+      detail: 'Une précision qui va au bout de ce que le champ accepte.',
+    }
+    const page: PageDemande = {
+      titre: 'Quincaillerie de Bépanda-Omnisport',
+      kicker: 'QUINCAILLERIE ET MATÉRIAUX',
+      accroche: 'Tôles, ciment, fers à béton et outillage de chantier, à Bépanda depuis 2012.',
+      sommaire: true,
+      sections: Array.from({ length: MAX_SECTIONS }, (_, i) => ({
+        titre: `Section numéro ${i + 1} au titre long`,
+        sorte: 'prix' as const,
+        lignes: Array.from({ length: MAX_LIGNES_SECTION }, () => ligne),
+      })),
+      telephone: '+237 6 99 41 27 08',
+      adresse: 'Rue Bépanda-Omnisport, en face du marché, Douala',
+      horaires: 'Du lundi au samedi, de 7 h à 19 h',
+    }
+    const rendue = pageDeLecture(instantane(ID_COMPOSE_PAGE, page), CTX, LIEN)
+    console.log(`  page pleine : ${ko(octets(rendue))} — ${ko(octetsComprimes(rendue))} comprimée`)
+    expect(octets(rendue), `page pleine : ${ko(octets(rendue))}`).toBeLessThanOrEqual(PLAFOND)
+    // Et la feuille A4 n'y est pas : une vitrine ne se met pas dans une chemise.
+    expect(rendue).not.toContain('210mm')
   })
 
   it('sans un seul script — c’est l’autre moitié du plafond', () => {

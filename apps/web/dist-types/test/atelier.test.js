@@ -120,16 +120,55 @@ describe('l’étage 2, quand on le demande', () => {
         expect(hote.textContent).toContain('pas de réseau');
     });
 });
-describe('quand la demande n’est pas un registre', () => {
-    it('rapporte le refus du modèle, sans créer d’outil', async () => {
-        // Le défaut d'origine : « je veux un site internet » créait un registre
-        // « Ventes » inventé de bout en bout. Un outil qui ne sait pas dire non
-        // finit par mentir.
-        repond(200, { impossible: 'Un site internet ne se range pas dans un registre.', fcfa: 0.13 });
-        demander('je veux un site internet');
+describe('la troisième forme : une page', () => {
+    const PAGE = {
+        titre: 'Quincaillerie Bépanda',
+        kicker: 'QUINCAILLERIE',
+        accroche: 'Tôles, ciment et outillage, à Bépanda depuis 2012.',
+        sections: [
+            { titre: 'Quelques prix', sorte: 'prix', lignes: [{ nom: 'Sac de ciment', valeur: '5 800 F' }] },
+        ],
+        telephone: '699412708',
+    };
+    it('crée la page composée', async () => {
+        /*
+         * Le défaut rapporté depuis un téléphone : « je veux un site internet »
+         * n'avait aucune issue sinon le refus, parce que rien derrière ne savait
+         * en faire une. Le refus était juste ; c'est ce qu'il refusait qui
+         * manquait. Neuf demandes de site sur dix demandent une page à envoyer sur
+         * WhatsApp — pas un site.
+         */
+        repond(200, { page: PAGE, fcfa: 0.19 });
+        demander('je veux un site internet pour ma quincaillerie');
         cliquer('Compose-le pour moi');
         await attendre();
-        expect(hote.textContent).toContain('ne se range pas dans un registre');
+        expect(creations[0]?.skeleton).toBe('compose-page');
+        expect(creations[0]?.registre).toMatchObject({ page: { titre: 'Quincaillerie Bépanda' } });
+    });
+    it('refuse une page dont une section est un titre suivi de rien', async () => {
+        // Elle se publierait sous le nom de quelqu'un, avec un trou dedans.
+        repond(200, { page: { ...PAGE, sections: [{ titre: 'Nos prix', sorte: 'prix' }] }, fcfa: 0.19 });
+        demander('je veux un site internet pour ma quincaillerie');
+        cliquer('Compose-le pour moi');
+        await attendre();
+        expect(creations).toHaveLength(0);
+        expect(hote.textContent).toContain('ne décrit pas un outil valide');
+    });
+    it('annonce les trois formes avant qu’on clique', () => {
+        // Ce que la machine sait faire se dit avant de payer, pas après.
+        demander('je veux un site internet pour ma quincaillerie');
+        expect(hote.textContent).toContain('une page à envoyer sur');
+    });
+});
+describe('quand la demande n’est aucune des trois', () => {
+    it('rapporte le refus du modèle, sans créer d’outil', async () => {
+        // Un outil qui ne sait pas dire non finit par mentir : il inventait un
+        // registre « Ventes » de bout en bout, et le facturait.
+        repond(200, { impossible: 'Un logo se dessine, il ne se tient pas en lignes.', fcfa: 0.13 });
+        demander('fais-moi un logo');
+        cliquer('Compose-le pour moi');
+        await attendre();
+        expect(hote.textContent).toContain('il ne se tient pas en lignes');
         expect(creations).toHaveLength(0);
     });
     it('ne propose pas de réessayer : la réponse ne changera pas', async () => {

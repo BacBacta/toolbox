@@ -1,12 +1,16 @@
 import type { Instantane, RenderContext } from '@a237/engine'
 import { squeletteParId } from '@a237/engine'
 import { render as enChaine } from 'preact-render-to-string'
-import a4Css from '@a237/render/styles/a4.css?raw'
+import feuilleA4Css from '@a237/render/styles/a4.css?raw'
+import vitrineCss from '@a237/render/styles/vitrine.css?raw'
+import a4Css from './a4.css?raw'
+import carteCss from './carte.css?raw'
 import lectureCss from './lecture.css?raw'
 import { sansCommentaires } from './feuille.js'
 import { PageIllisible, PageIntrouvable, PiedLecture } from './page.js'
 import type { MetaPage } from './page.js'
-import { VueCarte, carteDe, documentDe } from './rendu.js'
+import { PageVitrine } from '@a237/render/page'
+import { VueCarte, carteDe, documentDe, pageDe } from './rendu.js'
 
 /**
  * La page complète, en une chaîne.
@@ -17,9 +21,23 @@ import { VueCarte, carteDe, documentDe } from './rendu.js'
  * eux, n'ont rien à y faire : voir `sansCommentaires`.
  */
 
-/** Les deux feuilles, allégées une fois pour toutes au chargement du module. */
-const CSS_A4 = sansCommentaires(a4Css)
-const CSS_LECTURE = sansCommentaires(lectureCss)
+/**
+ * Les feuilles, allégées une fois pour toutes au chargement du module, et
+ * **composées selon ce qu'on dessine**.
+ *
+ * Elles n'en faisaient qu'une, inlinée partout. Le plafond du § 8 est de 25 Ko
+ * par page de lecture, et une page composée pleine en pesait 24,8 : les
+ * deux kilo-octets de style de carte qu'elle n'emploie jamais lui coûtaient un
+ * douzième de son budget. Chaque forme n'emporte plus que ce qu'elle dessine.
+ *
+ * `CSS_CADRE` est le tronc commun — la palette, le corps, le pied. Il est dans
+ * les trois, parce que les trois en ont besoin.
+ */
+const CSS_CADRE = sansCommentaires(lectureCss)
+const CSS_CARTE = sansCommentaires(carteCss)
+/** La mise à l'échelle de la feuille et le lien d'impression : les écrits seuls. */
+const CSS_A4 = sansCommentaires(a4Css) + sansCommentaires(feuilleA4Css)
+const CSS_VITRINE = sansCommentaires(vitrineCss)
 
 /** Échappe ce qui part dans un attribut de métadonnée. */
 function attr(valeur: string): string {
@@ -122,7 +140,7 @@ export function pageIllisible(): string {
       description: 'Ce document ne peut pas être affiché.',
       lien: '',
     },
-    CSS_LECTURE,
+    CSS_CADRE,
     enChaine(<PageIllisible />),
   )
 }
@@ -147,6 +165,22 @@ function dessiner(
   image?: string,
 ): string {
   const meta = metaDe(instantane, ctx, lien, image)
+
+  /*
+   * Une page composée d'abord : c'est la seule des trois formes qui a été
+   * écrite pour être lue derrière un lien, et elle n'emporte ni la feuille A4
+   * ni l'offre d'impression. Une vitrine ne se met pas dans une chemise.
+   */
+  const vitrine = pageDe(instantane)
+  if (vitrine !== null) {
+    return envelopper(
+      meta,
+      CSS_CADRE + CSS_VITRINE,
+      `<main class="lecture">${enChaine(<PageVitrine page={vitrine} />)}</main>` +
+        enChaine(<PiedLecture instantane={instantane} />),
+    )
+  }
+
   const document = documentDe(instantane, ctx)
 
   if (document !== null) {
@@ -154,7 +188,7 @@ function dessiner(
     // aurait reçu imprimé.
     return envelopper(
       meta,
-      CSS_A4 + CSS_LECTURE,
+      CSS_CADRE + CSS_A4,
       `<main class="lecture">${enChaine(document)}</main>` +
         enChaine(<PiedLecture instantane={instantane} pdf={`${lien.replace('/d/', '/p/')}`} />),
     )
@@ -165,7 +199,7 @@ function dessiner(
 
   return envelopper(
     meta,
-    CSS_LECTURE,
+    CSS_CADRE + CSS_CARTE,
     `<main class="lecture">${enChaine(<VueCarte carte={carte} />)}</main>${enChaine(<PiedLecture instantane={instantane} />)}`,
   )
 }
@@ -173,7 +207,7 @@ function dessiner(
 export function pageIntrouvable(): string {
   return envelopper(
     { titre: 'Lien introuvable — Atelier 237', description: 'Ce document n’est plus publié.', lien: '' },
-    CSS_LECTURE,
+    CSS_CADRE,
     enChaine(<PageIntrouvable />),
   )
 }

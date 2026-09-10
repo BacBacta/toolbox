@@ -1,16 +1,18 @@
-import type { BatirPartage, CalculDemande, Extrait, RegistreDemande, RenderContext } from '@a237/engine';
+import type { BatirPartage, CalculDemande, Extrait, PageDemande, RegistreDemande, RenderContext } from '@a237/engine';
 import type { JSX } from 'preact';
 import type { OutilEnregistre } from './stockage.js';
 /**
  * Ce que le modèle a composé, quand il a composé quelque chose.
  *
- * Deux formes, jamais les deux à la fois : un registre tient une liste, une
- * calculatrice répond à une question. La coquille les transporte sans les
- * comprendre — c'est le fragment de l'outil qui sait les dessiner.
+ * Trois formes, jamais deux à la fois : un registre tient une liste, une
+ * calculatrice répond à une question, une page se montre. La coquille les
+ * transporte sans les comprendre — c'est le fragment de l'outil qui sait les
+ * dessiner.
  */
 export interface Compose {
     readonly registre?: RegistreDemande;
     readonly calcul?: CalculDemande;
+    readonly page?: PageDemande;
 }
 export interface ProprietesOutil {
     readonly outil: OutilEnregistre;

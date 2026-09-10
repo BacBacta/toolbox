@@ -1,5 +1,7 @@
 import type { CalculDemande } from './calcul.js'
 import { verifierCalcul } from './calcul.js'
+import type { PageDemande } from './page.js'
+import { verifierPage } from './page.js'
 import type { RefusModele, RegistreDemande } from './registre.js'
 import { MAX_REFUS, schemaRefus, verifierRegistre } from './registre.js'
 import type { ErreurValidation } from './types.js'
@@ -11,8 +13,9 @@ import { valider } from './valider.js'
  *
  * L'aiguillage se fait sur la forme et non sur un champ « type » que le modèle
  * devrait penser à remplir : `colonnes` fait un registre, `entrees` une
- * calculatrice, `impossible` un refus. Un champ de discrimination de plus,
- * c'est une occasion de plus de se tromper, et une reprise coûte un tour.
+ * calculatrice, `sections` une page, `impossible` un refus. Un champ de
+ * discrimination de plus, c'est une occasion de plus de se tromper, et une
+ * reprise coûte un tour.
  *
  * Le refus se reconnaît en premier. Un modèle qui dit « je ne peux pas » a
  * bien travaillé ; le reprendre pour non-conformité brûlerait un tour à lui
@@ -22,6 +25,7 @@ import { valider } from './valider.js'
 export type ReponseModele =
   | { readonly sorte: 'registre'; readonly registre: RegistreDemande }
   | { readonly sorte: 'calcul'; readonly calcul: CalculDemande }
+  | { readonly sorte: 'page'; readonly page: PageDemande }
   | { readonly sorte: 'refus'; readonly pourquoi: string }
   | { readonly sorte: 'invalide'; readonly erreurs: readonly ErreurValidation[] }
 
@@ -96,6 +100,13 @@ export function lireReponseModele(valeur: unknown): ReponseModele {
     return erreurs.length > 0
       ? { sorte: 'invalide', erreurs }
       : { sorte: 'refus', pourquoi: coupe as RefusModele['impossible'] }
+  }
+
+  if ('sections' in valeur) {
+    const erreurs = verifierPage(valeur)
+    return erreurs.length > 0
+      ? { sorte: 'invalide', erreurs }
+      : { sorte: 'page', page: valeur as PageDemande }
   }
 
   if ('entrees' in valeur) {

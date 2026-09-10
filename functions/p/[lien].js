@@ -429,6 +429,280 @@ function lienValide(lien) {
 	return MOTIF_LIEN.test(lien);
 }
 //#endregion
+//#region ../engine/src/valider.ts
+/**
+* Validateur du sous-ensemble de JSON Schema retenu par le produit.
+*
+* C'est la porte par laquelle passe toute sortie de modèle avant d'atteindre
+* quoi que ce soit (BRIEF.md § 2.1, § 3.5). Écrit à la main, sans dépendance :
+* cent lignes valent mieux qu'une bibliothèque dans un budget de 120 Ko, et la
+* surface à raisonner reste lisible d'un coup d'œil.
+*
+* Le vocabulaire est celui de JSON Schema standard — `type`, `enum`, `required`,
+* `additionalProperties`, `minimum`… — pour que le même objet serve de schéma de
+* réponse contrainte au modèle en phase 4, sans traduction.
+*
+* Le validateur ne corrige rien et ne complète rien. Il dit ce qui ne va pas, et
+* l'appelant décide. Un seul essai de reprise est prévu, puis abandon.
+*/
+function typeDe(v) {
+	if (v === null) return "null";
+	if (Array.isArray(v)) return "tableau";
+	return typeof v;
+}
+function err(chemin, message) {
+	return {
+		chemin,
+		message
+	};
+}
+function valider(schema, valeur, chemin = "$") {
+	switch (schema.type) {
+		case "string": {
+			if (typeof valeur !== "string") return [err(chemin, `chaîne attendue, reçu ${typeDe(valeur)}`)];
+			const e = [];
+			if (schema.enum !== void 0 && !schema.enum.includes(valeur)) e.push(err(chemin, `valeur hors liste : « ${valeur} »`));
+			if (schema.minLength !== void 0 && valeur.length < schema.minLength) e.push(err(chemin, `trop court : ${valeur.length} caractères, minimum ${schema.minLength}`));
+			if (schema.maxLength !== void 0 && valeur.length > schema.maxLength) e.push(err(chemin, `trop long : ${valeur.length} caractères, maximum ${schema.maxLength}`));
+			return e;
+		}
+		case "number":
+		case "integer": {
+			if (typeof valeur !== "number" || !Number.isFinite(valeur)) return [err(chemin, `nombre attendu, reçu ${typeDe(valeur)}`)];
+			const e = [];
+			if (schema.type === "integer" && !Number.isInteger(valeur)) e.push(err(chemin, `entier attendu, reçu ${valeur}`));
+			if (schema.minimum !== void 0 && valeur < schema.minimum) e.push(err(chemin, `inférieur au minimum ${schema.minimum} : ${valeur}`));
+			if (schema.maximum !== void 0 && valeur > schema.maximum) e.push(err(chemin, `supérieur au maximum ${schema.maximum} : ${valeur}`));
+			return e;
+		}
+		case "boolean": return typeof valeur === "boolean" ? [] : [err(chemin, `booléen attendu, reçu ${typeDe(valeur)}`)];
+		case "array": {
+			if (!Array.isArray(valeur)) return [err(chemin, `tableau attendu, reçu ${typeDe(valeur)}`)];
+			const e = [];
+			if (schema.minItems !== void 0 && valeur.length < schema.minItems) e.push(err(chemin, `trop peu d'éléments : ${valeur.length}, minimum ${schema.minItems}`));
+			if (schema.maxItems !== void 0 && valeur.length > schema.maxItems) e.push(err(chemin, `trop d'éléments : ${valeur.length}, maximum ${schema.maxItems}`));
+			valeur.forEach((v, i) => {
+				e.push(...valider(schema.items, v, `${chemin}[${i}]`));
+			});
+			return e;
+		}
+		case "object": {
+			if (typeof valeur !== "object" || valeur === null || Array.isArray(valeur)) return [err(chemin, `objet attendu, reçu ${typeDe(valeur)}`)];
+			const obj = valeur;
+			const e = [];
+			for (const clef of schema.required ?? []) if (!Object.hasOwn(obj, clef)) e.push(err(`${chemin}.${clef}`, "champ obligatoire manquant"));
+			for (const clef of Object.keys(obj)) {
+				if (!Object.hasOwn(schema.properties, clef)) {
+					if (schema.additionalProperties === false) e.push(err(`${chemin}.${clef}`, "champ inattendu"));
+					continue;
+				}
+				const sous = schema.properties[clef];
+				if (sous === void 0) continue;
+				e.push(...valider(sous, obj[clef], `${chemin}.${clef}`));
+			}
+			return e;
+		}
+	}
+}
+/**
+* Met un numéro au format international attendu par `wa.me`.
+*
+* Accepte ce qu'un utilisateur tape vraiment : espaces, tirets, points, `+`,
+* `00`, avec ou sans indicatif. Rend `null` si rien d'exploitable n'en sort —
+* mieux vaut proposer de copier le message que d'ouvrir WhatsApp sur un
+* mauvais numéro.
+*/
+function numeroInternational(brut) {
+	let chiffres = brut.replace(/[^\d+]/g, "");
+	if (chiffres.startsWith("+")) chiffres = chiffres.slice(1);
+	else if (chiffres.startsWith("00")) chiffres = chiffres.slice(2);
+	chiffres = chiffres.replace(/\D/g, "");
+	if (chiffres === "") return null;
+	if (/^[62]\d{8}$/.test(chiffres)) return "237" + chiffres;
+	if (chiffres.length >= 10 && chiffres.length <= 15) return chiffres;
+	return null;
+}
+/** Le lien qui ouvre WhatsApp avec le message déjà écrit. */
+function lienWhatsApp(tel, message) {
+	const numero = numeroInternational(tel);
+	if (numero === null) return null;
+	return `https://wa.me/${numero}?text=${encodeURIComponent(message)}`;
+}
+var schemaPage = {
+	type: "object",
+	additionalProperties: false,
+	required: [
+		"titre",
+		"kicker",
+		"accroche",
+		"sections"
+	],
+	properties: {
+		titre: {
+			type: "string",
+			minLength: 2,
+			maxLength: 40,
+			title: "Nom",
+			description: "Le nom de l’activité, tel qu’il est sur l’enseigne. Ex. « Quincaillerie Bépanda »."
+		},
+		kicker: {
+			type: "string",
+			minLength: 2,
+			maxLength: 30,
+			title: "Sur-titre",
+			description: "En capitales, au-dessus du nom. Ex. « QUINCAILLERIE »."
+		},
+		accroche: {
+			type: "string",
+			minLength: 4,
+			maxLength: 120,
+			title: "Accroche",
+			description: "Une phrase. Ce qu’on dirait à quelqu’un qui passe devant la boutique."
+		},
+		sections: {
+			type: "array",
+			minItems: 1,
+			maxItems: 8,
+			items: {
+				type: "object",
+				additionalProperties: false,
+				required: ["titre", "sorte"],
+				properties: {
+					titre: {
+						type: "string",
+						minLength: 2,
+						maxLength: 40,
+						title: "Titre de la section",
+						description: "Ex. « Ce que je vends »."
+					},
+					sorte: {
+						type: "string",
+						enum: [
+							"texte",
+							"liste",
+							"prix"
+						],
+						title: "Sorte",
+						description: "texte : un paragraphe. liste : des noms. prix : des noms avec un montant."
+					},
+					texte: {
+						type: "string",
+						maxLength: 400,
+						title: "Texte",
+						description: "Pour une section « texte ». Deux paragraphes au plus."
+					},
+					lignes: {
+						type: "array",
+						maxItems: 8,
+						items: {
+							type: "object",
+							additionalProperties: false,
+							required: ["nom"],
+							properties: {
+								nom: {
+									type: "string",
+									minLength: 1,
+									maxLength: 60,
+									title: "Ce que c’est",
+									description: "Ex. « Tôle bac 30/100 »."
+								},
+								valeur: {
+									type: "string",
+									maxLength: 30,
+									title: "Prix ou quantité",
+									description: "Tel qu’on le dit. Ex. « 12 500 F », « 2 h »."
+								},
+								detail: {
+									type: "string",
+									maxLength: 60,
+									title: "Précision",
+									description: "Une ligne, si elle sert."
+								}
+							}
+						},
+						title: "Lignes",
+						description: "Pour « liste » ou « prix »."
+					}
+				}
+			},
+			title: "Sections"
+		},
+		telephone: {
+			type: "string",
+			maxLength: 20,
+			title: "WhatsApp",
+			description: "Le numéro qu’on peut écrire. Ex. « 6 99 41 27 08 »."
+		},
+		adresse: {
+			type: "string",
+			maxLength: 90,
+			title: "Où",
+			description: "Le quartier et la rue. Ex. « Rue Bépanda-Omnisport, en face du marché »."
+		},
+		horaires: {
+			type: "string",
+			maxLength: 60,
+			title: "Quand",
+			description: "Ex. « Lundi à samedi, 7 h – 19 h »."
+		},
+		sommaire: {
+			type: "boolean",
+			title: "Menu en haut",
+			description: "Vrai quand la demande dit « un site » : un menu saute d’une section à l’autre. Faux pour une simple page."
+		}
+	}
+};
+/**
+* Vérifie ce que le modèle a rendu, au-delà de ce que le schéma sait dire.
+*
+* Le schéma tient les types et les bornes. Ce qu'il ne tient pas, c'est la
+* cohérence entre `sorte` et le contenu : une section « prix » sans lignes est
+* un titre suivi de rien, et une section « texte » sans texte aussi. Les
+* laisser passer donnerait une page à trous, publiée sous le nom de quelqu'un.
+*/
+function verifierPage(valeur) {
+	const erreurs = [...valider(schemaPage, valeur)];
+	if (erreurs.length > 0) return erreurs;
+	const page = valeur;
+	for (const [i, section] of page.sections.entries()) {
+		const chemin = `$.sections[${i}]`;
+		if (section.sorte === "texte") {
+			if ((section.texte ?? "").trim() === "") erreurs.push({
+				chemin: `${chemin}.texte`,
+				message: "une section « texte » sans texte est un titre suivi de rien"
+			});
+			continue;
+		}
+		if ((section.lignes ?? []).length === 0) erreurs.push({
+			chemin: `${chemin}.lignes`,
+			message: `une section « ${section.sorte} » sans lignes est un titre suivi de rien`
+		});
+	}
+	return erreurs;
+}
+/**
+* L'ancre d'une section, pour le sommaire.
+*
+* Elle se dérive du titre et non d'un compteur : une ancre numérotée change de
+* cible dès qu'on insère une section, et un lien déjà envoyé tombe alors sur
+* autre chose. Les accents sont dépliés, le reste devient un tiret ; deux
+* titres qui se réduisent au même reçoivent leur rang, parce qu'un identifiant
+* en double fait sauter le menu au premier des deux.
+*/
+function ancresDeSections(sections) {
+	const vues = /* @__PURE__ */ new Map();
+	return sections.map((section, i) => {
+		const base = section.titre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `section-${i + 1}`;
+		const deja = vues.get(base);
+		vues.set(base, (deja ?? 0) + 1);
+		return deja === void 0 ? base : `${base}-${deja + 1}`;
+	});
+}
+/** Le menu a-t-il lieu d'être ? */
+function avecSommaire(page) {
+	return page.sommaire === true && page.sections.length >= 3;
+}
+//#endregion
 //#region ../../node_modules/.pnpm/preact@10.29.8_preact-render-to-string@6.7.0/node_modules/preact/dist/preact.module.js
 var n;
 var l$1;
@@ -1071,6 +1345,129 @@ function sansCommentaires(css) {
 	return sortie;
 }
 //#endregion
+//#region ../../node_modules/.pnpm/preact@10.29.8_preact-render-to-string@6.7.0/node_modules/preact/jsx-runtime/dist/jsxRuntime.module.js
+var f = 0;
+Array.isArray;
+function u(e, t, n, o, i, u) {
+	t || (t = {});
+	var a, c, p = t;
+	if ("ref" in p) for (c in p = {}, t) "ref" == c ? a = t[c] : p[c] = t[c];
+	var l = {
+		type: e,
+		props: p,
+		key: n,
+		ref: a,
+		__k: null,
+		__: null,
+		__b: 0,
+		__e: null,
+		__c: null,
+		constructor: void 0,
+		__v: --f,
+		__i: -1,
+		__u: 0,
+		__source: i,
+		__self: u
+	};
+	if ("function" == typeof e && (a = e.defaultProps)) for (c in a) void 0 === p[c] && (p[c] = a[c]);
+	return l$1.vnode && l$1.vnode(l), l;
+}
+//#endregion
+//#region ../render/src/page/vitrine.tsx
+/**
+* Une page composée, dessinée à la main.
+*
+* C'est le même composant qui sert l'aperçu dans l'application et la page
+* publiée sur le serveur. Deux dessins pour une même configuration finiraient
+* par ne plus montrer la même chose, et c'est celui que le client voit qui
+* aurait tort.
+*
+* Il n'y a **aucun script** : ni ici, ni dans ce que le modèle a le droit
+* d'écrire. Une page composée ne peut pas en contenir, parce qu'aucun champ du
+* contrat n'en accepte — l'invariant § 2.1 tient par la forme du contrat, pas
+* par un filtre qu'on pourrait oublier.
+*/
+function Lignes$1(props) {
+	const lignes = props.section.lignes ?? [];
+	return /* @__PURE__ */ u("ul", {
+		class: props.section.sorte === "prix" ? "vitrine-prix" : "vitrine-liste",
+		children: lignes.map((l) => /* @__PURE__ */ u("li", { children: [/* @__PURE__ */ u("span", {
+			class: "quoi",
+			children: [/* @__PURE__ */ u("b", { children: l.nom }), l.detail !== void 0 && l.detail !== "" && /* @__PURE__ */ u("span", {
+				class: "detail",
+				children: l.detail
+			})]
+		}), l.valeur !== void 0 && l.valeur !== "" && /* @__PURE__ */ u("span", {
+			class: "combien",
+			children: l.valeur
+		})] }, l.nom))
+	});
+}
+function PageVitrine(props) {
+	const p = props.page;
+	const ancres = ancresDeSections(p.sections);
+	const sommaire = avecSommaire(p);
+	const message = `Bonjour ${p.titre}, j’ai vu votre page.`;
+	const whatsapp = p.telephone === void 0 || p.telephone === "" ? null : lienWhatsApp(p.telephone, message);
+	return /* @__PURE__ */ u("article", {
+		class: "vitrine",
+		children: [
+			/* @__PURE__ */ u("header", {
+				class: "vitrine-tete",
+				children: [
+					/* @__PURE__ */ u("p", {
+						class: "kicker",
+						children: p.kicker
+					}),
+					/* @__PURE__ */ u("h1", { children: p.titre }),
+					/* @__PURE__ */ u("p", {
+						class: "accroche",
+						children: p.accroche
+					})
+				]
+			}),
+			sommaire && /* @__PURE__ */ u("nav", {
+				class: "vitrine-sommaire",
+				"aria-label": "Sections",
+				children: p.sections.map((section, i) => /* @__PURE__ */ u("a", {
+					href: `#${ancres[i] ?? ""}`,
+					children: section.titre
+				}, section.titre))
+			}),
+			p.sections.map((section, i) => /* @__PURE__ */ u("section", {
+				class: "vitrine-section",
+				id: sommaire ? ancres[i] : void 0,
+				children: [/* @__PURE__ */ u("h2", { children: section.titre }), section.sorte === "texte" ? (section.texte ?? "").split("\n").filter((bout) => bout.trim() !== "").map((bout) => /* @__PURE__ */ u("p", { children: bout }, bout)) : /* @__PURE__ */ u(Lignes$1, { section })]
+			}, section.titre)),
+			(whatsapp !== null || p.adresse !== void 0 && p.adresse !== "" || p.horaires !== void 0 && p.horaires !== "") && /* @__PURE__ */ u("footer", {
+				class: "vitrine-pied",
+				children: [
+					whatsapp !== null && /* @__PURE__ */ u("a", {
+						class: "vitrine-appel",
+						href: whatsapp,
+						rel: "noreferrer",
+						children: ["Écrire sur WhatsApp", /* @__PURE__ */ u("span", { children: p.telephone })]
+					}),
+					p.adresse !== void 0 && p.adresse !== "" && /* @__PURE__ */ u("p", {
+						class: "vitrine-ou",
+						children: [/* @__PURE__ */ u("span", {
+							class: "etiquette",
+							children: "Où"
+						}), p.adresse]
+					}),
+					p.horaires !== void 0 && p.horaires !== "" && /* @__PURE__ */ u("p", {
+						class: "vitrine-ou",
+						children: [/* @__PURE__ */ u("span", {
+							class: "etiquette",
+							children: "Quand"
+						}), p.horaires]
+					})
+				]
+			})
+		]
+	});
+}
+//#endregion
 //#region ../render/src/encres.ts
 /**
 * Les quatre encres des documents.
@@ -1100,34 +1497,6 @@ var ENCRES = {
 };
 function hexEncre(e) {
 	return ENCRES[e].hex;
-}
-//#endregion
-//#region ../../node_modules/.pnpm/preact@10.29.8_preact-render-to-string@6.7.0/node_modules/preact/jsx-runtime/dist/jsxRuntime.module.js
-var f = 0;
-Array.isArray;
-function u(e, t, n, o, i, u) {
-	t || (t = {});
-	var a, c, p = t;
-	if ("ref" in p) for (c in p = {}, t) "ref" == c ? a = t[c] : p[c] = t[c];
-	var l = {
-		type: e,
-		props: p,
-		key: n,
-		ref: a,
-		__k: null,
-		__: null,
-		__b: 0,
-		__e: null,
-		__c: null,
-		constructor: void 0,
-		__v: --f,
-		__i: -1,
-		__u: 0,
-		__source: i,
-		__self: u
-	};
-	if ("function" == typeof e && (a = e.defaultProps)) for (c in a) void 0 === p[c] && (p[c] = a[c]);
-	return l$1.vnode && l$1.vnode(l), l;
 }
 //#endregion
 //#region ../render/src/doc/chrome.tsx
@@ -2059,6 +2428,10 @@ function DocumentFacture(props) {
 * on rend leur **carte**, que chaque squelette sait déjà produire et qui est
 * déjà éprouvée. Elle dit l'essentiel — un titre, un grand chiffre, une liste —
 * et ne prétend pas être l'outil.
+*
+* Une page composée est le cas le plus simple des trois : elle **est** faite
+* pour être lue derrière un lien. Rien à résumer, rien à rejouer — on la
+* dessine, avec le composant que l'aperçu de l'application emploie déjà.
 */
 var DOCUMENTS = {
 	devis: DocumentDevis,
@@ -2069,11 +2442,24 @@ var DOCUMENTS = {
 	motivation: DocumentMotivation,
 	cv: DocumentCv
 };
+/**
+* La page que porte l'instantané, si c'en est une et qu'elle tient debout.
+*
+* Le contrôle est refait ici et pas seulement à la publication : ce qui est
+* déjà dans KV a pu être déposé par une version plus ancienne du contrôle, et
+* une page à trous vaut mieux refusée qu'affichée sous le nom de quelqu'un.
+*/
+function pageDe(instantane) {
+	if (instantane.skeleton !== "compose-page") return null;
+	return verifierPage(instantane.etat).length > 0 ? null : instantane.etat;
+}
 /** La facture a besoin de l'instant pour dire son retard ; les autres non. */
 function estFacture(skeleton) {
 	return skeleton === "facture";
 }
 function documentDe(instantane, ctx) {
+	const page = pageDe(instantane);
+	if (page !== null) return /* @__PURE__ */ u(PageVitrine, { page });
 	const Composant = Object.hasOwn(DOCUMENTS, instantane.skeleton) ? DOCUMENTS[instantane.skeleton] : void 0;
 	if (Composant === void 0) return null;
 	const etat = instantane.etat;

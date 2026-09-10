@@ -533,3 +533,20 @@ body {
     --echelle: 0.78;
   }
 }
+
+/*
+ * L'aperçu d'une page composée.
+ *
+ * Il ne cherche pas à imiter un téléphone dans un cadre : la coquille est déjà
+ * lue sur un téléphone, et un mockup dans un mockup mange la largeur qui sert
+ * à lire. Un filet et le fond du papier suffisent à dire « ceci est ce que le
+ * client verra », et ce qui est dedans est le composant de la page publiée,
+ * pas une approximation.
+ */
+.page-apercu {
+  margin: 0 calc(-1 * var(--pas-3));
+  padding: var(--pas-3);
+  border: 1px solid var(--trait);
+  border-radius: var(--rond-m);
+  background: var(--surface);
+}

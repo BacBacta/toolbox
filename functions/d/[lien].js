@@ -2807,6 +2807,82 @@ function brute(e, lire, niveau) {
 	}
 }
 //#endregion
+//#region ../engine/src/valider.ts
+/**
+* Validateur du sous-ensemble de JSON Schema retenu par le produit.
+*
+* C'est la porte par laquelle passe toute sortie de modèle avant d'atteindre
+* quoi que ce soit (BRIEF.md § 2.1, § 3.5). Écrit à la main, sans dépendance :
+* cent lignes valent mieux qu'une bibliothèque dans un budget de 120 Ko, et la
+* surface à raisonner reste lisible d'un coup d'œil.
+*
+* Le vocabulaire est celui de JSON Schema standard — `type`, `enum`, `required`,
+* `additionalProperties`, `minimum`… — pour que le même objet serve de schéma de
+* réponse contrainte au modèle en phase 4, sans traduction.
+*
+* Le validateur ne corrige rien et ne complète rien. Il dit ce qui ne va pas, et
+* l'appelant décide. Un seul essai de reprise est prévu, puis abandon.
+*/
+function typeDe(v) {
+	if (v === null) return "null";
+	if (Array.isArray(v)) return "tableau";
+	return typeof v;
+}
+function err(chemin, message) {
+	return {
+		chemin,
+		message
+	};
+}
+function valider(schema, valeur, chemin = "$") {
+	switch (schema.type) {
+		case "string": {
+			if (typeof valeur !== "string") return [err(chemin, `chaîne attendue, reçu ${typeDe(valeur)}`)];
+			const e = [];
+			if (schema.enum !== void 0 && !schema.enum.includes(valeur)) e.push(err(chemin, `valeur hors liste : « ${valeur} »`));
+			if (schema.minLength !== void 0 && valeur.length < schema.minLength) e.push(err(chemin, `trop court : ${valeur.length} caractères, minimum ${schema.minLength}`));
+			if (schema.maxLength !== void 0 && valeur.length > schema.maxLength) e.push(err(chemin, `trop long : ${valeur.length} caractères, maximum ${schema.maxLength}`));
+			return e;
+		}
+		case "number":
+		case "integer": {
+			if (typeof valeur !== "number" || !Number.isFinite(valeur)) return [err(chemin, `nombre attendu, reçu ${typeDe(valeur)}`)];
+			const e = [];
+			if (schema.type === "integer" && !Number.isInteger(valeur)) e.push(err(chemin, `entier attendu, reçu ${valeur}`));
+			if (schema.minimum !== void 0 && valeur < schema.minimum) e.push(err(chemin, `inférieur au minimum ${schema.minimum} : ${valeur}`));
+			if (schema.maximum !== void 0 && valeur > schema.maximum) e.push(err(chemin, `supérieur au maximum ${schema.maximum} : ${valeur}`));
+			return e;
+		}
+		case "boolean": return typeof valeur === "boolean" ? [] : [err(chemin, `booléen attendu, reçu ${typeDe(valeur)}`)];
+		case "array": {
+			if (!Array.isArray(valeur)) return [err(chemin, `tableau attendu, reçu ${typeDe(valeur)}`)];
+			const e = [];
+			if (schema.minItems !== void 0 && valeur.length < schema.minItems) e.push(err(chemin, `trop peu d'éléments : ${valeur.length}, minimum ${schema.minItems}`));
+			if (schema.maxItems !== void 0 && valeur.length > schema.maxItems) e.push(err(chemin, `trop d'éléments : ${valeur.length}, maximum ${schema.maxItems}`));
+			valeur.forEach((v, i) => {
+				e.push(...valider(schema.items, v, `${chemin}[${i}]`));
+			});
+			return e;
+		}
+		case "object": {
+			if (typeof valeur !== "object" || valeur === null || Array.isArray(valeur)) return [err(chemin, `objet attendu, reçu ${typeDe(valeur)}`)];
+			const obj = valeur;
+			const e = [];
+			for (const clef of schema.required ?? []) if (!Object.hasOwn(obj, clef)) e.push(err(`${chemin}.${clef}`, "champ obligatoire manquant"));
+			for (const clef of Object.keys(obj)) {
+				if (!Object.hasOwn(schema.properties, clef)) {
+					if (schema.additionalProperties === false) e.push(err(`${chemin}.${clef}`, "champ inattendu"));
+					continue;
+				}
+				const sous = schema.properties[clef];
+				if (sous === void 0) continue;
+				e.push(...valider(sous, obj[clef], `${chemin}.${clef}`));
+			}
+			return e;
+		}
+	}
+}
+//#endregion
 //#region ../engine/src/calcul.ts
 /**
 * La deuxième forme que le modèle peut composer : une calculatrice.
@@ -2823,6 +2899,257 @@ function brute(e, lire, niveau) {
 */
 /** Celui d'une calculatrice composée. Voir `ID_COMPOSE` : même raison. */
 var ID_COMPOSE_CALCUL = "compose-calcul";
+/**
+* Met un numéro au format international attendu par `wa.me`.
+*
+* Accepte ce qu'un utilisateur tape vraiment : espaces, tirets, points, `+`,
+* `00`, avec ou sans indicatif. Rend `null` si rien d'exploitable n'en sort —
+* mieux vaut proposer de copier le message que d'ouvrir WhatsApp sur un
+* mauvais numéro.
+*/
+function numeroInternational(brut) {
+	let chiffres = brut.replace(/[^\d+]/g, "");
+	if (chiffres.startsWith("+")) chiffres = chiffres.slice(1);
+	else if (chiffres.startsWith("00")) chiffres = chiffres.slice(2);
+	chiffres = chiffres.replace(/\D/g, "");
+	if (chiffres === "") return null;
+	if (/^[62]\d{8}$/.test(chiffres)) return "237" + chiffres;
+	if (chiffres.length >= 10 && chiffres.length <= 15) return chiffres;
+	return null;
+}
+/** Le lien qui ouvre WhatsApp avec le message déjà écrit. */
+function lienWhatsApp(tel, message) {
+	const numero = numeroInternational(tel);
+	if (numero === null) return null;
+	return `https://wa.me/${numero}?text=${encodeURIComponent(message)}`;
+}
+var schemaPage = {
+	type: "object",
+	additionalProperties: false,
+	required: [
+		"titre",
+		"kicker",
+		"accroche",
+		"sections"
+	],
+	properties: {
+		titre: {
+			type: "string",
+			minLength: 2,
+			maxLength: 40,
+			title: "Nom",
+			description: "Le nom de l’activité, tel qu’il est sur l’enseigne. Ex. « Quincaillerie Bépanda »."
+		},
+		kicker: {
+			type: "string",
+			minLength: 2,
+			maxLength: 30,
+			title: "Sur-titre",
+			description: "En capitales, au-dessus du nom. Ex. « QUINCAILLERIE »."
+		},
+		accroche: {
+			type: "string",
+			minLength: 4,
+			maxLength: 120,
+			title: "Accroche",
+			description: "Une phrase. Ce qu’on dirait à quelqu’un qui passe devant la boutique."
+		},
+		sections: {
+			type: "array",
+			minItems: 1,
+			maxItems: 8,
+			items: {
+				type: "object",
+				additionalProperties: false,
+				required: ["titre", "sorte"],
+				properties: {
+					titre: {
+						type: "string",
+						minLength: 2,
+						maxLength: 40,
+						title: "Titre de la section",
+						description: "Ex. « Ce que je vends »."
+					},
+					sorte: {
+						type: "string",
+						enum: [
+							"texte",
+							"liste",
+							"prix"
+						],
+						title: "Sorte",
+						description: "texte : un paragraphe. liste : des noms. prix : des noms avec un montant."
+					},
+					texte: {
+						type: "string",
+						maxLength: 400,
+						title: "Texte",
+						description: "Pour une section « texte ». Deux paragraphes au plus."
+					},
+					lignes: {
+						type: "array",
+						maxItems: 8,
+						items: {
+							type: "object",
+							additionalProperties: false,
+							required: ["nom"],
+							properties: {
+								nom: {
+									type: "string",
+									minLength: 1,
+									maxLength: 60,
+									title: "Ce que c’est",
+									description: "Ex. « Tôle bac 30/100 »."
+								},
+								valeur: {
+									type: "string",
+									maxLength: 30,
+									title: "Prix ou quantité",
+									description: "Tel qu’on le dit. Ex. « 12 500 F », « 2 h »."
+								},
+								detail: {
+									type: "string",
+									maxLength: 60,
+									title: "Précision",
+									description: "Une ligne, si elle sert."
+								}
+							}
+						},
+						title: "Lignes",
+						description: "Pour « liste » ou « prix »."
+					}
+				}
+			},
+			title: "Sections"
+		},
+		telephone: {
+			type: "string",
+			maxLength: 20,
+			title: "WhatsApp",
+			description: "Le numéro qu’on peut écrire. Ex. « 6 99 41 27 08 »."
+		},
+		adresse: {
+			type: "string",
+			maxLength: 90,
+			title: "Où",
+			description: "Le quartier et la rue. Ex. « Rue Bépanda-Omnisport, en face du marché »."
+		},
+		horaires: {
+			type: "string",
+			maxLength: 60,
+			title: "Quand",
+			description: "Ex. « Lundi à samedi, 7 h – 19 h »."
+		},
+		sommaire: {
+			type: "boolean",
+			title: "Menu en haut",
+			description: "Vrai quand la demande dit « un site » : un menu saute d’une section à l’autre. Faux pour une simple page."
+		}
+	}
+};
+/**
+* Vérifie ce que le modèle a rendu, au-delà de ce que le schéma sait dire.
+*
+* Le schéma tient les types et les bornes. Ce qu'il ne tient pas, c'est la
+* cohérence entre `sorte` et le contenu : une section « prix » sans lignes est
+* un titre suivi de rien, et une section « texte » sans texte aussi. Les
+* laisser passer donnerait une page à trous, publiée sous le nom de quelqu'un.
+*/
+function verifierPage(valeur) {
+	const erreurs = [...valider(schemaPage, valeur)];
+	if (erreurs.length > 0) return erreurs;
+	const page = valeur;
+	for (const [i, section] of page.sections.entries()) {
+		const chemin = `$.sections[${i}]`;
+		if (section.sorte === "texte") {
+			if ((section.texte ?? "").trim() === "") erreurs.push({
+				chemin: `${chemin}.texte`,
+				message: "une section « texte » sans texte est un titre suivi de rien"
+			});
+			continue;
+		}
+		if ((section.lignes ?? []).length === 0) erreurs.push({
+			chemin: `${chemin}.lignes`,
+			message: `une section « ${section.sorte} » sans lignes est un titre suivi de rien`
+		});
+	}
+	return erreurs;
+}
+/**
+* L'ancre d'une section, pour le sommaire.
+*
+* Elle se dérive du titre et non d'un compteur : une ancre numérotée change de
+* cible dès qu'on insère une section, et un lien déjà envoyé tombe alors sur
+* autre chose. Les accents sont dépliés, le reste devient un tiret ; deux
+* titres qui se réduisent au même reçoivent leur rang, parce qu'un identifiant
+* en double fait sauter le menu au premier des deux.
+*/
+function ancresDeSections(sections) {
+	const vues = /* @__PURE__ */ new Map();
+	return sections.map((section, i) => {
+		const base = section.titre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `section-${i + 1}`;
+		const deja = vues.get(base);
+		vues.set(base, (deja ?? 0) + 1);
+		return deja === void 0 ? base : `${base}-${deja + 1}`;
+	});
+}
+/** Le menu a-t-il lieu d'être ? */
+function avecSommaire(page) {
+	return page.sommaire === true && page.sections.length >= 3;
+}
+/**
+* La carte d'une page, celle que WhatsApp montre avant qu'on ouvre le lien.
+*
+* Elle n'a pas de grand chiffre à afficher : une vitrine ne totalise rien. Ce
+* qui tient sa place est **ce qui fait cliquer** — le numéro qu'on peut écrire,
+* et à défaut le premier prix annoncé. Une carte sans rien au milieu se lit
+* comme un outil vide ; on préfère alors le sur-titre au blanc.
+*/
+function carteDePage(page, ctx) {
+	const grand = grandDeLaPage(page);
+	const vitrine = sectionListee(page);
+	return {
+		kicker: page.kicker,
+		title: page.titre,
+		sub: page.accroche,
+		tag: null,
+		bigLabel: grand.libelle,
+		big: grand.valeur,
+		pct: null,
+		subline: [page.adresse, page.horaires].filter((x) => x !== void 0 && x !== "").join(" · "),
+		listTitle: vitrine === null ? "" : vitrine.titre.toUpperCase(),
+		items: vitrine === null ? [] : itemsDeSection(vitrine),
+		link: ctx.lien,
+		stamp: arreteLe(ctx.maintenant)
+	};
+}
+function grandDeLaPage(page) {
+	if ((page.telephone === void 0 ? null : numeroInternational(page.telephone)) !== null) return {
+		libelle: "WHATSAPP",
+		valeur: page.telephone ?? ""
+	};
+	const premiere = page.sections.find((s) => s.sorte === "prix")?.lignes?.find((l) => l.valeur !== void 0 && l.valeur !== "");
+	if (premiere !== void 0) return {
+		libelle: premiere.nom.toUpperCase(),
+		valeur: premiere.valeur ?? ""
+	};
+	return {
+		libelle: "",
+		valeur: page.kicker
+	};
+}
+/** La section qu'on montre sur la carte : des prix de préférence, une liste sinon. */
+function sectionListee(page) {
+	return page.sections.find((s) => s.sorte === "prix") ?? page.sections.find((s) => s.sorte === "liste") ?? null;
+}
+function itemsDeSection(section) {
+	return (section.lignes ?? []).map((l) => ({
+		n: l.nom,
+		ok: false,
+		warn: false,
+		val: l.valeur !== void 0 && l.valeur !== "" ? l.valeur : null
+	}));
+}
 //#endregion
 //#region ../engine/src/registre.ts
 /**
@@ -4820,10 +5147,19 @@ function J(e) {
 }
 //#endregion
 //#region ../render/src/styles/a4.css?raw
-var a4_default = "/*\n * Feuille A4 réelle, en millimètres.\n *\n * Le prototype dessinait un aperçu à l'échelle, en pixels minuscules (7,4 px\n * pour le corps de texte). Ça se voit à l'écran et ça s'imprime n'importe\n * comment. Ici la page fait ses 210 × 297 mm et le texte ses points : on rend à\n * la taille vraie, et c'est l'aperçu qui est mis à l'échelle par --echelle.\n *\n * **Cette feuille ignore le thème sombre, et c'est voulu** : un devis part à\n * l'impression et chez un client. Il est blanc chez tout le monde. Elle ne lit\n * donc aucun jeton de l'interface et se suffit à elle-même.\n *\n * Aucune police web : on prend ce que le téléphone a déjà (invariant § 2.6).\n */\n\n.a4-cadre {\n  --echelle: 1;\n  width: calc(210mm * var(--echelle));\n  overflow: hidden;\n}\n\n.a4-cadre > .a4 {\n  transform: scale(var(--echelle));\n  transform-origin: top left;\n  margin-bottom: calc((297mm * var(--echelle)) - 297mm);\n  box-shadow: 0 2px 18px rgb(18 23 16 / 12%);\n}\n\n.a4 {\n  --pa: #1f2a44;\n  --trait: #d7dce1;\n  --trait-fort: #aeb6bd;\n  --gris: #4e575e;\n  --gris-clair: #7b848b;\n\n  box-sizing: border-box;\n  position: relative;\n  width: 210mm;\n  min-height: 297mm;\n  padding: 15mm 16mm 20mm;\n  background: #fff;\n  color: #16191c;\n  font: 9.5pt/1.5 system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n  font-variant-numeric: tabular-nums lining-nums;\n  /* Les aplats d'accent doivent sortir de l'imprimante, pas être « économisés ». */\n  print-color-adjust: exact;\n  -webkit-print-color-adjust: exact;\n}\n\n.a4 * {\n  box-sizing: border-box;\n}\n\n/* ─────────────────────────────── entête ─────────────────────────────── */\n\n.a4-entete {\n  display: flex;\n  justify-content: space-between;\n  align-items: flex-start;\n  gap: 10mm;\n  padding-bottom: 3.5mm;\n  border-bottom: 0.7mm solid var(--pa);\n}\n\n.a4-entete .raison {\n  font-size: 14pt;\n  font-weight: 700;\n  line-height: 1.15;\n  letter-spacing: -0.01em;\n  color: var(--pa);\n}\n\n.a4-entete .coordonnees,\n.a4-entete .immat {\n  margin-top: 1.5mm;\n  font-size: 8pt;\n  line-height: 1.55;\n  color: var(--gris);\n}\n\n.a4-entete .immat {\n  text-align: right;\n  white-space: nowrap;\n}\n\n/* ─────────────────────────────── titre ─────────────────────────────── */\n\n.a4-titre {\n  margin: 9mm 0 0;\n  font-size: 22pt;\n  font-weight: 700;\n  line-height: 1;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  color: var(--pa);\n}\n\n.a4-sous-titre {\n  margin-top: 2mm;\n  font-size: 9pt;\n  color: var(--gris);\n}\n\n.a4-bloc-client {\n  margin-top: 7mm;\n  padding: 3.5mm 4mm;\n  border: 0.25mm solid var(--trait);\n  border-left: 1.2mm solid var(--pa);\n  border-radius: 0 1mm 1mm 0;\n  background: #fbfcfd;\n  font-size: 9pt;\n  line-height: 1.55;\n}\n\n.a4-bloc-client .etiquette {\n  margin-bottom: 0.8mm;\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.14em;\n  text-transform: uppercase;\n  color: var(--gris-clair);\n}\n\n/* ─────────────────────────────── tableau ─────────────────────────────── */\n\n.a4-tableau {\n  width: 100%;\n  margin-top: 7mm;\n  border-collapse: collapse;\n  font-size: 8.5pt;\n}\n\n.a4-tableau th {\n  padding: 2.4mm 2mm;\n  border-bottom: 0.6mm solid var(--pa);\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  text-align: left;\n  color: var(--pa);\n  white-space: nowrap;\n}\n\n.a4-tableau td {\n  padding: 2.4mm 2mm;\n  border-bottom: 0.2mm solid var(--trait);\n  vertical-align: top;\n}\n\n/* Une ligne de facture ne se coupe pas au milieu par un saut de page. */\n.a4-tableau tr {\n  break-inside: avoid;\n}\n\n.a4-tableau .nombre {\n  text-align: right;\n  white-space: nowrap;\n}\n\n.a4-tableau tbody tr:last-child td {\n  border-bottom: 0.4mm solid var(--trait-fort);\n}\n\n.a4-vide {\n  padding: 8mm 0;\n  color: var(--gris-clair);\n  font-style: italic;\n  text-align: center;\n}\n\n/* ─────────────────────────────── totaux ─────────────────────────────── */\n\n.a4-totaux {\n  margin-top: 5mm;\n  margin-left: auto;\n  width: 88mm;\n  font-size: 9pt;\n  break-inside: avoid;\n}\n\n.a4-totaux .ligne {\n  display: flex;\n  justify-content: space-between;\n  gap: 6mm;\n  padding: 1.6mm 1mm;\n}\n\n.a4-totaux .ligne + .ligne {\n  border-top: 0.2mm solid var(--trait);\n}\n\n.a4-totaux .fort {\n  margin-top: 1.5mm;\n  padding: 2.6mm 3mm;\n  border: 0;\n  border-radius: 1mm;\n  background: var(--pa);\n  color: #fff;\n  font-size: 11.5pt;\n  font-weight: 700;\n  letter-spacing: 0.01em;\n}\n\n.a4-en-lettres {\n  margin-top: 4mm;\n  font-size: 8.5pt;\n  font-style: italic;\n  line-height: 1.55;\n  color: var(--gris);\n  break-inside: avoid;\n}\n\n/* ─────────────────────── mentions, signatures, pied ─────────────────────── */\n\n.a4-mentions {\n  margin-top: 7mm;\n  font-size: 8pt;\n  line-height: 1.6;\n  color: var(--gris);\n  orphans: 2;\n  widows: 2;\n}\n\n.a4-mentions p {\n  margin: 0 0 2mm;\n}\n\n.a4-signatures {\n  display: flex;\n  gap: 10mm;\n  margin-top: 12mm;\n  break-inside: avoid;\n}\n\n.a4-signatures .zone {\n  flex: 1;\n}\n\n.a4-signatures .libelle {\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  color: var(--pa);\n}\n\n.a4-signatures .mention {\n  margin-top: 0.8mm;\n  font-size: 7.5pt;\n  color: var(--gris-clair);\n}\n\n.a4-signatures .cadre {\n  margin-top: 2.5mm;\n  height: 24mm;\n  border: 0.25mm dashed var(--trait-fort);\n  border-radius: 1mm;\n}\n\n.a4-pied {\n  position: absolute;\n  left: 16mm;\n  right: 16mm;\n  bottom: 11mm;\n  padding-top: 2.5mm;\n  border-top: 0.2mm solid var(--trait);\n  font-size: 7pt;\n  line-height: 1.6;\n  color: var(--gris-clair);\n}\n\n.a4-numero-page {\n  position: absolute;\n  right: 16mm;\n  bottom: 6mm;\n  font-size: 7pt;\n  color: var(--gris-clair);\n}\n\n/* ─────────────────────────────── impression ─────────────────────────── */\n\n@page {\n  size: A4;\n  margin: 0;\n}\n\n@media print {\n  .a4-cadre {\n    --echelle: 1;\n    width: auto;\n    overflow: visible;\n  }\n\n  .a4-cadre > .a4 {\n    transform: none;\n    margin-bottom: 0;\n    box-shadow: none;\n  }\n}\n\n/* ────────────────────── actes et lettres ────────────────────── */\n/*\n * Ces quatre documents ne portent pas de tableau taxé. Ce qui les distingue,\n * c'est la disposition : un acte pose ses parties avant son corps, une lettre\n * française met l'expéditeur à gauche et le destinataire à droite. Le reste —\n * papier, titre, signatures, pied — vient des mêmes pièces que le devis.\n */\n\n/* Un corps de texte long : la mesure compte plus que la taille. */\n.a4-corps {\n  margin-top: 6mm;\n  font-size: 9.5pt;\n  line-height: 1.7;\n  color: var(--encre);\n  text-align: justify;\n}\n\n.a4-corps p {\n  margin: 0 0 3.5mm;\n}\n\n/* Les deux parties d'un acte, nommées avant le corps. */\n.a4-parties {\n  margin-top: 6mm;\n  font-size: 9.5pt;\n  line-height: 1.9;\n}\n\n.a4-parties .qui {\n  font-weight: 700;\n  color: var(--pa);\n}\n\n/* Le montant encadré : ce que l'œil doit trouver en premier sur l'acte. */\n.a4-encadre {\n  margin-top: 6mm;\n  padding: 4mm 5mm;\n  border: 0.5mm solid var(--pa);\n  border-radius: 1mm;\n  break-inside: avoid;\n}\n\n.a4-encadre .etiquette {\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.12em;\n  text-transform: uppercase;\n  color: var(--pa);\n}\n\n.a4-encadre .chiffre {\n  margin-top: 1mm;\n  font-size: 16pt;\n  font-weight: 800;\n  letter-spacing: -0.01em;\n}\n\n.a4-encadre .lettres {\n  margin-top: 0.8mm;\n  font-size: 9pt;\n  font-style: italic;\n  color: var(--gris);\n}\n\n.a4-encadre .echeance {\n  margin-top: 2.5mm;\n  font-size: 9pt;\n}\n\n/* La disposition d'une lettre française. */\n.a4-lettre-tete {\n  display: flex;\n  justify-content: space-between;\n  gap: 10mm;\n  font-size: 9pt;\n  line-height: 1.5;\n}\n\n.a4-lettre-tete .expediteur {\n  max-width: 70mm;\n}\n\n.a4-lettre-tete .destinataire {\n  max-width: 80mm;\n  text-align: right;\n  color: var(--gris);\n}\n\n.a4-lettre-date {\n  margin-top: 8mm;\n  font-size: 9pt;\n  text-align: right;\n  color: var(--gris);\n}\n\n.a4-lettre-objet {\n  display: inline-block;\n  margin-top: 6mm;\n  padding-bottom: 1mm;\n  border-bottom: 0.3mm solid var(--pa);\n  font-size: 10pt;\n  font-weight: 600;\n}\n\n.a4-lettre-signature {\n  margin-top: 10mm;\n  font-size: 10pt;\n  text-align: right;\n}\n\n/* ───────────────────────────── curriculum vitæ ─────────────────────────────\n *\n * Quatre gabarits pour une même feuille. Ils ne diffèrent que par la police,\n * la façon d'annoncer une section et la présence d'une colonne : la structure\n * du contenu est la même pour les quatre, et c'est ce qui permet de changer de\n * gabarit sans rien ressaisir.\n *\n * Aucune police web ici non plus (invariant § 2.6). « Serif » et « grotesque »\n * se jouent avec les familles génériques que tout téléphone possède.\n */\n\n.a4-cv {\n  --cv-inter: 1.5;\n  --cv-saut: 5mm;\n}\n\n.a4-cv.dense {\n  --cv-inter: 1.28;\n  --cv-saut: 3mm;\n  font-size: 9pt;\n}\n\n.a4-cv .cv-nom {\n  font-size: 20pt;\n  font-weight: 700;\n  letter-spacing: 0.02em;\n  line-height: 1.15;\n}\n\n.a4-cv .cv-titre {\n  margin-top: 1mm;\n  color: var(--pa);\n  font-size: 11pt;\n  font-weight: 600;\n}\n\n.a4-cv .cv-contact {\n  margin-top: 2mm;\n  color: var(--gris);\n  font-size: 9pt;\n}\n\n.a4-cv .cv-section {\n  margin: var(--cv-saut) 0 2mm;\n  color: var(--pa);\n  font-size: 9pt;\n  font-weight: 700;\n  letter-spacing: 0.08em;\n  text-transform: uppercase;\n}\n\n.a4-cv .cv-profil {\n  line-height: var(--cv-inter);\n  text-align: justify;\n}\n\n.a4-cv .cv-profil p {\n  margin: 0 0 2mm;\n}\n\n.a4-cv .cv-item {\n  margin-bottom: 3mm;\n  line-height: var(--cv-inter);\n}\n\n.a4-cv .cv-quoi {\n  font-size: 10pt;\n  font-weight: 600;\n}\n\n.a4-cv .cv-ou {\n  color: var(--gris);\n  font-size: 9pt;\n}\n\n/* La puce est dessinée, pas listée : un <ul> imprime des marges que le\n * gabarit ne contrôle pas d'un navigateur à l'autre. */\n.a4-cv .cv-fait {\n  position: relative;\n  margin-top: 1mm;\n  padding-left: 4mm;\n  font-size: 9.5pt;\n}\n\n.a4-cv .cv-fait::before {\n  content: \"\";\n  position: absolute;\n  top: 1.7mm;\n  left: 0.8mm;\n  width: 1.2mm;\n  height: 1.2mm;\n  background: var(--pa);\n}\n\n.a4-cv .cv-serie {\n  font-size: 9.5pt;\n  line-height: var(--cv-inter);\n}\n\n/* — Notaire : sérif, tout centré, pour une administration. — */\n.a4-cv.notaire {\n  font-family: Georgia, \"Times New Roman\", serif;\n}\n\n.a4-cv.notaire .cv-tete {\n  padding-bottom: 3mm;\n  border-bottom: 0.4mm solid var(--pa);\n  text-align: center;\n}\n\n.a4-cv.notaire .cv-section {\n  border-bottom: 0.2mm solid var(--trait);\n  padding-bottom: 1mm;\n  text-align: center;\n  letter-spacing: 0.14em;\n}\n\n.a4-cv.notaire .cv-serie {\n  text-align: center;\n}\n\n/* — Exécutif : grotesque, un filet de couleur, pour le privé. — */\n\n/*\n * Le filet sort dans la marge : posé dans la colonne de texte, il décalait le\n * nom de quatre millimètres vers la droite et l'entête ne s'alignait plus sur\n * les titres de section en dessous.\n */\n.a4-cv.executif .cv-tete {\n  /* 5 mm de retrait plus l'épaisseur du filet : sans elle, le nom reste décalé\n   * du filet lui-même et rate l'alignement d'un millimètre et demi. */\n  margin-left: -6.5mm;\n  border-left: 1.5mm solid var(--pa);\n  padding-left: 5mm;\n}\n\n.a4-cv.executif .cv-section {\n  border-bottom: 0.2mm solid var(--trait);\n  padding-bottom: 1mm;\n}\n\n/* — Éditorial : le nom en display, la date en marge, pour un métier créatif. — */\n.a4-cv.editorial .cv-nom {\n  font-size: 28pt;\n  font-weight: 300;\n  letter-spacing: -0.01em;\n}\n\n.a4-cv.editorial .cv-tete {\n  padding-bottom: 4mm;\n  border-bottom: 0.8mm solid var(--pa);\n}\n\n.a4-cv.editorial .cv-section {\n  color: var(--gris-clair);\n  letter-spacing: 0.18em;\n}\n\n/*\n * `column-gap`, pas `gap` : chaque fait occupe sa propre rangée de la grille,\n * et un `gap` de quatre millimètres les écartait tous les uns des autres —\n * trois puces séparées comme trois paragraphes.\n */\n.a4-cv.editorial .cv-item {\n  display: grid;\n  grid-template-columns: 28mm 1fr;\n  column-gap: 4mm;\n}\n\n.a4-cv.editorial .cv-marge {\n  grid-column: 1;\n  grid-row: 1;\n  color: var(--gris);\n  font-size: 9pt;\n  text-align: right;\n}\n\n.a4-cv.editorial .cv-quoi,\n.a4-cv.editorial .cv-ou,\n.a4-cv.editorial .cv-fait {\n  grid-column: 2;\n}\n\n/* — Bloc : une bande latérale porte le contact et les listes. — */\n\n/*\n * La hauteur est celle de la zone de texte de la feuille : 297 mm moins les\n * marges haute et basse. Sans elle, le filet de la bande s'arrête où le\n * contenu s'arrête, et un CV court montre un trait qui meurt au milieu de la\n * page — ce qui se lit comme un défaut de rendu, pas comme un parti pris.\n */\n.a4-cv.bloc {\n  display: grid;\n  grid-template-columns: 58mm 1fr;\n  gap: 8mm;\n  min-height: calc(297mm - 15mm - 20mm);\n}\n\n/* Justifier une colonne de cent millimètres ouvre des rivières entre les mots. */\n.a4-cv.bloc .cv-profil {\n  text-align: left;\n}\n\n.a4-cv.bloc .cv-bande {\n  padding-right: 6mm;\n  border-right: 0.3mm solid var(--trait);\n}\n\n.a4-cv.bloc .cv-bande .cv-nom {\n  font-size: 16pt;\n}\n\n.a4-cv.bloc .cv-bande .cv-titre {\n  font-size: 10pt;\n}\n\n.a4-cv.bloc .cv-ligne {\n  margin-top: 1mm;\n  font-size: 9pt;\n  line-height: 1.35;\n  overflow-wrap: anywhere;\n}\n\n.a4-cv.bloc .cv-principal .cv-section:first-child {\n  margin-top: 0;\n}\n";
+var a4_default$1 = "/*\n * Feuille A4 réelle, en millimètres.\n *\n * Le prototype dessinait un aperçu à l'échelle, en pixels minuscules (7,4 px\n * pour le corps de texte). Ça se voit à l'écran et ça s'imprime n'importe\n * comment. Ici la page fait ses 210 × 297 mm et le texte ses points : on rend à\n * la taille vraie, et c'est l'aperçu qui est mis à l'échelle par --echelle.\n *\n * **Cette feuille ignore le thème sombre, et c'est voulu** : un devis part à\n * l'impression et chez un client. Il est blanc chez tout le monde. Elle ne lit\n * donc aucun jeton de l'interface et se suffit à elle-même.\n *\n * Aucune police web : on prend ce que le téléphone a déjà (invariant § 2.6).\n */\n\n.a4-cadre {\n  --echelle: 1;\n  width: calc(210mm * var(--echelle));\n  overflow: hidden;\n}\n\n.a4-cadre > .a4 {\n  transform: scale(var(--echelle));\n  transform-origin: top left;\n  margin-bottom: calc((297mm * var(--echelle)) - 297mm);\n  box-shadow: 0 2px 18px rgb(18 23 16 / 12%);\n}\n\n.a4 {\n  --pa: #1f2a44;\n  --trait: #d7dce1;\n  --trait-fort: #aeb6bd;\n  --gris: #4e575e;\n  --gris-clair: #7b848b;\n\n  box-sizing: border-box;\n  position: relative;\n  width: 210mm;\n  min-height: 297mm;\n  padding: 15mm 16mm 20mm;\n  background: #fff;\n  color: #16191c;\n  font: 9.5pt/1.5 system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n  font-variant-numeric: tabular-nums lining-nums;\n  /* Les aplats d'accent doivent sortir de l'imprimante, pas être « économisés ». */\n  print-color-adjust: exact;\n  -webkit-print-color-adjust: exact;\n}\n\n.a4 * {\n  box-sizing: border-box;\n}\n\n/* ─────────────────────────────── entête ─────────────────────────────── */\n\n.a4-entete {\n  display: flex;\n  justify-content: space-between;\n  align-items: flex-start;\n  gap: 10mm;\n  padding-bottom: 3.5mm;\n  border-bottom: 0.7mm solid var(--pa);\n}\n\n.a4-entete .raison {\n  font-size: 14pt;\n  font-weight: 700;\n  line-height: 1.15;\n  letter-spacing: -0.01em;\n  color: var(--pa);\n}\n\n.a4-entete .coordonnees,\n.a4-entete .immat {\n  margin-top: 1.5mm;\n  font-size: 8pt;\n  line-height: 1.55;\n  color: var(--gris);\n}\n\n.a4-entete .immat {\n  text-align: right;\n  white-space: nowrap;\n}\n\n/* ─────────────────────────────── titre ─────────────────────────────── */\n\n.a4-titre {\n  margin: 9mm 0 0;\n  font-size: 22pt;\n  font-weight: 700;\n  line-height: 1;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  color: var(--pa);\n}\n\n.a4-sous-titre {\n  margin-top: 2mm;\n  font-size: 9pt;\n  color: var(--gris);\n}\n\n.a4-bloc-client {\n  margin-top: 7mm;\n  padding: 3.5mm 4mm;\n  border: 0.25mm solid var(--trait);\n  border-left: 1.2mm solid var(--pa);\n  border-radius: 0 1mm 1mm 0;\n  background: #fbfcfd;\n  font-size: 9pt;\n  line-height: 1.55;\n}\n\n.a4-bloc-client .etiquette {\n  margin-bottom: 0.8mm;\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.14em;\n  text-transform: uppercase;\n  color: var(--gris-clair);\n}\n\n/* ─────────────────────────────── tableau ─────────────────────────────── */\n\n.a4-tableau {\n  width: 100%;\n  margin-top: 7mm;\n  border-collapse: collapse;\n  font-size: 8.5pt;\n}\n\n.a4-tableau th {\n  padding: 2.4mm 2mm;\n  border-bottom: 0.6mm solid var(--pa);\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  text-align: left;\n  color: var(--pa);\n  white-space: nowrap;\n}\n\n.a4-tableau td {\n  padding: 2.4mm 2mm;\n  border-bottom: 0.2mm solid var(--trait);\n  vertical-align: top;\n}\n\n/* Une ligne de facture ne se coupe pas au milieu par un saut de page. */\n.a4-tableau tr {\n  break-inside: avoid;\n}\n\n.a4-tableau .nombre {\n  text-align: right;\n  white-space: nowrap;\n}\n\n.a4-tableau tbody tr:last-child td {\n  border-bottom: 0.4mm solid var(--trait-fort);\n}\n\n.a4-vide {\n  padding: 8mm 0;\n  color: var(--gris-clair);\n  font-style: italic;\n  text-align: center;\n}\n\n/* ─────────────────────────────── totaux ─────────────────────────────── */\n\n.a4-totaux {\n  margin-top: 5mm;\n  margin-left: auto;\n  width: 88mm;\n  font-size: 9pt;\n  break-inside: avoid;\n}\n\n.a4-totaux .ligne {\n  display: flex;\n  justify-content: space-between;\n  gap: 6mm;\n  padding: 1.6mm 1mm;\n}\n\n.a4-totaux .ligne + .ligne {\n  border-top: 0.2mm solid var(--trait);\n}\n\n.a4-totaux .fort {\n  margin-top: 1.5mm;\n  padding: 2.6mm 3mm;\n  border: 0;\n  border-radius: 1mm;\n  background: var(--pa);\n  color: #fff;\n  font-size: 11.5pt;\n  font-weight: 700;\n  letter-spacing: 0.01em;\n}\n\n.a4-en-lettres {\n  margin-top: 4mm;\n  font-size: 8.5pt;\n  font-style: italic;\n  line-height: 1.55;\n  color: var(--gris);\n  break-inside: avoid;\n}\n\n/* ─────────────────────── mentions, signatures, pied ─────────────────────── */\n\n.a4-mentions {\n  margin-top: 7mm;\n  font-size: 8pt;\n  line-height: 1.6;\n  color: var(--gris);\n  orphans: 2;\n  widows: 2;\n}\n\n.a4-mentions p {\n  margin: 0 0 2mm;\n}\n\n.a4-signatures {\n  display: flex;\n  gap: 10mm;\n  margin-top: 12mm;\n  break-inside: avoid;\n}\n\n.a4-signatures .zone {\n  flex: 1;\n}\n\n.a4-signatures .libelle {\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  color: var(--pa);\n}\n\n.a4-signatures .mention {\n  margin-top: 0.8mm;\n  font-size: 7.5pt;\n  color: var(--gris-clair);\n}\n\n.a4-signatures .cadre {\n  margin-top: 2.5mm;\n  height: 24mm;\n  border: 0.25mm dashed var(--trait-fort);\n  border-radius: 1mm;\n}\n\n.a4-pied {\n  position: absolute;\n  left: 16mm;\n  right: 16mm;\n  bottom: 11mm;\n  padding-top: 2.5mm;\n  border-top: 0.2mm solid var(--trait);\n  font-size: 7pt;\n  line-height: 1.6;\n  color: var(--gris-clair);\n}\n\n.a4-numero-page {\n  position: absolute;\n  right: 16mm;\n  bottom: 6mm;\n  font-size: 7pt;\n  color: var(--gris-clair);\n}\n\n/* ─────────────────────────────── impression ─────────────────────────── */\n\n@page {\n  size: A4;\n  margin: 0;\n}\n\n@media print {\n  .a4-cadre {\n    --echelle: 1;\n    width: auto;\n    overflow: visible;\n  }\n\n  .a4-cadre > .a4 {\n    transform: none;\n    margin-bottom: 0;\n    box-shadow: none;\n  }\n}\n\n/* ────────────────────── actes et lettres ────────────────────── */\n/*\n * Ces quatre documents ne portent pas de tableau taxé. Ce qui les distingue,\n * c'est la disposition : un acte pose ses parties avant son corps, une lettre\n * française met l'expéditeur à gauche et le destinataire à droite. Le reste —\n * papier, titre, signatures, pied — vient des mêmes pièces que le devis.\n */\n\n/* Un corps de texte long : la mesure compte plus que la taille. */\n.a4-corps {\n  margin-top: 6mm;\n  font-size: 9.5pt;\n  line-height: 1.7;\n  color: var(--encre);\n  text-align: justify;\n}\n\n.a4-corps p {\n  margin: 0 0 3.5mm;\n}\n\n/* Les deux parties d'un acte, nommées avant le corps. */\n.a4-parties {\n  margin-top: 6mm;\n  font-size: 9.5pt;\n  line-height: 1.9;\n}\n\n.a4-parties .qui {\n  font-weight: 700;\n  color: var(--pa);\n}\n\n/* Le montant encadré : ce que l'œil doit trouver en premier sur l'acte. */\n.a4-encadre {\n  margin-top: 6mm;\n  padding: 4mm 5mm;\n  border: 0.5mm solid var(--pa);\n  border-radius: 1mm;\n  break-inside: avoid;\n}\n\n.a4-encadre .etiquette {\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.12em;\n  text-transform: uppercase;\n  color: var(--pa);\n}\n\n.a4-encadre .chiffre {\n  margin-top: 1mm;\n  font-size: 16pt;\n  font-weight: 800;\n  letter-spacing: -0.01em;\n}\n\n.a4-encadre .lettres {\n  margin-top: 0.8mm;\n  font-size: 9pt;\n  font-style: italic;\n  color: var(--gris);\n}\n\n.a4-encadre .echeance {\n  margin-top: 2.5mm;\n  font-size: 9pt;\n}\n\n/* La disposition d'une lettre française. */\n.a4-lettre-tete {\n  display: flex;\n  justify-content: space-between;\n  gap: 10mm;\n  font-size: 9pt;\n  line-height: 1.5;\n}\n\n.a4-lettre-tete .expediteur {\n  max-width: 70mm;\n}\n\n.a4-lettre-tete .destinataire {\n  max-width: 80mm;\n  text-align: right;\n  color: var(--gris);\n}\n\n.a4-lettre-date {\n  margin-top: 8mm;\n  font-size: 9pt;\n  text-align: right;\n  color: var(--gris);\n}\n\n.a4-lettre-objet {\n  display: inline-block;\n  margin-top: 6mm;\n  padding-bottom: 1mm;\n  border-bottom: 0.3mm solid var(--pa);\n  font-size: 10pt;\n  font-weight: 600;\n}\n\n.a4-lettre-signature {\n  margin-top: 10mm;\n  font-size: 10pt;\n  text-align: right;\n}\n\n/* ───────────────────────────── curriculum vitæ ─────────────────────────────\n *\n * Quatre gabarits pour une même feuille. Ils ne diffèrent que par la police,\n * la façon d'annoncer une section et la présence d'une colonne : la structure\n * du contenu est la même pour les quatre, et c'est ce qui permet de changer de\n * gabarit sans rien ressaisir.\n *\n * Aucune police web ici non plus (invariant § 2.6). « Serif » et « grotesque »\n * se jouent avec les familles génériques que tout téléphone possède.\n */\n\n.a4-cv {\n  --cv-inter: 1.5;\n  --cv-saut: 5mm;\n}\n\n.a4-cv.dense {\n  --cv-inter: 1.28;\n  --cv-saut: 3mm;\n  font-size: 9pt;\n}\n\n.a4-cv .cv-nom {\n  font-size: 20pt;\n  font-weight: 700;\n  letter-spacing: 0.02em;\n  line-height: 1.15;\n}\n\n.a4-cv .cv-titre {\n  margin-top: 1mm;\n  color: var(--pa);\n  font-size: 11pt;\n  font-weight: 600;\n}\n\n.a4-cv .cv-contact {\n  margin-top: 2mm;\n  color: var(--gris);\n  font-size: 9pt;\n}\n\n.a4-cv .cv-section {\n  margin: var(--cv-saut) 0 2mm;\n  color: var(--pa);\n  font-size: 9pt;\n  font-weight: 700;\n  letter-spacing: 0.08em;\n  text-transform: uppercase;\n}\n\n.a4-cv .cv-profil {\n  line-height: var(--cv-inter);\n  text-align: justify;\n}\n\n.a4-cv .cv-profil p {\n  margin: 0 0 2mm;\n}\n\n.a4-cv .cv-item {\n  margin-bottom: 3mm;\n  line-height: var(--cv-inter);\n}\n\n.a4-cv .cv-quoi {\n  font-size: 10pt;\n  font-weight: 600;\n}\n\n.a4-cv .cv-ou {\n  color: var(--gris);\n  font-size: 9pt;\n}\n\n/* La puce est dessinée, pas listée : un <ul> imprime des marges que le\n * gabarit ne contrôle pas d'un navigateur à l'autre. */\n.a4-cv .cv-fait {\n  position: relative;\n  margin-top: 1mm;\n  padding-left: 4mm;\n  font-size: 9.5pt;\n}\n\n.a4-cv .cv-fait::before {\n  content: \"\";\n  position: absolute;\n  top: 1.7mm;\n  left: 0.8mm;\n  width: 1.2mm;\n  height: 1.2mm;\n  background: var(--pa);\n}\n\n.a4-cv .cv-serie {\n  font-size: 9.5pt;\n  line-height: var(--cv-inter);\n}\n\n/* — Notaire : sérif, tout centré, pour une administration. — */\n.a4-cv.notaire {\n  font-family: Georgia, \"Times New Roman\", serif;\n}\n\n.a4-cv.notaire .cv-tete {\n  padding-bottom: 3mm;\n  border-bottom: 0.4mm solid var(--pa);\n  text-align: center;\n}\n\n.a4-cv.notaire .cv-section {\n  border-bottom: 0.2mm solid var(--trait);\n  padding-bottom: 1mm;\n  text-align: center;\n  letter-spacing: 0.14em;\n}\n\n.a4-cv.notaire .cv-serie {\n  text-align: center;\n}\n\n/* — Exécutif : grotesque, un filet de couleur, pour le privé. — */\n\n/*\n * Le filet sort dans la marge : posé dans la colonne de texte, il décalait le\n * nom de quatre millimètres vers la droite et l'entête ne s'alignait plus sur\n * les titres de section en dessous.\n */\n.a4-cv.executif .cv-tete {\n  /* 5 mm de retrait plus l'épaisseur du filet : sans elle, le nom reste décalé\n   * du filet lui-même et rate l'alignement d'un millimètre et demi. */\n  margin-left: -6.5mm;\n  border-left: 1.5mm solid var(--pa);\n  padding-left: 5mm;\n}\n\n.a4-cv.executif .cv-section {\n  border-bottom: 0.2mm solid var(--trait);\n  padding-bottom: 1mm;\n}\n\n/* — Éditorial : le nom en display, la date en marge, pour un métier créatif. — */\n.a4-cv.editorial .cv-nom {\n  font-size: 28pt;\n  font-weight: 300;\n  letter-spacing: -0.01em;\n}\n\n.a4-cv.editorial .cv-tete {\n  padding-bottom: 4mm;\n  border-bottom: 0.8mm solid var(--pa);\n}\n\n.a4-cv.editorial .cv-section {\n  color: var(--gris-clair);\n  letter-spacing: 0.18em;\n}\n\n/*\n * `column-gap`, pas `gap` : chaque fait occupe sa propre rangée de la grille,\n * et un `gap` de quatre millimètres les écartait tous les uns des autres —\n * trois puces séparées comme trois paragraphes.\n */\n.a4-cv.editorial .cv-item {\n  display: grid;\n  grid-template-columns: 28mm 1fr;\n  column-gap: 4mm;\n}\n\n.a4-cv.editorial .cv-marge {\n  grid-column: 1;\n  grid-row: 1;\n  color: var(--gris);\n  font-size: 9pt;\n  text-align: right;\n}\n\n.a4-cv.editorial .cv-quoi,\n.a4-cv.editorial .cv-ou,\n.a4-cv.editorial .cv-fait {\n  grid-column: 2;\n}\n\n/* — Bloc : une bande latérale porte le contact et les listes. — */\n\n/*\n * La hauteur est celle de la zone de texte de la feuille : 297 mm moins les\n * marges haute et basse. Sans elle, le filet de la bande s'arrête où le\n * contenu s'arrête, et un CV court montre un trait qui meurt au milieu de la\n * page — ce qui se lit comme un défaut de rendu, pas comme un parti pris.\n */\n.a4-cv.bloc {\n  display: grid;\n  grid-template-columns: 58mm 1fr;\n  gap: 8mm;\n  min-height: calc(297mm - 15mm - 20mm);\n}\n\n/* Justifier une colonne de cent millimètres ouvre des rivières entre les mots. */\n.a4-cv.bloc .cv-profil {\n  text-align: left;\n}\n\n.a4-cv.bloc .cv-bande {\n  padding-right: 6mm;\n  border-right: 0.3mm solid var(--trait);\n}\n\n.a4-cv.bloc .cv-bande .cv-nom {\n  font-size: 16pt;\n}\n\n.a4-cv.bloc .cv-bande .cv-titre {\n  font-size: 10pt;\n}\n\n.a4-cv.bloc .cv-ligne {\n  margin-top: 1mm;\n  font-size: 9pt;\n  line-height: 1.35;\n  overflow-wrap: anywhere;\n}\n\n.a4-cv.bloc .cv-principal .cv-section:first-child {\n  margin-top: 0;\n}\n";
+//#endregion
+//#region ../render/src/styles/vitrine.css?raw
+var vitrine_default = "/*\n * La page composée par le modèle.\n *\n * Elle vit à deux endroits : en aperçu dans l'application, et publiée sur le\n * serveur pour qui reçoit le lien. Une seule feuille, pour que les deux\n * montrent la même chose — celle que le client voit ne doit pas être la\n * surprise.\n *\n * Elle se lit d'un pouce, sur un téléphone d'entrée de gamme, souvent dans le\n * navigateur intégré de WhatsApp. Aucune animation, aucune police à charger :\n * ce qui arrive est fini quand il arrive.\n */\n\n.vitrine {\n  max-width: 560px;\n  margin: 0 auto;\n  padding: 4px 0 8px;\n}\n\n.vitrine-tete {\n  padding-bottom: 18px;\n  border-bottom: 2px solid var(--accent);\n}\n\n.vitrine-tete .kicker {\n  margin: 0 0 6px;\n  color: var(--accent);\n  font-size: 12px;\n  font-weight: 700;\n  letter-spacing: 0.14em;\n  text-transform: uppercase;\n}\n\n.vitrine-tete h1 {\n  margin: 0;\n  font-size: 27px;\n  line-height: 1.15;\n  letter-spacing: -0.02em;\n}\n\n.vitrine-tete .accroche {\n  margin: 8px 0 0;\n  color: var(--encre-2);\n  font-size: 15px;\n  line-height: 1.45;\n}\n\n.vitrine-section {\n  margin-top: 24px;\n}\n\n.vitrine-section h2 {\n  margin: 0 0 10px;\n  font-size: 12px;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  color: var(--encre-3);\n}\n\n.vitrine-section p {\n  margin: 0 0 8px;\n  font-size: 15px;\n  line-height: 1.55;\n  color: var(--encre-2);\n}\n\n.vitrine-liste,\n.vitrine-prix {\n  margin: 0;\n  padding: 0;\n  list-style: none;\n}\n\n.vitrine-liste li,\n.vitrine-prix li {\n  display: flex;\n  align-items: baseline;\n  justify-content: space-between;\n  gap: 14px;\n  padding: 9px 0;\n  border-top: 1px solid var(--trait);\n  font-size: 15px;\n}\n\n.vitrine-liste li:first-child,\n.vitrine-prix li:first-child {\n  border-top: 0;\n}\n\n.vitrine-liste .quoi,\n.vitrine-prix .quoi {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  min-width: 0;\n}\n\n.vitrine-liste .detail,\n.vitrine-prix .detail {\n  color: var(--encre-3);\n  font-size: 13px;\n}\n\n/* Le prix ne se coupe jamais : c'est le chiffre qu'on cherche du regard. */\n.vitrine-prix .combien {\n  flex: none;\n  color: var(--accent);\n  font-weight: 700;\n  white-space: nowrap;\n}\n\n.vitrine-liste .combien {\n  flex: none;\n  color: var(--encre-3);\n  white-space: nowrap;\n}\n\n.vitrine-pied {\n  margin-top: 26px;\n  padding-top: 18px;\n  border-top: 1px solid var(--trait);\n}\n\n/*\n * Le bouton qui rapporte.\n *\n * Quelqu'un qui lit la page et veut acheter ne doit pas avoir à recopier dix\n * chiffres : `wa.me` ouvre WhatsApp avec le message déjà écrit, gratuitement\n * et sans compte (§ 6).\n */\n.vitrine-appel {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  padding: 13px 16px;\n  border-radius: 12px;\n  background: var(--accent);\n  color: #fff;\n  font-weight: 700;\n  text-decoration: none;\n}\n\n.vitrine-appel span {\n  font-weight: 400;\n  font-size: 13px;\n  opacity: 0.85;\n}\n\n.vitrine-ou {\n  display: flex;\n  gap: 10px;\n  margin: 12px 0 0;\n  color: var(--encre-2);\n  font-size: 14px;\n}\n\n.vitrine-ou .etiquette {\n  /*\n   * Assez large pour « QUAND », le plus long des libellés. À 46 px il touchait\n   * le texte alors que « OÙ » gardait sa gouttière : la colonne était taillée\n   * pour le mot le plus court.\n   */\n  flex: none;\n  width: 58px;\n  color: var(--encre-3);\n  font-size: 11px;\n  font-weight: 700;\n  letter-spacing: 0.08em;\n  text-transform: uppercase;\n  line-height: 1.6;\n}\n\n/*\n * Le sommaire d'un « site ».\n *\n * Des ancres et non des adresses : sur une connexion qui hoquette, un menu qui\n * recharge est un menu qu'on n'ose plus toucher. Il défile horizontalement\n * plutôt que de passer à la ligne — six titres empilés repousseraient la\n * première section sous le pli, et on cacherait le contenu pour montrer son\n * plan.\n */\n.vitrine-sommaire {\n  display: flex;\n  gap: 8px;\n  margin-top: 14px;\n  overflow-x: auto;\n  scrollbar-width: none;\n}\n\n.vitrine-sommaire a {\n  flex: none;\n  padding: 7px 12px;\n  border: 1px solid var(--trait);\n  border-radius: 999px;\n  color: var(--encre-2);\n  font-size: 13px;\n  text-decoration: none;\n  white-space: nowrap;\n}\n\n/* Une section visée par le sommaire ne doit pas coller au bord de l'écran. */\n.vitrine-section {\n  scroll-margin-top: 12px;\n}\n";
+//#endregion
+//#region src/a4.css?raw
+var a4_default = "/*\n * Ce que seuls les écrits A4 emportent : la mise à l'échelle de la feuille et\n * le lien d'impression. Une vitrine ne se met pas dans une chemise, et une\n * carte ne s'imprime pas — leur donner ces règles serait du poids sans dessin.\n */\n/*\n * La feuille A4 occupe exactement la largeur disponible.\n *\n * Par paliers — 0,44 puis 0,66 puis 0,86 — elle ne la remplissait presque\n * jamais : sur un écran de 500 px elle restait dessinée pour 390, et son texte\n * finissait plus petit que celui du pied de page. Or c'est le document qu'on\n * vient lire. Le calcul le met à la largeur juste à chaque taille d'écran, et\n * s'arrête à 1 : un devis agrandi au-delà de sa taille réelle n'apprend rien de\n * plus et se met à baver.\n *\n * 210 mm valent 793,7 px à 96 ppp ; les 32 px sont les marges du corps. Le\n * diviseur porte son unité : diviser une longueur par un nombre rend une\n * longueur, et `min(1, 0.41px)` mélange un nombre et une longueur — déclaration\n * invalide, silencieusement ignorée. L'échelle retombait alors à 1 et le\n * document sortait à sa taille réelle, coupé par le cadre sur un téléphone.\n */\n.a4-cadre {\n  --echelle: min(1, calc((100vw - 32px) / 793.7px));\n  margin: 0 auto;\n}\n@media print {\n  body { padding: 0; background: #fff; }\n  .lecture-pied { display: none; }\n}\n\n/*\n * « Enregistrer en PDF » : un lien, pas un bouton.\n *\n * La page n'a aucun script, et c'est ce qui la rend fiable dans le navigateur\n * intégré de WhatsApp, sur un téléphone d'entrée de gamme. Un lien de\n * téléchargement n'en demande pas.\n */\n.lecture-pdf { margin: 10px 0 0; }\n.lecture-pdf a {\n  color: var(--accent);\n  font-weight: 600;\n  text-decoration: none;\n  border-bottom: 1px solid currentColor;\n}\n";
+//#endregion
+//#region src/carte.css?raw
+var carte_default = "/*\n * La carte dessinée en HTML, pour un registre publié.\n *\n * Elle vit dans sa propre feuille parce qu'elle ne sert qu'à un tiers des\n * pages : un écrit A4 dessine son document, une page composée dessine sa\n * vitrine, et ni l'un ni l'autre n'a de carte. Inliner ces règles partout\n * mettait deux kilo-octets de style mort dans chaque page — sur un plafond de\n * 25 Ko (§ 8), c'est un douzième dépensé à ne rien dessiner.\n */\n.lecture-carte {\n  max-width: 560px;\n  margin: 0 auto;\n  padding: 20px;\n  border: 1px solid var(--trait);\n  border-radius: 18px;\n  background: var(--surface);\n}\n.lecture-carte .kicker {\n  margin: 0;\n  color: var(--accent);\n  font-size: 11px;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n}\n.lecture-carte h1 { margin: 4px 0 0; font-size: 22px; line-height: 1.2; }\n.lecture-carte .sous { margin: 2px 0 0; color: var(--encre-3); font-size: 13px; }\n.lecture-carte .grand { margin-top: 20px; }\n.lecture-carte .etiquette {\n  margin: 0;\n  color: var(--encre-3);\n  font-size: 11px;\n  font-weight: 700;\n  letter-spacing: 0.09em;\n  text-transform: uppercase;\n}\n.lecture-carte .chiffre {\n  margin: 2px 0 0;\n  color: var(--accent);\n  font-size: 34px;\n  font-weight: 700;\n  line-height: 1.1;\n}\n.lecture-carte .barre {\n  height: 10px;\n  margin-top: 10px;\n  border-radius: 999px;\n  background: #edf1e9;\n  overflow: hidden;\n}\n.lecture-carte .barre i { display: block; height: 100%; background: var(--accent); }\n.lecture-carte .ligne { margin: 8px 0 0; color: var(--encre-2); font-size: 13px; }\n.lecture-carte .detail { margin-top: 20px; }\n.lecture-carte ul { margin: 8px 0 0; padding: 0; list-style: none; }\n.lecture-carte li {\n  display: flex;\n  justify-content: space-between;\n  gap: 12px;\n  padding: 7px 0;\n  border-top: 1px solid var(--trait);\n  font-size: 14px;\n}\n/*\n * Le nom cède, le montant non.\n *\n * Sans `min-width: 0`, un article au nom long et insécable — une référence de\n * pièce, un numéro de série — pousse le montant hors de la rangée : le chiffre\n * qu'on cherche du regard est le seul à disparaître. C'est la même règle que\n * la vitrine applique à ses lignes de prix.\n */\n.lecture-carte .quoi { min-width: 0; }\n.lecture-carte li.alerte .combien { color: var(--alerte); font-weight: 700; }\n.lecture-carte li.fait .combien { color: var(--accent); }\n.lecture-carte .combien { white-space: nowrap; }\n/* « + 47 autres » : la carte est un résumé, elle dit ce qu'elle ne montre pas. */\n.lecture-carte .reste {\n  margin: 10px 0 0;\n  padding-top: 7px;\n  border-top: 1px solid var(--trait);\n  color: var(--encre-2);\n  font-size: 13px;\n}\n";
 //#endregion
 //#region src/lecture.css?raw
-var lecture_default = "/*\n * La page de lecture. Inlinée dans le HTML : une feuille séparée serait une\n * requête de plus sur une connexion qui hoquette, pour deux kilo-octets.\n */\n:root {\n  --encre: #121710;\n  --encre-2: #414b3f;\n  --encre-3: #5e6a5c;\n  --fond: #fafbf7;\n  --surface: #fff;\n  --trait: #dfe5d9;\n  --accent: #1b5e43;\n  --alerte: #9c2717;\n}\n* { box-sizing: border-box; }\nbody {\n  margin: 0;\n  padding: 16px;\n  background: var(--fond);\n  color: var(--encre);\n  font: 15px/1.5 system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n  font-variant-numeric: tabular-nums;\n}\n.lecture { max-width: 760px; margin: 0 auto; }\n.lecture-carte {\n  max-width: 560px;\n  margin: 0 auto;\n  padding: 20px;\n  border: 1px solid var(--trait);\n  border-radius: 18px;\n  background: var(--surface);\n}\n.lecture-carte .kicker {\n  margin: 0;\n  color: var(--accent);\n  font-size: 11px;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n}\n.lecture-carte h1 { margin: 4px 0 0; font-size: 22px; line-height: 1.2; }\n.lecture-carte .sous { margin: 2px 0 0; color: var(--encre-3); font-size: 13px; }\n.lecture-carte .grand { margin-top: 20px; }\n.lecture-carte .etiquette {\n  margin: 0;\n  color: var(--encre-3);\n  font-size: 11px;\n  font-weight: 700;\n  letter-spacing: 0.09em;\n  text-transform: uppercase;\n}\n.lecture-carte .chiffre {\n  margin: 2px 0 0;\n  color: var(--accent);\n  font-size: 34px;\n  font-weight: 700;\n  line-height: 1.1;\n}\n.lecture-carte .barre {\n  height: 10px;\n  margin-top: 10px;\n  border-radius: 999px;\n  background: #edf1e9;\n  overflow: hidden;\n}\n.lecture-carte .barre i { display: block; height: 100%; background: var(--accent); }\n.lecture-carte .ligne { margin: 8px 0 0; color: var(--encre-2); font-size: 13px; }\n.lecture-carte .detail { margin-top: 20px; }\n.lecture-carte ul { margin: 8px 0 0; padding: 0; list-style: none; }\n.lecture-carte li {\n  display: flex;\n  justify-content: space-between;\n  gap: 12px;\n  padding: 7px 0;\n  border-top: 1px solid var(--trait);\n  font-size: 14px;\n}\n.lecture-carte li.alerte .combien { color: var(--alerte); font-weight: 700; }\n.lecture-carte li.fait .combien { color: var(--accent); }\n.lecture-carte .combien { white-space: nowrap; }\n/* « + 47 autres » : la carte est un résumé, elle dit ce qu'elle ne montre pas. */\n.lecture-carte .reste {\n  margin: 10px 0 0;\n  padding-top: 7px;\n  border-top: 1px solid var(--trait);\n  color: var(--encre-2);\n  font-size: 13px;\n}\n/*\n * Le pied s'efface derrière le document.\n *\n * À 12 px sous une feuille mise à l'échelle, il était plus gros que le texte du\n * devis lui-même — la mention de l'atelier se lisait mieux que le montant.\n */\n.lecture-pied {\n  max-width: 560px;\n  margin: 14px auto 0;\n  color: var(--encre-3);\n  font-size: 11px;\n  text-align: center;\n}\n.lecture-pied p { margin: 2px 0; }\n.lecture-marque { font-weight: 700; letter-spacing: 0.08em; opacity: 0.75; }\n.lecture-vide { max-width: 460px; margin: 12vh auto; text-align: center; }\n.lecture-vide h1 { font-size: 20px; }\n.lecture-vide p { color: var(--encre-2); }\n\n/*\n * La feuille A4 occupe exactement la largeur disponible.\n *\n * Par paliers — 0,44 puis 0,66 puis 0,86 — elle ne la remplissait presque\n * jamais : sur un écran de 500 px elle restait dessinée pour 390, et son texte\n * finissait plus petit que celui du pied de page. Or c'est le document qu'on\n * vient lire. Le calcul le met à la largeur juste à chaque taille d'écran, et\n * s'arrête à 1 : un devis agrandi au-delà de sa taille réelle n'apprend rien de\n * plus et se met à baver.\n *\n * 210 mm valent 793,7 px à 96 ppp ; les 32 px sont les marges du corps. Le\n * diviseur porte son unité : diviser une longueur par un nombre rend une\n * longueur, et `min(1, 0.41px)` mélange un nombre et une longueur — déclaration\n * invalide, silencieusement ignorée. L'échelle retombait alors à 1 et le\n * document sortait à sa taille réelle, coupé par le cadre sur un téléphone.\n */\n.a4-cadre {\n  --echelle: min(1, calc((100vw - 32px) / 793.7px));\n  margin: 0 auto;\n}\n@media print {\n  body { padding: 0; background: #fff; }\n  .lecture-pied { display: none; }\n}\n\n/*\n * « Enregistrer en PDF » : un lien, pas un bouton.\n *\n * La page n'a aucun script, et c'est ce qui la rend fiable dans le navigateur\n * intégré de WhatsApp, sur un téléphone d'entrée de gamme. Un lien de\n * téléchargement n'en demande pas.\n */\n.lecture-pdf { margin: 10px 0 0; }\n.lecture-pdf a {\n  color: var(--accent);\n  font-weight: 600;\n  text-decoration: none;\n  border-bottom: 1px solid currentColor;\n}\n";
+var lecture_default = "/*\n * La page de lecture. Inlinée dans le HTML : une feuille séparée serait une\n * requête de plus sur une connexion qui hoquette, pour deux kilo-octets.\n */\n:root {\n  --encre: #121710;\n  --encre-2: #414b3f;\n  --encre-3: #5e6a5c;\n  --fond: #fafbf7;\n  --surface: #fff;\n  --trait: #dfe5d9;\n  --accent: #1b5e43;\n  --alerte: #9c2717;\n}\n* { box-sizing: border-box; }\nbody {\n  margin: 0;\n  padding: 16px;\n  background: var(--fond);\n  color: var(--encre);\n  font: 15px/1.5 system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n  font-variant-numeric: tabular-nums;\n}\n.lecture { max-width: 760px; margin: 0 auto; }\n/*\n * Le pied s'efface derrière le document.\n *\n * À 12 px sous une feuille mise à l'échelle, il était plus gros que le texte du\n * devis lui-même — la mention de l'atelier se lisait mieux que le montant.\n */\n.lecture-pied {\n  max-width: 560px;\n  margin: 14px auto 0;\n  color: var(--encre-3);\n  font-size: 11px;\n  text-align: center;\n}\n.lecture-pied p { margin: 2px 0; }\n.lecture-marque { font-weight: 700; letter-spacing: 0.08em; opacity: 0.75; }\n.lecture-vide { max-width: 460px; margin: 12vh auto; text-align: center; }\n.lecture-vide h1 { font-size: 20px; }\n.lecture-vide p { color: var(--encre-2); }\n";
 //#endregion
 //#region src/feuille.ts
 /**
@@ -4978,6 +5314,101 @@ function PageIllisible() {
 			/* @__PURE__ */ u("p", {
 				class: "lecture-marque",
 				children: "Atelier\xA0237"
+			})
+		]
+	});
+}
+//#endregion
+//#region ../render/src/page/vitrine.tsx
+/**
+* Une page composée, dessinée à la main.
+*
+* C'est le même composant qui sert l'aperçu dans l'application et la page
+* publiée sur le serveur. Deux dessins pour une même configuration finiraient
+* par ne plus montrer la même chose, et c'est celui que le client voit qui
+* aurait tort.
+*
+* Il n'y a **aucun script** : ni ici, ni dans ce que le modèle a le droit
+* d'écrire. Une page composée ne peut pas en contenir, parce qu'aucun champ du
+* contrat n'en accepte — l'invariant § 2.1 tient par la forme du contrat, pas
+* par un filtre qu'on pourrait oublier.
+*/
+function Lignes$1(props) {
+	const lignes = props.section.lignes ?? [];
+	return /* @__PURE__ */ u("ul", {
+		class: props.section.sorte === "prix" ? "vitrine-prix" : "vitrine-liste",
+		children: lignes.map((l) => /* @__PURE__ */ u("li", { children: [/* @__PURE__ */ u("span", {
+			class: "quoi",
+			children: [/* @__PURE__ */ u("b", { children: l.nom }), l.detail !== void 0 && l.detail !== "" && /* @__PURE__ */ u("span", {
+				class: "detail",
+				children: l.detail
+			})]
+		}), l.valeur !== void 0 && l.valeur !== "" && /* @__PURE__ */ u("span", {
+			class: "combien",
+			children: l.valeur
+		})] }, l.nom))
+	});
+}
+function PageVitrine(props) {
+	const p = props.page;
+	const ancres = ancresDeSections(p.sections);
+	const sommaire = avecSommaire(p);
+	const message = `Bonjour ${p.titre}, j’ai vu votre page.`;
+	const whatsapp = p.telephone === void 0 || p.telephone === "" ? null : lienWhatsApp(p.telephone, message);
+	return /* @__PURE__ */ u("article", {
+		class: "vitrine",
+		children: [
+			/* @__PURE__ */ u("header", {
+				class: "vitrine-tete",
+				children: [
+					/* @__PURE__ */ u("p", {
+						class: "kicker",
+						children: p.kicker
+					}),
+					/* @__PURE__ */ u("h1", { children: p.titre }),
+					/* @__PURE__ */ u("p", {
+						class: "accroche",
+						children: p.accroche
+					})
+				]
+			}),
+			sommaire && /* @__PURE__ */ u("nav", {
+				class: "vitrine-sommaire",
+				"aria-label": "Sections",
+				children: p.sections.map((section, i) => /* @__PURE__ */ u("a", {
+					href: `#${ancres[i] ?? ""}`,
+					children: section.titre
+				}, section.titre))
+			}),
+			p.sections.map((section, i) => /* @__PURE__ */ u("section", {
+				class: "vitrine-section",
+				id: sommaire ? ancres[i] : void 0,
+				children: [/* @__PURE__ */ u("h2", { children: section.titre }), section.sorte === "texte" ? (section.texte ?? "").split("\n").filter((bout) => bout.trim() !== "").map((bout) => /* @__PURE__ */ u("p", { children: bout }, bout)) : /* @__PURE__ */ u(Lignes$1, { section })]
+			}, section.titre)),
+			(whatsapp !== null || p.adresse !== void 0 && p.adresse !== "" || p.horaires !== void 0 && p.horaires !== "") && /* @__PURE__ */ u("footer", {
+				class: "vitrine-pied",
+				children: [
+					whatsapp !== null && /* @__PURE__ */ u("a", {
+						class: "vitrine-appel",
+						href: whatsapp,
+						rel: "noreferrer",
+						children: ["Écrire sur WhatsApp", /* @__PURE__ */ u("span", { children: p.telephone })]
+					}),
+					p.adresse !== void 0 && p.adresse !== "" && /* @__PURE__ */ u("p", {
+						class: "vitrine-ou",
+						children: [/* @__PURE__ */ u("span", {
+							class: "etiquette",
+							children: "Où"
+						}), p.adresse]
+					}),
+					p.horaires !== void 0 && p.horaires !== "" && /* @__PURE__ */ u("p", {
+						class: "vitrine-ou",
+						children: [/* @__PURE__ */ u("span", {
+							class: "etiquette",
+							children: "Quand"
+						}), p.horaires]
+					})
+				]
 			})
 		]
 	});
@@ -5943,6 +6374,10 @@ function DocumentFacture(props) {
 * on rend leur **carte**, que chaque squelette sait déjà produire et qui est
 * déjà éprouvée. Elle dit l'essentiel — un titre, un grand chiffre, une liste —
 * et ne prétend pas être l'outil.
+*
+* Une page composée est le cas le plus simple des trois : elle **est** faite
+* pour être lue derrière un lien. Rien à résumer, rien à rejouer — on la
+* dessine, avec le composant que l'aperçu de l'application emploie déjà.
 */
 var DOCUMENTS = {
 	devis: DocumentDevis,
@@ -5953,11 +6388,24 @@ var DOCUMENTS = {
 	motivation: DocumentMotivation,
 	cv: DocumentCv
 };
+/**
+* La page que porte l'instantané, si c'en est une et qu'elle tient debout.
+*
+* Le contrôle est refait ici et pas seulement à la publication : ce qui est
+* déjà dans KV a pu être déposé par une version plus ancienne du contrôle, et
+* une page à trous vaut mieux refusée qu'affichée sous le nom de quelqu'un.
+*/
+function pageDe(instantane) {
+	if (instantane.skeleton !== "compose-page") return null;
+	return verifierPage(instantane.etat).length > 0 ? null : instantane.etat;
+}
 /** La facture a besoin de l'instant pour dire son retard ; les autres non. */
 function estFacture(skeleton) {
 	return skeleton === "facture";
 }
 function documentDe(instantane, ctx) {
+	const page = pageDe(instantane);
+	if (page !== null) return /* @__PURE__ */ u(PageVitrine, { page });
 	const Composant = Object.hasOwn(DOCUMENTS, instantane.skeleton) ? DOCUMENTS[instantane.skeleton] : void 0;
 	if (Composant === void 0) return null;
 	const etat = instantane.etat;
@@ -5978,6 +6426,8 @@ function documentDe(instantane, ctx) {
 * était le seul qu'on ne pouvait pas partager.
 */
 function carteDe(instantane, ctx) {
+	const page = pageDe(instantane);
+	if (page !== null) return carteDePage(page, ctx);
 	const squelette = squeletteCompose(instantane) ?? squeletteParId(instantane.skeleton);
 	if (squelette === null) return null;
 	try {
@@ -6078,9 +6528,23 @@ function VueCarte(props) {
 * le premier octet — la page est finie quand elle arrive. Ses commentaires,
 * eux, n'ont rien à y faire : voir `sansCommentaires`.
 */
-/** Les deux feuilles, allégées une fois pour toutes au chargement du module. */
-var CSS_A4 = sansCommentaires(a4_default);
-var CSS_LECTURE = sansCommentaires(lecture_default);
+/**
+* Les feuilles, allégées une fois pour toutes au chargement du module, et
+* **composées selon ce qu'on dessine**.
+*
+* Elles n'en faisaient qu'une, inlinée partout. Le plafond du § 8 est de 25 Ko
+* par page de lecture, et une page composée pleine en pesait 24,8 : les
+* deux kilo-octets de style de carte qu'elle n'emploie jamais lui coûtaient un
+* douzième de son budget. Chaque forme n'emporte plus que ce qu'elle dessine.
+*
+* `CSS_CADRE` est le tronc commun — la palette, le corps, le pied. Il est dans
+* les trois, parce que les trois en ont besoin.
+*/
+var CSS_CADRE = sansCommentaires(lecture_default);
+var CSS_CARTE = sansCommentaires(carte_default);
+/** La mise à l'échelle de la feuille et le lien d'impression : les écrits seuls. */
+var CSS_A4 = sansCommentaires(a4_default) + sansCommentaires(a4_default$1);
+var CSS_VITRINE = sansCommentaires(vitrine_default);
 /** Échappe ce qui part dans un attribut de métadonnée. */
 function attr(valeur) {
 	return valeur.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -6139,7 +6603,7 @@ function pageIllisible() {
 		titre: "Document illisible — Atelier 237",
 		description: "Ce document ne peut pas être affiché.",
 		lien: ""
-	}, CSS_LECTURE, K(/* @__PURE__ */ u(PageIllisible, {})));
+	}, CSS_CADRE, K(/* @__PURE__ */ u(PageIllisible, {})));
 }
 function pageDeLecture(instantane, ctx, lien, image) {
 	try {
@@ -6150,21 +6614,23 @@ function pageDeLecture(instantane, ctx, lien, image) {
 }
 function dessiner(instantane, ctx, lien, image) {
 	const meta = metaDe(instantane, ctx, lien, image);
+	const vitrine = pageDe(instantane);
+	if (vitrine !== null) return envelopper(meta, CSS_CADRE + CSS_VITRINE, `<main class="lecture">${K(/* @__PURE__ */ u(PageVitrine, { page: vitrine }))}</main>` + K(/* @__PURE__ */ u(PiedLecture, { instantane })));
 	const document = documentDe(instantane, ctx);
-	if (document !== null) return envelopper(meta, CSS_A4 + CSS_LECTURE, `<main class="lecture">${K(document)}</main>` + K(/* @__PURE__ */ u(PiedLecture, {
+	if (document !== null) return envelopper(meta, CSS_CADRE + CSS_A4, `<main class="lecture">${K(document)}</main>` + K(/* @__PURE__ */ u(PiedLecture, {
 		instantane,
 		pdf: `${lien.replace("/d/", "/p/")}`
 	})));
 	const carte = carteDe(instantane, ctx);
 	if (carte === null) return pageIntrouvable();
-	return envelopper(meta, CSS_LECTURE, `<main class="lecture">${K(/* @__PURE__ */ u(VueCarte, { carte }))}</main>${K(/* @__PURE__ */ u(PiedLecture, { instantane }))}`);
+	return envelopper(meta, CSS_CADRE + CSS_CARTE, `<main class="lecture">${K(/* @__PURE__ */ u(VueCarte, { carte }))}</main>${K(/* @__PURE__ */ u(PiedLecture, { instantane }))}`);
 }
 function pageIntrouvable() {
 	return envelopper({
 		titre: "Lien introuvable — Atelier 237",
 		description: "Ce document n’est plus publié.",
 		lien: ""
-	}, CSS_LECTURE, K(/* @__PURE__ */ u(PageIntrouvable, {})));
+	}, CSS_CADRE, K(/* @__PURE__ */ u(PageIntrouvable, {})));
 }
 //#endregion
 //#region src/worker-lire.ts

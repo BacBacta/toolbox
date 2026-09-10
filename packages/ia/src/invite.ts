@@ -1,4 +1,6 @@
-import { MAX_COLONNES, MAX_ENTREES, schemaCalcul, schemaRefus, schemaRegistre } from '@a237/engine'
+import {
+  MAX_COLONNES, MAX_ENTREES, MAX_SECTIONS, schemaCalcul, schemaPage, schemaRefus, schemaRegistre,
+} from '@a237/engine'
 
 /**
  * L'invite qui impose la sortie en JSON conforme au schéma (§ 3).
@@ -11,11 +13,19 @@ import { MAX_COLONNES, MAX_ENTREES, schemaCalcul, schemaRefus, schemaRegistre } 
  * Trois choses seulement ne peuvent pas vivre dans le schéma : le métier
  * (Cameroun, francs CFA, téléphone), l'interdiction de sortir du cadre, et le
  * fait que la réponse doit être du JSON nu.
+ *
+ * Les trois schémas pèsent ensemble à peu près deux mille jetons d'entrée,
+ * soit environ un quart de franc par génération — mesuré, pas estimé. Le
+ * plafond du § 8 est d'un franc : tant qu'on est là, envoyer tous les schémas
+ * vaut mieux que deviner lequel envoyer. Se tromper de famille ferait payer un
+ * refus à quelqu'un dont la demande était parfaitement faisable, et c'est le
+ * plus cher des deux échecs. Le jour où le total s'approche du franc, c'est le
+ * routage qu'il faudra écrire, et cette note sera le point de départ.
  */
 
-const CONSIGNES = `Tu configures un registre pour un petit commerçant camerounais.
+const CONSIGNES = `Tu fabriques un outil pour un petit commerçant camerounais.
 
-Tu sais fabriquer deux sortes d'outils, et choisir entre les deux.
+Tu sais fabriquer trois sortes de choses, et choisir entre elles.
 
 Un **registre** est un tableau de lignes qu'on tient à la main : des ventes,
 des dettes, un stock, des présences, des cotisations. Il répond à « qu'est-ce
@@ -25,25 +35,34 @@ Une **calculatrice** a quelques champs et un résultat. Elle répond à « combi
 ça fait ? » — ce qu'il reste à payer, la part de chacun, une marge, une remise.
 Sa formule se déclare en arbre, jamais en code.
 
+Une **page** se publie derrière un lien qu'on envoie sur WhatsApp. Elle répond
+à « comment je me montre ? » — une vitrine de boutique, un menu de restaurant,
+une liste de prix, une annonce, un profil d'artisan. C'est ce que demande
+« je veux un site internet » : ici, un site et une page sont la même chose, et
+le champ « sommaire » met un menu en haut quand il y a plusieurs sujets.
+N'invente jamais un numéro de téléphone, une adresse ni un prix : laisse le
+champ vide si la demande ne le donne pas — un prix inventé se lit comme un
+engagement.
+
 Réponds par un objet JSON seul, sans texte autour, sans bloc de code.
 
 Les schémas plus bas **décrivent** la forme de ta réponse. Ils ne sont pas la
 réponse : renvoie un objet dont les champs sont remplis pour cette demande-là,
 jamais la description elle-même.
 
-**Si la demande n'est ni l'un ni l'autre, refuse.** Un site internet, une
-application, un logo, une traduction, un conseil : rien de tout cela ne se
-range dans un tableau ni dans une formule. Réponds alors par un objet
-qui n'a qu'un champ « impossible », en disant en une phrase ce que tu ne peux
-pas faire, et ce que tu sais faire. Ne fabrique jamais un outil plausible pour
-une demande qui n'en réclame pas : un outil inventé se remplit une fois, puis
-se referme pour toujours.
+**Si la demande n'est aucune des trois, refuse.** Une application à installer,
+un logo, une photo, une traduction, un conseil : rien de cela ne se range dans
+un tableau, dans une formule ni dans une page. Réponds alors par un objet qui
+n'a qu'un champ « impossible », en disant en une phrase ce que tu ne peux pas
+faire, et ce que tu sais faire. Ne fabrique jamais un outil plausible pour une
+demande qui n'en réclame pas : un outil inventé se remplit une fois, puis se
+referme pour toujours.
 
 Règles :
 - Les montants sont en francs CFA, entiers, sans décimale.
 - Les libellés sont en français, courts, tutoiement, sans jargon comptable.
-- ${MAX_COLONNES} colonnes ou ${MAX_ENTREES} champs au maximum : ça se lit sur un
-  téléphone de 360 pixels.
+- ${MAX_COLONNES} colonnes, ${MAX_ENTREES} champs ou ${MAX_SECTIONS} sections au
+  maximum : ça se lit sur un téléphone de 360 pixels.
 - La première colonne nomme la ligne : mets devant celle qui l'identifie.
 - Au plus une colonne de type bascule.
 - N'invente pas de colonne que la demande ne réclame pas.
@@ -59,6 +78,9 @@ ${JSON.stringify(schemaRegistre)}
 
 Une calculatrice doit respecter celui-ci :
 ${JSON.stringify(schemaCalcul)}
+
+Une page, celui-ci :
+${JSON.stringify(schemaPage)}
 
 Un refus, celui-ci :
 ${JSON.stringify(schemaRefus)}

@@ -1,8 +1,8 @@
+import { lienWhatsApp } from '@a237/engine'
 import type { ShareSpec } from '@a237/engine'
 import { cartePng, dessinerCarte } from '@a237/render/carte'
 import type { JSX } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { lienWhatsApp } from './whatsapp.js'
 
 /**
  * La feuille de diffusion.

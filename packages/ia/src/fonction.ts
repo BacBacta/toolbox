@@ -168,7 +168,7 @@ export async function repondre(
       jetonsEntree: resultat.cout.entree,
       jetonsSortie: resultat.cout.sortie,
       coutXaf: resultat.cout.fcfa,
-      ok: resultat.sorte === 'reussi' || resultat.sorte === 'calcule',
+      ok: resultat.sorte === 'reussi' || resultat.sorte === 'calcule' || resultat.sorte === 'page',
     })
 
     // Le coût part dans le journal du serveur en attendant `ai_calls` : la
@@ -197,11 +197,15 @@ export async function repondre(
       return { statut: 200, corps: { calcul: resultat.calcul, fcfa: resultat.cout.fcfa } }
     }
 
+    if (resultat.sorte === 'page') {
+      return { statut: 200, corps: { page: resultat.page, fcfa: resultat.cout.fcfa } }
+    }
+
     if (resultat.sorte !== 'reussi') {
       return {
         statut: 422,
         corps: {
-          erreur: 'le modèle n’a pas produit un registre utilisable',
+          erreur: 'le modèle n’a pas produit un outil utilisable',
           details: resultat.erreurs.map((e) => `${e.chemin} : ${e.message}`),
           // Un échec a coûté deux tours. L'omettre ferait sous-estimer la
           // dépense réelle, et le brief demande le coût de chaque appel (§ 8).

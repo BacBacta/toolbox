@@ -1,5 +1,8 @@
 import type { Instantane } from '@a237/engine'
-import { accepteLaVersion, lienValide, publiable, pourquoiNonPubliable } from '@a237/engine'
+import {
+  ID_COMPOSE, ID_COMPOSE_CALCUL, ID_COMPOSE_PAGE, accepteLaVersion, lienValide, publiable,
+  pourquoiNonPubliable,
+} from '@a237/engine'
 import { rendable, squeletteConnu } from './html.js'
 
 /**
@@ -13,6 +16,14 @@ import { rendable, squeletteConnu } from './html.js'
 
 /** Un instantané plus gros que ça n'est pas un outil, c'est un dépôt. */
 export const TAILLE_MAX = 256 * 1024
+
+/**
+ * Ce que le modèle sait composer, et qui n'a donc pas de squelette au
+ * catalogue. Les identifiants viennent du moteur : recopiés ici, ils
+ * finiraient par ne plus être les mêmes, et c'est la publication qui
+ * refuserait — après coup, chez le destinataire.
+ */
+const COMPOSES: ReadonlySet<string> = new Set([ID_COMPOSE, ID_COMPOSE_CALCUL, ID_COMPOSE_PAGE])
 
 export interface Depot {
   readonly lien: string
@@ -48,7 +59,7 @@ export function controler(recu: unknown, detenu: DejaLa | null): Verdict | null 
   if (inst === null || typeof inst !== 'object') return refus(400, 'instantane-absent')
 
   const skeleton = typeof inst.skeleton === 'string' ? inst.skeleton : ''
-  if (!squeletteConnu(skeleton) && skeleton !== 'compose' && skeleton !== 'compose-calcul') {
+  if (!squeletteConnu(skeleton) && !COMPOSES.has(skeleton)) {
     return refus(400, 'squelette-inconnu')
   }
 

@@ -708,6 +708,158 @@ function verifierCalcul(valeur) {
 	erreurs.push(...verifierExpression(c.sortie.formule, clefs, "$.sortie.formule"));
 	return erreurs;
 }
+var schemaPage = {
+	type: "object",
+	additionalProperties: false,
+	required: [
+		"titre",
+		"kicker",
+		"accroche",
+		"sections"
+	],
+	properties: {
+		titre: {
+			type: "string",
+			minLength: 2,
+			maxLength: 40,
+			title: "Nom",
+			description: "Le nom de l’activité, tel qu’il est sur l’enseigne. Ex. « Quincaillerie Bépanda »."
+		},
+		kicker: {
+			type: "string",
+			minLength: 2,
+			maxLength: 30,
+			title: "Sur-titre",
+			description: "En capitales, au-dessus du nom. Ex. « QUINCAILLERIE »."
+		},
+		accroche: {
+			type: "string",
+			minLength: 4,
+			maxLength: 120,
+			title: "Accroche",
+			description: "Une phrase. Ce qu’on dirait à quelqu’un qui passe devant la boutique."
+		},
+		sections: {
+			type: "array",
+			minItems: 1,
+			maxItems: 8,
+			items: {
+				type: "object",
+				additionalProperties: false,
+				required: ["titre", "sorte"],
+				properties: {
+					titre: {
+						type: "string",
+						minLength: 2,
+						maxLength: 40,
+						title: "Titre de la section",
+						description: "Ex. « Ce que je vends »."
+					},
+					sorte: {
+						type: "string",
+						enum: [
+							"texte",
+							"liste",
+							"prix"
+						],
+						title: "Sorte",
+						description: "texte : un paragraphe. liste : des noms. prix : des noms avec un montant."
+					},
+					texte: {
+						type: "string",
+						maxLength: 400,
+						title: "Texte",
+						description: "Pour une section « texte ». Deux paragraphes au plus."
+					},
+					lignes: {
+						type: "array",
+						maxItems: 8,
+						items: {
+							type: "object",
+							additionalProperties: false,
+							required: ["nom"],
+							properties: {
+								nom: {
+									type: "string",
+									minLength: 1,
+									maxLength: 60,
+									title: "Ce que c’est",
+									description: "Ex. « Tôle bac 30/100 »."
+								},
+								valeur: {
+									type: "string",
+									maxLength: 30,
+									title: "Prix ou quantité",
+									description: "Tel qu’on le dit. Ex. « 12 500 F », « 2 h »."
+								},
+								detail: {
+									type: "string",
+									maxLength: 60,
+									title: "Précision",
+									description: "Une ligne, si elle sert."
+								}
+							}
+						},
+						title: "Lignes",
+						description: "Pour « liste » ou « prix »."
+					}
+				}
+			},
+			title: "Sections"
+		},
+		telephone: {
+			type: "string",
+			maxLength: 20,
+			title: "WhatsApp",
+			description: "Le numéro qu’on peut écrire. Ex. « 6 99 41 27 08 »."
+		},
+		adresse: {
+			type: "string",
+			maxLength: 90,
+			title: "Où",
+			description: "Le quartier et la rue. Ex. « Rue Bépanda-Omnisport, en face du marché »."
+		},
+		horaires: {
+			type: "string",
+			maxLength: 60,
+			title: "Quand",
+			description: "Ex. « Lundi à samedi, 7 h – 19 h »."
+		},
+		sommaire: {
+			type: "boolean",
+			title: "Menu en haut",
+			description: "Vrai quand la demande dit « un site » : un menu saute d’une section à l’autre. Faux pour une simple page."
+		}
+	}
+};
+/**
+* Vérifie ce que le modèle a rendu, au-delà de ce que le schéma sait dire.
+*
+* Le schéma tient les types et les bornes. Ce qu'il ne tient pas, c'est la
+* cohérence entre `sorte` et le contenu : une section « prix » sans lignes est
+* un titre suivi de rien, et une section « texte » sans texte aussi. Les
+* laisser passer donnerait une page à trous, publiée sous le nom de quelqu'un.
+*/
+function verifierPage(valeur) {
+	const erreurs = [...valider(schemaPage, valeur)];
+	if (erreurs.length > 0) return erreurs;
+	const page = valeur;
+	for (const [i, section] of page.sections.entries()) {
+		const chemin = `$.sections[${i}]`;
+		if (section.sorte === "texte") {
+			if ((section.texte ?? "").trim() === "") erreurs.push({
+				chemin: `${chemin}.texte`,
+				message: "une section « texte » sans texte est un titre suivi de rien"
+			});
+			continue;
+		}
+		if ((section.lignes ?? []).length === 0) erreurs.push({
+			chemin: `${chemin}.lignes`,
+			message: `une section « ${section.sorte} » sans lignes est un titre suivi de rien`
+		});
+	}
+	return erreurs;
+}
 /**
 * Le schéma que l'invite impose au modèle.
 *
@@ -957,6 +1109,16 @@ function lireReponseModele(valeur) {
 		} : {
 			sorte: "refus",
 			pourquoi: coupe
+		};
+	}
+	if ("sections" in valeur) {
+		const erreurs = verifierPage(valeur);
+		return erreurs.length > 0 ? {
+			sorte: "invalide",
+			erreurs
+		} : {
+			sorte: "page",
+			page: valeur
 		};
 	}
 	if ("entrees" in valeur) {
@@ -1254,10 +1416,18 @@ function couter(jetons, prix, tauxFcfaParDollar) {
 * Trois choses seulement ne peuvent pas vivre dans le schéma : le métier
 * (Cameroun, francs CFA, téléphone), l'interdiction de sortir du cadre, et le
 * fait que la réponse doit être du JSON nu.
+*
+* Les trois schémas pèsent ensemble à peu près deux mille jetons d'entrée,
+* soit environ un quart de franc par génération — mesuré, pas estimé. Le
+* plafond du § 8 est d'un franc : tant qu'on est là, envoyer tous les schémas
+* vaut mieux que deviner lequel envoyer. Se tromper de famille ferait payer un
+* refus à quelqu'un dont la demande était parfaitement faisable, et c'est le
+* plus cher des deux échecs. Le jour où le total s'approche du franc, c'est le
+* routage qu'il faudra écrire, et cette note sera le point de départ.
 */
-var CONSIGNES = `Tu configures un registre pour un petit commerçant camerounais.
+var CONSIGNES = `Tu fabriques un outil pour un petit commerçant camerounais.
 
-Tu sais fabriquer deux sortes d'outils, et choisir entre les deux.
+Tu sais fabriquer trois sortes de choses, et choisir entre elles.
 
 Un **registre** est un tableau de lignes qu'on tient à la main : des ventes,
 des dettes, un stock, des présences, des cotisations. Il répond à « qu'est-ce
@@ -1267,25 +1437,34 @@ Une **calculatrice** a quelques champs et un résultat. Elle répond à « combi
 ça fait ? » — ce qu'il reste à payer, la part de chacun, une marge, une remise.
 Sa formule se déclare en arbre, jamais en code.
 
+Une **page** se publie derrière un lien qu'on envoie sur WhatsApp. Elle répond
+à « comment je me montre ? » — une vitrine de boutique, un menu de restaurant,
+une liste de prix, une annonce, un profil d'artisan. C'est ce que demande
+« je veux un site internet » : ici, un site et une page sont la même chose, et
+le champ « sommaire » met un menu en haut quand il y a plusieurs sujets.
+N'invente jamais un numéro de téléphone, une adresse ni un prix : laisse le
+champ vide si la demande ne le donne pas — un prix inventé se lit comme un
+engagement.
+
 Réponds par un objet JSON seul, sans texte autour, sans bloc de code.
 
 Les schémas plus bas **décrivent** la forme de ta réponse. Ils ne sont pas la
 réponse : renvoie un objet dont les champs sont remplis pour cette demande-là,
 jamais la description elle-même.
 
-**Si la demande n'est ni l'un ni l'autre, refuse.** Un site internet, une
-application, un logo, une traduction, un conseil : rien de tout cela ne se
-range dans un tableau ni dans une formule. Réponds alors par un objet
-qui n'a qu'un champ « impossible », en disant en une phrase ce que tu ne peux
-pas faire, et ce que tu sais faire. Ne fabrique jamais un outil plausible pour
-une demande qui n'en réclame pas : un outil inventé se remplit une fois, puis
-se referme pour toujours.
+**Si la demande n'est aucune des trois, refuse.** Une application à installer,
+un logo, une photo, une traduction, un conseil : rien de cela ne se range dans
+un tableau, dans une formule ni dans une page. Réponds alors par un objet qui
+n'a qu'un champ « impossible », en disant en une phrase ce que tu ne peux pas
+faire, et ce que tu sais faire. Ne fabrique jamais un outil plausible pour une
+demande qui n'en réclame pas : un outil inventé se remplit une fois, puis se
+referme pour toujours.
 
 Règles :
 - Les montants sont en francs CFA, entiers, sans décimale.
 - Les libellés sont en français, courts, tutoiement, sans jargon comptable.
-- 6 colonnes ou 5 champs au maximum : ça se lit sur un
-  téléphone de 360 pixels.
+- 6 colonnes, 5 champs ou 8 sections au
+  maximum : ça se lit sur un téléphone de 360 pixels.
 - La première colonne nomme la ligne : mets devant celle qui l'identifie.
 - Au plus une colonne de type bascule.
 - N'invente pas de colonne que la demande ne réclame pas.
@@ -1300,6 +1479,9 @@ ${JSON.stringify(schemaRegistre)}
 
 Une calculatrice doit respecter celui-ci :
 ${JSON.stringify(schemaCalcul)}
+
+Une page, celui-ci :
+${JSON.stringify(schemaPage)}
 
 Un refus, celui-ci :
 ${JSON.stringify(schemaRefus)}
@@ -1364,6 +1546,12 @@ async function traiter(demande, fournisseur, tauxFcfaParDollar) {
 		if (lu.sorte === "calcul") return {
 			sorte: "calcule",
 			calcul: lu.calcul,
+			cout: cout(),
+			essais: essai
+		};
+		if (lu.sorte === "page") return {
+			sorte: "page",
+			page: lu.page,
 			cout: cout(),
 			essais: essai
 		};
@@ -1517,7 +1705,7 @@ async function repondre(corpsRecu, r, seance) {
 			jetonsEntree: resultat.cout.entree,
 			jetonsSortie: resultat.cout.sortie,
 			coutXaf: resultat.cout.fcfa,
-			ok: resultat.sorte === "reussi" || resultat.sorte === "calcule"
+			ok: resultat.sorte === "reussi" || resultat.sorte === "calcule" || resultat.sorte === "page"
 		});
 		console.log(JSON.stringify({
 			evenement: "appel_ia",
@@ -1540,10 +1728,17 @@ async function repondre(corpsRecu, r, seance) {
 				fcfa: resultat.cout.fcfa
 			}
 		};
+		if (resultat.sorte === "page") return {
+			statut: 200,
+			corps: {
+				page: resultat.page,
+				fcfa: resultat.cout.fcfa
+			}
+		};
 		if (resultat.sorte !== "reussi") return {
 			statut: 422,
 			corps: {
-				erreur: "le modèle n’a pas produit un registre utilisable",
+				erreur: "le modèle n’a pas produit un outil utilisable",
 				details: resultat.erreurs.map((e) => `${e.chemin} : ${e.message}`),
 				fcfa: resultat.cout.fcfa
 			}

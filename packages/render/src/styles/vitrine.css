@@ -1,0 +1,205 @@
+/*
+ * La page composée par le modèle.
+ *
+ * Elle vit à deux endroits : en aperçu dans l'application, et publiée sur le
+ * serveur pour qui reçoit le lien. Une seule feuille, pour que les deux
+ * montrent la même chose — celle que le client voit ne doit pas être la
+ * surprise.
+ *
+ * Elle se lit d'un pouce, sur un téléphone d'entrée de gamme, souvent dans le
+ * navigateur intégré de WhatsApp. Aucune animation, aucune police à charger :
+ * ce qui arrive est fini quand il arrive.
+ */
+
+.vitrine {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 4px 0 8px;
+}
+
+.vitrine-tete {
+  padding-bottom: 18px;
+  border-bottom: 2px solid var(--accent);
+}
+
+.vitrine-tete .kicker {
+  margin: 0 0 6px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.vitrine-tete h1 {
+  margin: 0;
+  font-size: 27px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.vitrine-tete .accroche {
+  margin: 8px 0 0;
+  color: var(--encre-2);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.vitrine-section {
+  margin-top: 24px;
+}
+
+.vitrine-section h2 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--encre-3);
+}
+
+.vitrine-section p {
+  margin: 0 0 8px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--encre-2);
+}
+
+.vitrine-liste,
+.vitrine-prix {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vitrine-liste li,
+.vitrine-prix li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 9px 0;
+  border-top: 1px solid var(--trait);
+  font-size: 15px;
+}
+
+.vitrine-liste li:first-child,
+.vitrine-prix li:first-child {
+  border-top: 0;
+}
+
+.vitrine-liste .quoi,
+.vitrine-prix .quoi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.vitrine-liste .detail,
+.vitrine-prix .detail {
+  color: var(--encre-3);
+  font-size: 13px;
+}
+
+/* Le prix ne se coupe jamais : c'est le chiffre qu'on cherche du regard. */
+.vitrine-prix .combien {
+  flex: none;
+  color: var(--accent);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.vitrine-liste .combien {
+  flex: none;
+  color: var(--encre-3);
+  white-space: nowrap;
+}
+
+.vitrine-pied {
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--trait);
+}
+
+/*
+ * Le bouton qui rapporte.
+ *
+ * Quelqu'un qui lit la page et veut acheter ne doit pas avoir à recopier dix
+ * chiffres : `wa.me` ouvre WhatsApp avec le message déjà écrit, gratuitement
+ * et sans compte (§ 6).
+ */
+.vitrine-appel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 13px 16px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.vitrine-appel span {
+  font-weight: 400;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.vitrine-ou {
+  display: flex;
+  gap: 10px;
+  margin: 12px 0 0;
+  color: var(--encre-2);
+  font-size: 14px;
+}
+
+.vitrine-ou .etiquette {
+  /*
+   * Assez large pour « QUAND », le plus long des libellés. À 46 px il touchait
+   * le texte alors que « OÙ » gardait sa gouttière : la colonne était taillée
+   * pour le mot le plus court.
+   */
+  flex: none;
+  width: 58px;
+  color: var(--encre-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.6;
+}
+
+/*
+ * Le sommaire d'un « site ».
+ *
+ * Des ancres et non des adresses : sur une connexion qui hoquette, un menu qui
+ * recharge est un menu qu'on n'ose plus toucher. Il défile horizontalement
+ * plutôt que de passer à la ligne — six titres empilés repousseraient la
+ * première section sous le pli, et on cacherait le contenu pour montrer son
+ * plan.
+ */
+.vitrine-sommaire {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.vitrine-sommaire a {
+  flex: none;
+  padding: 7px 12px;
+  border: 1px solid var(--trait);
+  border-radius: 999px;
+  color: var(--encre-2);
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* Une section visée par le sommaire ne doit pas coller au bord de l'écran. */
+.vitrine-section {
+  scroll-margin-top: 12px;
+}

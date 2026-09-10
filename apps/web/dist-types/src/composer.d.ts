@@ -1,4 +1,4 @@
-import type { CalculDemande, RegistreDemande } from '@a237/engine';
+import type { CalculDemande, PageDemande, RegistreDemande } from '@a237/engine';
 /**
  * L'étage 2 : ce que l'étage 1 n'a pas su faire, on le fait composer.
  *
@@ -20,6 +20,15 @@ export type Composition = {
 } | {
     readonly sorte: 'calcule';
     readonly calcul: CalculDemande;
+    readonly fcfa: number;
+}
+/**
+ * Une page à publier. C'est la réponse à « je veux un site internet », qui
+ * était jusqu'ici la demande la plus refusée de toutes.
+ */
+ | {
+    readonly sorte: 'page';
+    readonly page: PageDemande;
     readonly fcfa: number;
 }
 /**
