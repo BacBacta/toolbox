@@ -1,4 +1,4 @@
-import type { Projet } from '@a237/etabli'
+import type { Projet, Textes } from '@a237/etabli'
 import type { JSX } from 'preact'
 import { useState } from 'preact/hooks'
 import { adressePartagee, deposer } from './partage.js'
@@ -25,6 +25,7 @@ type Etat =
 export function Partage(props: {
   readonly projet: Projet
   readonly onChanger: (projet: Projet) => void
+  readonly t: Textes
 }): JSX.Element {
   const [etat, setEtat] = useState<Etat>(
     props.projet.lien === undefined
@@ -44,8 +45,8 @@ export function Partage(props: {
     setEtat({
       quoi: 'raté',
       pourquoi: r.sorte === 'pas-de-reseau'
-        ? 'Pas de réseau. Ton projet est en sécurité sur ce téléphone ; réessaie quand ça revient.'
-        : r.sorte === 'refuse' ? r.pourquoi : 'Le partage a échoué.',
+        ? props.t.pasDeReseau
+        : r.sorte === 'refuse' ? r.pourquoi : props.t.partageEchoue,
     })
   }
 
@@ -58,10 +59,10 @@ export function Partage(props: {
         onClick={() => void envoyer()}
       >
         {etat.quoi === 'en-cours'
-          ? 'Envoi…'
+          ? props.t.envoiEnCours
           : props.projet.lien === undefined
-            ? 'Sauvegarder en ligne et partager'
-            : 'Mettre à jour le lien'}
+            ? props.t.sauvegarder
+            : props.t.mettreAJour}
       </button>
 
       {etat.quoi === 'fait' && (
@@ -72,7 +73,7 @@ export function Partage(props: {
               * « Garde-le » est l'instruction qui sauve le travail : c'est lui
               * qui retrouve le projet quand le téléphone a disparu.
               */}
-            Garde ce lien : il retrouve ton projet même si tu perds ce téléphone.
+            {props.t.gardeCeLien}
           </p>
           <code class="adresse">{etat.adresse}</code>
           <div class="partage-actions">
@@ -87,7 +88,7 @@ export function Partage(props: {
                 )
               }}
             >
-              {copie ? 'Copié' : 'Copier'}
+              {copie ? props.t.copie : props.t.copier}
             </button>
             <a
               class="whatsapp"
@@ -95,7 +96,7 @@ export function Partage(props: {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Envoyer sur WhatsApp
+              {props.t.surWhatsApp}
             </a>
           </div>
         </div>

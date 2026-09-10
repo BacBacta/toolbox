@@ -4,6 +4,7 @@ import { render as monter } from 'preact';
 import { act } from 'preact/test-utils';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Editeur } from '../src/editeur.js';
+import { textes } from '@a237/etabli';
 /**
  * Écrire du code sur un téléphone.
  *
@@ -23,7 +24,7 @@ let ecrits;
 let ajoutes;
 function poser(projet = PROJET, ouvert = 'script.js') {
     act(() => {
-        monter(_jsx(Editeur, { projet: projet, ouvert: ouvert, onOuvrir: () => undefined, onEcrire: (nom, contenu) => ecrits.push([nom, contenu]), onAjouter: (f) => ajoutes.push(f) }), hote);
+        monter(_jsx(Editeur, { projet: projet, ouvert: ouvert, onOuvrir: () => undefined, onEcrire: (nom, contenu) => ecrits.push([nom, contenu]), onAjouter: (f) => ajoutes.push(f), langue: "fr", t: textes('fr') }), hote);
     });
 }
 beforeEach(() => {

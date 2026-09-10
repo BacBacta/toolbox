@@ -1,8 +1,7 @@
-import type { Projet } from '@a237/etabli'
-import { BAC_A_SABLE, lireMessageDApercu, pourApercu } from '@a237/etabli'
+import type { Langue, MessageApercu, Projet, Textes } from '@a237/etabli'
+import { BAC_A_SABLE, expliquer, lireMessageDApercu, pourApercu } from '@a237/etabli'
 import type { JSX } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
-import type { MessageApercu } from '@a237/etabli'
 
 /**
  * Ce que le code fait, et ce qu'il dit.
@@ -22,6 +21,8 @@ export function Apercu(props: {
   readonly projet: Projet
   /** Change à chaque « Lancer » : c'est ce qui force le cadre à repartir de zéro. */
   readonly tour: number
+  readonly langue: Langue
+  readonly t: Textes
 }): JSX.Element {
   const cadre = useRef<HTMLIFrameElement | null>(null)
   const [journal, setJournal] = useState<readonly MessageApercu[]>([])
@@ -70,9 +71,9 @@ export function Apercu(props: {
         key={props.tour}
         ref={cadre}
         class="apercu-cadre"
-        title="Ton code en train de tourner"
+        title={props.t.cadreTitre}
         sandbox={BAC_A_SABLE}
-        srcdoc={pourApercu(props.projet)}
+        srcdoc={pourApercu(props.projet, props.langue)}
       />
 
       <button
@@ -80,9 +81,9 @@ export function Apercu(props: {
         class={erreurs > 0 ? 'console-titre a-des-erreurs' : 'console-titre'}
         onClick={() => setOuverte((o) => !o)}
       >
-        <span>{ouverte ? '▾' : '▸'} Console</span>
+        <span>{ouverte ? '▾' : '▸'} {props.t.console}</span>
         <span class="console-compte">
-          {erreurs > 0 ? `${erreurs} erreur${erreurs > 1 ? 's' : ''}` : `${journal.length}`}
+          {erreurs > 0 ? props.t.erreurs(erreurs) : `${journal.length}`}
         </span>
       </button>
 
@@ -90,16 +91,44 @@ export function Apercu(props: {
         <div class="console" role="log">
           {journal.length === 0 ? (
             <p class="console-vide">
-              Rien pour l’instant. Écris <code>console.log("salut")</code> pour voir.
+              {props.t.consoleVide} <code>console.log("hello")</code> {props.t.consoleVideExemple}
             </p>
           ) : (
             journal.map((m, i) => (
               // eslint-disable-next-line react/no-array-index-key
-              <p key={i} class={m.sorte === 'erreur' ? 'console-ligne erreur' : 'console-ligne'}>
-                {m.texte}
-              </p>
+              <Ligne key={i} message={m} langue={props.langue} />
             ))
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Une ligne de console, et sa traduction quand on la connaît.
+ *
+ * C'est la pièce qui change l'outil de nature. `Uncaught SyntaxError:
+ * Unexpected token '{'` ne dit rien à quelqu'un qui apprend — et rien du tout
+ * s'il ne lit pas l'anglais. Or c'est précisément le moment où il conclut qu'il
+ * n'y arrive pas, alors qu'il lui manquait une virgule.
+ *
+ * Le message d'origine reste affiché au-dessus : il faudra bien le reconnaître
+ * le jour où on cherchera dans un moteur de recherche, et le cacher
+ * apprendrait à dépendre de l'Établi.
+ */
+function Ligne(props: {
+  readonly message: MessageApercu
+  readonly langue: Langue
+}): JSX.Element {
+  const brut = props.message.sorte === 'erreur' ? expliquer(props.message.texte, props.langue) : null
+  return (
+    <div class={props.message.sorte === 'erreur' ? 'console-ligne erreur' : 'console-ligne'}>
+      <p class="console-brut">{props.message.texte}</p>
+      {brut !== null && (
+        <div class="console-explication">
+          <p class="quoi">{brut.quoi}</p>
+          <p class="faire">{brut.faire}</p>
         </div>
       )}
     </div>

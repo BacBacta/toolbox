@@ -1,5 +1,6 @@
-import type { Fichier, Projet } from '@a237/etabli'
-import { MODELES, fichierAExporter } from '@a237/etabli'
+import type { Fichier, Projet, Textes } from '@a237/etabli'
+import type { Langue } from '@a237/etabli'
+import { fichierAExporter, langueDuNavigateur, modeles, textes } from '@a237/etabli'
 import { lienDemande, recuperer } from './partage.js'
 import type { JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
@@ -25,7 +26,33 @@ type Ecran =
   | { readonly quoi: 'liste' }
   | { readonly quoi: 'projet'; readonly id: string }
 
+/**
+ * La langue, devinée une fois puis retenue.
+ *
+ * Le français est le repli parce qu'il est majoritaire dans le pays, mais un
+ * anglophone n'a pas à le subir : le téléphone dit déjà sa langue, et le choix
+ * se change à l'écran. Il tient d'une visite à l'autre — le redemander à chaque
+ * ouverture serait le lui redemander tous les jours.
+ *
+ * `localStorage` peut jeter (navigation privée, stockage refusé) : on retombe
+ * alors sur ce que dit le téléphone, ce qui est déjà la bonne réponse presque
+ * partout.
+ */
+const CLEF_LANGUE = 'etabli:langue'
+
+function langueRetenue(): Langue {
+  try {
+    const retenue = localStorage.getItem(CLEF_LANGUE)
+    if (retenue === 'fr' || retenue === 'en') return retenue
+  } catch {
+    /* stockage refusé : le téléphone décide */
+  }
+  return langueDuNavigateur(navigator.language)
+}
+
 export function App(): JSX.Element {
+  const [langue, setLangue] = useState<Langue>(langueRetenue())
+  const t = textes(langue)
   const [projets, setProjets] = useState<readonly Projet[] | null>(null)
   const [ecran, setEcran] = useState<Ecran>({ quoi: 'liste' })
   const [ouverture, setOuverture] = useState<'non'|'en-cours'|'faite'|'introuvable'|'echouee'>('non')
@@ -66,7 +93,7 @@ export function App(): JSX.Element {
   }, [])
 
   function creer(modeleId: string): void {
-    const modele = MODELES.find((m) => m.id === modeleId)
+    const modele = modeles(langue).find((m) => m.id === modeleId)
     if (modele === undefined) return
     const projet: Projet = {
       id: `p${Date.now().toString(36)}`,
@@ -79,6 +106,15 @@ export function App(): JSX.Element {
     void enregistrer(projet)
   }
 
+  function changerLangue(vers: Langue): void {
+    setLangue(vers)
+    try {
+      localStorage.setItem(CLEF_LANGUE, vers)
+    } catch {
+      /* stockage refusé : le choix tient pour cette visite, et c'est déjà ça */
+    }
+  }
+
   function remplacer(projet: Projet): void {
     setProjets((p) => (p ?? []).map((autre) => (autre.id === projet.id ? projet : autre)))
     void enregistrer(projet)
@@ -89,14 +125,16 @@ export function App(): JSX.Element {
     void supprimer(id)
   }
 
-  if (projets === null) return <main class="chargement">Un instant…</main>
+  if (projets === null) return <main class="chargement">{t.unInstant}</main>
 
   if (ecran.quoi === 'projet') {
     const projet = projets.find((p) => p.id === ecran.id)
-    if (projet === undefined) return <main class="chargement">Ce projet n’existe plus.</main>
+    if (projet === undefined) return <main class="chargement">{t.projetDisparu}</main>
     return (
       <EcranProjet
         projet={projet}
+        langue={langue}
+        t={t}
         onChanger={remplacer}
         onFermer={() => setEcran({ quoi: 'liste' })}
       />
@@ -105,20 +143,27 @@ export function App(): JSX.Element {
 
   return (
     <main class="liste">
-      <h1>Établi</h1>
-      <p class="sous-titre">Écris du code, ici, sans réseau.</p>
+      <div class="entete">
+        <h1>Établi</h1>
+        {/*
+          * Le bouton porte le nom de **l'autre** langue : c'est ce vers quoi il
+          * mène. « Langue / Language » demanderait de lire les deux pour
+          * comprendre — et celui qui ne lit qu'une des deux est justement celui
+          * à qui ce bouton sert.
+          */}
+        <button type="button" class="langue" onClick={() => changerLangue(langue === 'fr' ? 'en' : 'fr')}>
+          {t.langue}
+        </button>
+      </div>
+      <p class="sous-titre">{t.accroche}</p>
 
-      {ouverture === 'en-cours' && <p class="mot">On ouvre le projet reçu…</p>}
-      {ouverture === 'introuvable' && (
-        <p class="mot alerte">Ce lien n’existe plus. Demande à celui qui te l’a envoyé de le repartager.</p>
-      )}
-      {ouverture === 'echouee' && (
-        <p class="mot alerte">Ce lien n’a pas pu être ouvert. Vérifie ton réseau et réessaie.</p>
-      )}
+      {ouverture === 'en-cours' && <p class="mot">{t.ouvertureEnCours}</p>}
+      {ouverture === 'introuvable' && <p class="mot alerte">{t.lienMort}</p>}
+      {ouverture === 'echouee' && <p class="mot alerte">{t.lienIllisible}</p>}
 
-      <h2>Commencer</h2>
+      <h2>{t.commencer}</h2>
       <div class="modeles">
-        {MODELES.map((m) => (
+        {modeles(langue).map((m) => (
           <button type="button" key={m.id} class="modele" onClick={() => creer(m.id)}>
             <b>{m.nom}</b>
             <span>{m.dit}</span>
@@ -128,7 +173,7 @@ export function App(): JSX.Element {
 
       {projets.length > 0 && (
         <>
-          <h2>Tes projets</h2>
+          <h2>{t.tesProjets}</h2>
           <ul class="projets">
             {projets.map((p) => (
               <li key={p.id}>
@@ -138,12 +183,12 @@ export function App(): JSX.Element {
                   onClick={() => setEcran({ quoi: 'projet', id: p.id })}
                 >
                   <b>{p.nom}</b>
-                  <span>{p.fichiers.length} fichier{p.fichiers.length > 1 ? 's' : ''}</span>
+                  <span>{t.fichiers(p.fichiers.length)}</span>
                 </button>
                 <button
                   type="button"
                   class="effacer"
-                  aria-label={`Effacer ${p.nom}`}
+                  aria-label={t.effacer(p.nom)}
                   onClick={() => effacer(p.id)}
                 >
                   ✕
@@ -171,6 +216,8 @@ export function App(): JSX.Element {
  */
 function EcranProjet(props: {
   readonly projet: Projet
+  readonly langue: Langue
+  readonly t: Textes
   readonly onChanger: (projet: Projet) => void
   readonly onFermer: () => void
 }): JSX.Element {
@@ -203,12 +250,12 @@ function EcranProjet(props: {
   return (
     <main class="projet-ouvert">
       <header class="barre">
-        <button type="button" class="retour" onClick={props.onFermer}>← Mes projets</button>
+        <button type="button" class="retour" onClick={props.onFermer}>{props.t.mesProjets}</button>
         <b class="nom">{props.projet.nom}</b>
         {vue === 'ecrire' ? (
-          <button type="button" class="lancer" onClick={lancer}>▶ Lancer</button>
+          <button type="button" class="lancer" onClick={lancer}>{props.t.lancer}</button>
         ) : (
-          <button type="button" class="lancer" onClick={() => setVue('ecrire')}>Écrire</button>
+          <button type="button" class="lancer" onClick={() => setVue('ecrire')}>{props.t.ecrire}</button>
         )}
       </header>
 
@@ -219,17 +266,19 @@ function EcranProjet(props: {
           onOuvrir={setOuvert}
           onEcrire={ecrire}
           onAjouter={ajouter}
+          langue={props.langue}
+          t={props.t}
         />
       ) : (
         <>
-          <Apercu projet={props.projet} tour={tour} />
+          <Apercu projet={props.projet} tour={tour} langue={props.langue} t={props.t} />
           <div class="actions">
-            <button type="button" onClick={() => setTour((t) => t + 1)}>⟳ Relancer</button>
+            <button type="button" onClick={() => setTour((n) => n + 1)}>{props.t.relancer}</button>
             <button type="button" onClick={() => telecharger(props.projet)}>
-              Exporter en un fichier
+              {props.t.exporter}
             </button>
           </div>
-          <Partage projet={props.projet} onChanger={props.onChanger} />
+          <Partage projet={props.projet} onChanger={props.onChanger} t={props.t} />
         </>
       )}
     </main>

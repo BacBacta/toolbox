@@ -3,6 +3,7 @@ import { render as monter } from 'preact'
 import { act } from 'preact/test-utils'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { Editeur } from '../src/editeur.js'
+import { textes } from '@a237/etabli'
 import type { Fichier, Projet } from '@a237/etabli'
 
 /**
@@ -34,6 +35,8 @@ function poser(projet: Projet = PROJET, ouvert = 'script.js'): void {
         onOuvrir={() => undefined}
         onEcrire={(nom, contenu) => ecrits.push([nom, contenu])}
         onAjouter={(f) => ajoutes.push(f)}
+        langue="fr"
+        t={textes('fr')}
       />,
       hote,
     )

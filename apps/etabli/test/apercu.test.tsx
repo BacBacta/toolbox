@@ -3,6 +3,7 @@ import { render as monter } from 'preact'
 import { act } from 'preact/test-utils'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { Apercu } from '../src/apercu.js'
+import { textes } from '@a237/etabli'
 import type { Projet } from '@a237/etabli'
 
 const PROJET: Projet = {
@@ -13,7 +14,7 @@ const PROJET: Projet = {
 let hote: HTMLDivElement
 
 function poser(tour = 0): void {
-  act(() => { monter(<Apercu projet={PROJET} tour={tour} />, hote) })
+  act(() => { monter(<Apercu projet={PROJET} tour={tour} langue="fr" t={textes('fr')} />, hote) })
 }
 
 beforeEach(() => {
@@ -145,5 +146,70 @@ describe('la console vide', () => {
       act(() => { dispatchEvent(e) })
     }
     expect(hote.querySelector('.console-titre')?.textContent).toContain('2 erreurs')
+  })
+})
+
+/**
+ * L'explication sous l'erreur : ce qui change l'outil de nature.
+ *
+ * `Uncaught SyntaxError: Unexpected token '{'` ne dit rien à quelqu'un qui
+ * apprend — et rien du tout s'il ne lit pas l'anglais. C'est précisément le
+ * moment où il conclut qu'il n'y arrive pas, alors qu'il lui manquait une
+ * virgule.
+ */
+describe('l’erreur, expliquée', () => {
+  function erreur(texte: string): void {
+    const cadre = hote.querySelector('iframe') as HTMLIFrameElement
+    const e = new MessageEvent('message', { data: { a237: 'etabli', sorte: 'erreur', texte } })
+    Object.defineProperty(e, 'source', { value: cadre.contentWindow })
+    act(() => { dispatchEvent(e) })
+  }
+
+  function poserEn(langue: 'fr' | 'en'): void {
+    act(() => { monter(<Apercu projet={PROJET} tour={0} langue={langue} t={textes(langue)} />, hote) })
+    act(() => { (hote.querySelector('.console-titre') as HTMLButtonElement).click() })
+  }
+
+  it('dit ce qui s’est passé et quoi faire, en français', () => {
+    poserEn('fr')
+    erreur('Uncaught ReferenceError: prix is not defined')
+    const lu = hote.querySelector('.console-explication')?.textContent ?? ''
+    expect(lu).toContain('prix')
+    expect(lu).toMatch(/orthographe|déclare/i)
+  })
+
+  it('et en anglais quand c’est la langue choisie', () => {
+    poserEn('en')
+    erreur('Uncaught ReferenceError: prix is not defined')
+    const lu = hote.querySelector('.console-explication')?.textContent ?? ''
+    expect(lu).toMatch(/spelling|declare/i)
+    expect(lu).not.toMatch(/orthographe/i)
+  })
+
+  /*
+   * Le message d'origine reste affiché : il faudra bien le reconnaître le jour
+   * où on le cherchera dans un moteur de recherche, et le cacher apprendrait à
+   * dépendre de l'Établi.
+   */
+  it('sans cacher le message d’origine', () => {
+    poserEn('fr')
+    erreur('Uncaught ReferenceError: prix is not defined')
+    expect(hote.querySelector('.console-brut')?.textContent).toContain('ReferenceError')
+  })
+
+  it('et n’invente rien quand elle ne connaît pas l’erreur', () => {
+    poserEn('fr')
+    erreur('Uncaught WeirdError: quelque chose de très inhabituel')
+    expect(hote.querySelector('.console-explication')).toBe(null)
+    expect(hote.querySelector('.console-brut')?.textContent).toContain('WeirdError')
+  })
+
+  it('un journal ordinaire n’est pas expliqué : il n’y a rien à expliquer', () => {
+    poserEn('fr')
+    const cadre = hote.querySelector('iframe') as HTMLIFrameElement
+    const e = new MessageEvent('message', { data: { a237: 'etabli', sorte: 'journal', texte: 'salut' } })
+    Object.defineProperty(e, 'source', { value: cadre.contentWindow })
+    act(() => { dispatchEvent(e) })
+    expect(hote.querySelector('.console-explication')).toBe(null)
   })
 })

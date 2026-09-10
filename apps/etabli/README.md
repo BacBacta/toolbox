@@ -44,6 +44,17 @@ cents kilo-octets à cinq mégaoctets pour la seule zone de saisie.
   s'ouvre seul chez celui qui le reçoit, sans réseau du tout.
 - **Les exemples parlent d'ici.** Des francs CFA, des prix de quartier — pas
   des dollars.
+- **Deux langues, parce que le pays en a deux.** Le français et l'anglais sont
+  tous deux officiels au Cameroun, et le Nord-Ouest et le Sud-Ouest sont
+  anglophones. Tout bascule : l'interface, les reproches, les modèles — code
+  des modèles compris, parce qu'un anglophone devant
+  `const bouton = document.getElementById("bouton")` apprend à recopier sans
+  comprendre.
+- **L'erreur est expliquée, hors ligne.** `Uncaught SyntaxError: Unexpected
+  token '{'` ne dit rien à quelqu'un qui apprend. Un dictionnaire d'une
+  douzaine de motifs traduit les erreurs courantes en une phrase et un geste,
+  sans réseau, sans clef et sans coût. Le message d'origine reste affiché : il
+  faudra le reconnaître le jour où on le cherchera ailleurs.
 
 ## Le dépôt, et pourquoi il n'a pas de compte
 
@@ -88,6 +99,9 @@ vérification leur texte s'afficherait comme s'il venait du code de la personne.
 - **Python.** Prévu via Pyodide, mais c'est six mégaoctets à télécharger. Ça ne
   peut pas être dans la coquille : ce sera un choix explicite, avec le prix en
   mégaoctets annoncé avant.
+- **Le modèle en renfort.** Le dictionnaire couvre les erreurs courantes ; ce
+  qu'il ne connaît pas mériterait un appel au modèle. Ce sera l'étape
+  suivante, et elle demandera une clef sur ce projet-ci.
 - **Les leçons.** L'éditeur d'abord, sur une base qui marche.
 - **La coloration syntaxique.** Elle coûte au moins deux cents kilo-octets.
   Le chiffre du budget est ce qu'il faudra mettre en face le jour où on la

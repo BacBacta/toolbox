@@ -96,3 +96,23 @@ describe('un message qui revient de l’aperçu', () => {
     expect(lu?.texte.length).toBeLessThan(3000)
   })
 })
+
+/**
+ * Le pont s'exécute dans le cadre et ne sait rien de l'écran qui le contient.
+ *
+ * Il faut donc lui donner la langue au moment de l'assembler. Sans ça, une
+ * console en anglais annonçait « (ligne 64) » — un seul mot français au milieu,
+ * qui suffit à rappeler à un anglophone que l'outil n'a pas été fait pour lui.
+ * Vu sur le produit en ligne, pas dans un essai.
+ */
+describe('le mot que le pont ajoute au numéro de ligne', () => {
+  it('est « ligne » en français', () => {
+    expect(pourApercu(PROJET, 'fr')).toContain("' (ligne '")
+  })
+
+  it('et « line » en anglais', () => {
+    const doc = pourApercu(PROJET, 'en')
+    expect(doc).toContain("' (line '")
+    expect(doc).not.toContain("' (ligne '")
+  })
+})

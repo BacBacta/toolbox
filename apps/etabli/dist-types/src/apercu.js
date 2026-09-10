@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs } from "preact/jsx-runtime";
-import { BAC_A_SABLE, lireMessageDApercu, pourApercu } from '@a237/etabli';
+import { BAC_A_SABLE, expliquer, lireMessageDApercu, pourApercu } from '@a237/etabli';
 import { useEffect, useRef, useState } from 'preact/hooks';
 /**
  * Ce que le code fait, et ce qu'il dit.
@@ -43,7 +43,23 @@ export function Apercu(props) {
         return () => removeEventListener('message', recevoir);
     }, []);
     const erreurs = journal.filter((m) => m.sorte === 'erreur').length;
-    return (_jsxs("div", { class: "apercu", children: [_jsx("iframe", { ref: cadre, class: "apercu-cadre", title: "Ton code en train de tourner", sandbox: BAC_A_SABLE, srcdoc: pourApercu(props.projet) }, props.tour), _jsxs("button", { type: "button", class: erreurs > 0 ? 'console-titre a-des-erreurs' : 'console-titre', onClick: () => setOuverte((o) => !o), children: [_jsxs("span", { children: [ouverte ? '▾' : '▸', " Console"] }), _jsx("span", { class: "console-compte", children: erreurs > 0 ? `${erreurs} erreur${erreurs > 1 ? 's' : ''}` : `${journal.length}` })] }), ouverte && (_jsx("div", { class: "console", role: "log", children: journal.length === 0 ? (_jsxs("p", { class: "console-vide", children: ["Rien pour l\u2019instant. \u00C9cris ", _jsx("code", { children: "console.log(\"salut\")" }), " pour voir."] })) : (journal.map((m, i) => (_jsx("p", { class: m.sorte === 'erreur' ? 'console-ligne erreur' : 'console-ligne', children: m.texte }, i)))) }))] }));
+    return (_jsxs("div", { class: "apercu", children: [_jsx("iframe", { ref: cadre, class: "apercu-cadre", title: props.t.cadreTitre, sandbox: BAC_A_SABLE, srcdoc: pourApercu(props.projet, props.langue) }, props.tour), _jsxs("button", { type: "button", class: erreurs > 0 ? 'console-titre a-des-erreurs' : 'console-titre', onClick: () => setOuverte((o) => !o), children: [_jsxs("span", { children: [ouverte ? '▾' : '▸', " ", props.t.console] }), _jsx("span", { class: "console-compte", children: erreurs > 0 ? props.t.erreurs(erreurs) : `${journal.length}` })] }), ouverte && (_jsx("div", { class: "console", role: "log", children: journal.length === 0 ? (_jsxs("p", { class: "console-vide", children: [props.t.consoleVide, " ", _jsx("code", { children: "console.log(\"hello\")" }), " ", props.t.consoleVideExemple] })) : (journal.map((m, i) => (_jsx(Ligne, { message: m, langue: props.langue }, i)))) }))] }));
+}
+/**
+ * Une ligne de console, et sa traduction quand on la connaît.
+ *
+ * C'est la pièce qui change l'outil de nature. `Uncaught SyntaxError:
+ * Unexpected token '{'` ne dit rien à quelqu'un qui apprend — et rien du tout
+ * s'il ne lit pas l'anglais. Or c'est précisément le moment où il conclut qu'il
+ * n'y arrive pas, alors qu'il lui manquait une virgule.
+ *
+ * Le message d'origine reste affiché au-dessus : il faudra bien le reconnaître
+ * le jour où on cherchera dans un moteur de recherche, et le cacher
+ * apprendrait à dépendre de l'Établi.
+ */
+function Ligne(props) {
+    const brut = props.message.sorte === 'erreur' ? expliquer(props.message.texte, props.langue) : null;
+    return (_jsxs("div", { class: props.message.sorte === 'erreur' ? 'console-ligne erreur' : 'console-ligne', children: [_jsx("p", { class: "console-brut", children: props.message.texte }), brut !== null && (_jsxs("div", { class: "console-explication", children: [_jsx("p", { class: "quoi", children: brut.quoi }), _jsx("p", { class: "faire", children: brut.faire })] }))] }));
 }
 /**
  * Deux cents lignes gardées, les plus récentes.
