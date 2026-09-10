@@ -7,3 +7,8 @@ export type { MessageApercu } from './apercu.js'
 export { BAC_A_SABLE, lireMessageDApercu, pourApercu } from './apercu.js'
 export type { Modele } from './modeles.js'
 export { MODELES } from './modeles.js'
+export type { Depot } from './depot.js'
+export {
+  ALPHABET_LIEN, LONGUEUR_CLEF, LONGUEUR_LIEN, MAX_OCTETS_DEPOT,
+  clefValide, lienValide, lireDepot, nouveauLien, nouvelleClef, pourLeDepot,
+} from './depot.js'

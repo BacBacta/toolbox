@@ -36,11 +36,36 @@ cents kilo-octets à cinq mégaoctets pour la seule zone de saisie.
   390 pixels, du texte sorti par la droite est du texte qu'on croit effacé.
 - **Hors ligne d'abord.** Les projets vivent dans IndexedDB. On travaille
   pendant les coupures, dans un taxi, la veille d'un devoir.
-- **Le partage est un fichier.** Un seul document HTML autonome, qui part sur
-  WhatsApp comme n'importe quelle pièce jointe et s'ouvre seul chez celui qui
-  le reçoit. Pas de compte, pas de lien à héberger, pas de réseau.
+- **Un lien qu'on garde, et pas de compte.** « Sauvegarder en ligne et
+  partager » dépose le projet et rend un lien. Ce lien le retrouve quand le
+  téléphone a disparu, et c'est aussi celui qu'on envoie sur WhatsApp — un
+  seul geste pour les deux, parce que c'est le même dépôt.
+- **Le partage marche aussi en fichier.** Un seul document HTML autonome, qui
+  s'ouvre seul chez celui qui le reçoit, sans réseau du tout.
 - **Les exemples parlent d'ici.** Des francs CFA, des prix de quartier — pas
   des dollars.
+
+## Le dépôt, et pourquoi il n'a pas de compte
+
+`PUT /api/p/:lien` dépose, `GET /api/p/:lien` relit. C'est la **seule** écriture
+venue de l'extérieur dans tout l'Établi, et la seule raison pour laquelle il
+touche à un réseau.
+
+Le lien et la clef se tirent **sur l'appareil**, jamais sur le serveur : un
+premier dépôt tient donc en un aller simple, sans rien demander à personne.
+Créer un compte avant d'avoir écrit trois lignes est exactement la marche que
+cet outil existe pour retirer.
+
+Les deux ne voyagent pas ensemble. Le **lien** se partage — c'est son but. La
+**clef** autorise à réécrire et ne quitte jamais le téléphone : sans cette
+séparation, le premier destinataire pourrait effacer le travail de celui qui le
+lui a envoyé. Une écriture sans la bonne clef reçoit `404` et non `403`, pour ne
+pas apprendre à qui tâtonne quels liens sont pris.
+
+**Ce qui est déposé n'est jamais servi comme une page.** Le lien ouvre
+l'éditeur, qui charge le projet et l'exécute dans le cadre isolé de celui qui
+l'ouvre. Servir directement du HTML écrit par un inconnu ferait de cette adresse
+un hébergement de pages piégées.
 
 ## L'isolement
 
@@ -63,10 +88,6 @@ vérification leur texte s'afficherait comme s'il venait du code de la personne.
 - **Python.** Prévu via Pyodide, mais c'est six mégaoctets à télécharger. Ça ne
   peut pas être dans la coquille : ce sera un choix explicite, avec le prix en
   mégaoctets annoncé avant.
-- **Un lien court à partager.** Le fichier exporté marche aujourd'hui, sans
-  serveur. Un lien demanderait de servir du code écrit par n'importe qui, donc
-  **une origine séparée** de celle de l'atelier — sans quoi une page piégée
-  s'hébergerait à côté des comptes.
 - **Les leçons.** L'éditeur d'abord, sur une base qui marche.
 - **La coloration syntaxique.** Elle coûte au moins deux cents kilo-octets.
   Le chiffre du budget est ce qu'il faudra mettre en face le jour où on la
@@ -76,6 +97,17 @@ vérification leur texte s'afficherait comme s'il venait du code de la personne.
 
 ```bash
 pnpm --filter @a237/etabli-web dev      # développement
-pnpm --filter @a237/etabli-web build    # construction, dans apps/etabli/dist
+pnpm --filter @a237/etabli-web build    # dist/ et functions/
 node scripts/budget.mjs                 # le poids, mesuré et bloquant
+
+# La mise en ligne se lance **depuis apps/etabli**, jamais depuis la racine.
+npx wrangler pages deploy dist --cwd apps/etabli --branch main
 ```
+
+`apps/etabli/wrangler.toml` existe pour une raison apprise à ses dépens : lancé
+depuis la racine, l'envoi faisait lire le `wrangler.toml` de l'atelier à
+wrangler, et le projet de l'Établi s'est retrouvé avec les fonctions de
+l'atelier **et ses liaisons** — dont `COMPTES`, la base des comptes et des
+paiements. Wrangler prend la configuration la plus proche&nbsp;; celle-ci étant
+dans `apps/etabli`, un envoi lancé d'ici ne peut plus attraper celle de la
+racine.

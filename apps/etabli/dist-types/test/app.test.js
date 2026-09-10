@@ -4,7 +4,7 @@ import 'fake-indexeddb/auto';
 import { MODELES } from '@a237/etabli';
 import { render as monter } from 'preact';
 import { act } from 'preact/test-utils';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clear, createStore } from 'idb-keyval';
 import { App } from '../src/app.js';
 import { lireProjets } from '../src/stockage.js';
@@ -189,5 +189,92 @@ describe('les cas où l’on se rattrape', () => {
         const actif = hote.querySelector('.onglet.actif');
         expect(actif?.textContent).toBe('autre.js');
         expect(hote.querySelector('textarea').value).toBe('');
+    });
+});
+/**
+ * Sauvegarder et partager, dans l'écran.
+ *
+ * C'était le premier écart bloquant face à Replit, et il en refermait deux : le
+ * projet survit au téléphone perdu, et « regarde ce que j'ai fait » devient une
+ * adresse. L'un ne va pas sans l'autre — c'est le même dépôt.
+ */
+describe('le partage', () => {
+    const vraiFetch = globalThis.fetch;
+    afterEach(() => { globalThis.fetch = vraiFetch; });
+    async function ouvrirUnProjet() {
+        await ouvrir();
+        cliquer('.modele', 'Page vide');
+        cliquer('.lancer');
+    }
+    it('propose de sauvegarder, et rend un lien qu’on garde', async () => {
+        globalThis.fetch = (async () => new Response('{}', { status: 200 }));
+        await ouvrirUnProjet();
+        cliquer('.partager');
+        await reposer();
+        expect(hote.querySelector('.adresse')?.textContent).toMatch(/\?p=[2-9A-Z]{10}$/);
+        expect(hote.textContent).toContain('même si tu perds ce téléphone');
+    });
+    /*
+     * Hors ligne est le cas courant ici, pas l'exception. Le dire sans alarmer :
+     * le travail n'est pas perdu, il est sur le téléphone.
+     */
+    it('et quand il n’y a pas de réseau, le dit sans faire peur', async () => {
+        globalThis.fetch = (async () => { throw new Error('offline'); });
+        await ouvrirUnProjet();
+        cliquer('.partager');
+        await reposer();
+        expect(hote.querySelector('.alerte')?.textContent).toContain('en sécurité sur ce téléphone');
+    });
+    it('le lien est gardé avec le projet : la fois d’après met à jour, elle ne repart pas de zéro', async () => {
+        globalThis.fetch = (async () => new Response('{}', { status: 200 }));
+        await ouvrirUnProjet();
+        cliquer('.partager');
+        await reposer();
+        const premier = hote.querySelector('.adresse')?.textContent;
+        cliquer('.retour');
+        cliquer('.projet');
+        cliquer('.lancer');
+        expect(hote.querySelector('.partager')?.textContent).toContain('Mettre à jour');
+        expect(hote.querySelector('.adresse')?.textContent).toBe(premier);
+    });
+});
+/**
+ * Le bouton de partage sait aussi copier et envoyer.
+ *
+ * Sur un téléphone, recopier dix caractères à la main est exactement le genre
+ * de friction qui fait renoncer. Et WhatsApp est le canal : c'est là que le
+ * lien va, pas dans un courriel.
+ */
+describe('ce qu’on fait du lien une fois obtenu', () => {
+    const vraiFetch = globalThis.fetch;
+    afterEach(() => { globalThis.fetch = vraiFetch; });
+    it('se copie, et le bouton le confirme', async () => {
+        globalThis.fetch = (async () => new Response('{}', { status: 200 }));
+        let copie = '';
+        Object.defineProperty(navigator, 'clipboard', {
+            configurable: true,
+            value: { writeText: (t) => { copie = t; return Promise.resolve(); } },
+        });
+        await ouvrir();
+        cliquer('.modele', 'Page vide');
+        cliquer('.lancer');
+        cliquer('.partager');
+        await reposer();
+        cliquer('.partage-actions button', 'Copier');
+        await reposer();
+        expect(copie).toMatch(/\?p=[2-9A-Z]{10}$/);
+        expect(hote.querySelector('.partage-actions button')?.textContent).toBe('Copié');
+    });
+    it('et part sur WhatsApp avec le nom du projet', async () => {
+        globalThis.fetch = (async () => new Response('{}', { status: 200 }));
+        await ouvrir();
+        cliquer('.modele', 'Page vide');
+        cliquer('.lancer');
+        cliquer('.partager');
+        await reposer();
+        const wa = hote.querySelector('a.whatsapp');
+        expect(wa.href).toContain('wa.me');
+        expect(decodeURIComponent(wa.href)).toContain('Page vide');
+        expect(wa.getAttribute('rel')).toContain('noopener');
     });
 });
