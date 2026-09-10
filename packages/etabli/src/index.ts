@@ -18,3 +18,9 @@ export type { Textes } from './textes.js'
 export { textes } from './textes.js'
 export type { Jeton, SorteJeton } from './colorer.js'
 export { MAX_COLORE, colorer } from './colorer.js'
+export type { FichierPyodide, ManifestePython } from './python.js'
+export {
+  enMegaoctets, estProjetPython, fichierPrincipalPython, lireManifeste,
+} from './python.js'
+export type { EnvoiPython } from './apercu-python.js'
+export { lireEnvoiPython, pourApercuPython } from './apercu-python.js'

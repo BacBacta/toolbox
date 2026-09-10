@@ -15,11 +15,11 @@ navigateur** : le code s'exécute sur l'appareil, dans un cadre isolé, et rien
 ne part sur le réseau — ni pour ouvrir un projet, ni pour le lancer, ni pour
 le partager.
 
-**Dix-huit kilo-octets et neuf cents**, tout compris : éditeur, exécution,
-console, couleur, modèles, dépôt, export. C'est l'argument, et il est mesuré à
-chaque construction par `scripts/budget.mjs`. Les éditeurs qu'on installe
-ailleurs pèsent de deux cents kilo-octets à cinq mégaoctets pour la seule zone
-de saisie.
+**Vingt-deux kilo-octets et trois cents**, tout compris : éditeur, exécution,
+console, couleur, modèles, dépôt, export, et Python. C'est l'argument, et il
+est mesuré à chaque construction par `scripts/budget.mjs`. Les éditeurs qu'on
+installe ailleurs pèsent de deux cents kilo-octets à cinq mégaoctets pour la
+seule zone de saisie.
 
 ## Ce qui est adapté, concrètement
 
@@ -39,6 +39,12 @@ de saisie.
   et on cherche l'erreur ailleurs pendant vingt minutes. Coût mesuré :
   **un kilo-octet et six cents**, là où les bibliothèques du métier en
   demandent deux cents.
+- **Python, et son prix annoncé avant.** Un interpréteur Python compilé en
+  WebAssembly pèse cinq mégaoctets sur le fil. Sur un forfait compté à l'octet,
+  ce n'est pas un détail technique, c'est de l'argent. Le chiffre s'affiche
+  donc **avant** — dans le bouton lui-même, pour qu'on ne puisse pas appuyer
+  sans l'avoir eu sous les yeux. Une seule fois : ensuite Python tourne sans
+  réseau du tout.
 - **Les lignes se replient.** À l'inverse de tout éditeur de bureau : sur
   390 pixels, du texte sorti par la droite est du texte qu'on croit effacé.
 - **Hors ligne d'abord.** Les projets vivent dans IndexedDB. On travaille
@@ -127,11 +133,46 @@ sien, un `<textarea>` non. La mesure au navigateur a d'abord répondu « aligné
 simplement celle de la boîte. Avec un fichier assez long : 4104 contre 4080,
 soit une ligne d'écart. Une mesure qui ne peut pas échouer ne mesure rien.
 
+## Python, et pourquoi il ne coûte le réseau qu'une fois
+
+Le cadre isolé est dans une origine opaque — c'est le prix de l'isolement, et
+c'est ce qui rend acceptable d'ouvrir le projet de quelqu'un d'autre. Mais une
+origine opaque n'a **pas de stockage** : `caches` et `localStorage` y *lèvent*
+une exception, ils ne valent pas `undefined`, ce qui piège toute détection
+écrite en `typeof` — le banc d'essai qui a établi ça s'y est cassé le nez
+lui-même au premier passage. Ce qu'IndexedDB y garde disparaît avec le cadre.
+
+Le cadre ne peut donc rien retenir. Sans rien faire, chaque « Lancer »
+redescendrait cinq mégaoctets. C'est l'Établi qui garde les fichiers, les
+vérifie, et les poste au cadre.
+
+Restait à ce que Pyodide accepte de ne pas aller les chercher lui-même. Trois
+accroches, trouvées en lisant sa source puis vérifiées **en comptant les
+requêtes reçues par un serveur** :
+
+- il ne télécharge `pyodide.asm.js` que `if (typeof _createPyodideModule !=
+  "function")` — on le lui injecte en balise, il ne demande rien ;
+- `lockFileContents` lui évite d'aller chercher le verrou ;
+- le reste passe par `fetch`, qu'on détourne pour ces fichiers-là seulement.
+
+Le détournement de `fetch` seul ne suffisait pas : le compteur montrait
+`pyodide.asm.js` demandé deux fois, parce qu'il est chargé par balise et non
+par `fetch`. Un mégaoctet à chaque lancement, que personne n'aurait vu passer.
+Avec les trois accroches : **zéro requête** au second lancement.
+
+Le prix annoncé n'est pas une constante tapée à la main. `scripts/pyodide.mjs`
+le mesure à la construction, sur le `content-length` de la réponse compressée
+qu'un vrai serveur envoie. Comprimer nous-mêmes donnait un chiffre plus
+flatteur — quatre mégaoctets et demi contre cinq — parce qu'on peut choisir le
+réglage le plus lent. Annoncer moins que le vrai prix est exactement l'erreur
+que tout ceci existe pour ne pas commettre.
+
+Les douze mégaoctets ne sont pas versionnés : `pnpm pyodide` les récupère. Une
+installation qui ne l'a pas fait marche exactement comme avant, sans proposer
+Python — plutôt qu'avec un bouton qui échoue.
+
 ## Ce qui n'y est pas encore
 
-- **Python.** Prévu via Pyodide, mais c'est six mégaoctets à télécharger. Ça ne
-  peut pas être dans la coquille : ce sera un choix explicite, avec le prix en
-  mégaoctets annoncé avant.
 - **Le modèle en renfort.** Le dictionnaire couvre les erreurs courantes ; ce
   qu'il ne connaît pas mériterait un appel au modèle. Ce sera l'étape
   suivante, et elle demandera une clef sur ce projet-ci.
@@ -141,6 +182,7 @@ soit une ligne d'écart. Une mesure qui ne peut pas échouer ne mesure rien.
 
 ```bash
 pnpm --filter @a237/etabli-web dev      # développement
+pnpm pyodide                            # les douze mégaoctets de Python
 pnpm --filter @a237/etabli-web build    # dist/ et functions/
 node scripts/budget.mjs                 # le poids, mesuré et bloquant
 

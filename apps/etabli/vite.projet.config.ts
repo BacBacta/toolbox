@@ -21,6 +21,15 @@ const SORTIE = 'functions/api/p'
  * l'Établi.
  */
 export default defineConfig({
+  /*
+   * Pas de dossier public ici.
+   *
+   * Vite recopie `public/` dans `outDir`, et `outDir` est le dossier des
+   * fonctions. Les douze mégaoctets de Pyodide s'y sont retrouvés une fois —
+   * c'est-à-dire dans le paquet des fonctions Pages, qui n'a rien à en faire.
+   * La construction, elle, avait réussi sans rien dire.
+   */
+  publicDir: false,
   ssr: { noExternal: true, target: 'webworker' },
   build: {
     ssr: 'src/worker-projet.ts',

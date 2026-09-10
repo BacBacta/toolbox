@@ -56,6 +56,16 @@ export interface Textes {
   readonly pasDeReseau: string
   readonly partageEchoue: string
 
+  readonly pythonTitre: string
+  readonly pythonPourquoi: (taille: string) => string
+  readonly pythonUneSeuleFois: string
+  readonly pythonTelecharger: (taille: string) => string
+  readonly pythonEnCours: (fait: number) => string
+  readonly pythonEchoue: string
+  readonly pythonReessayer: string
+  readonly pythonPlusTard: string
+  readonly pythonIndisponible: string
+
   readonly langue: string
 }
 
@@ -101,6 +111,17 @@ const FR: Textes = {
   pasDeReseau: 'Pas de réseau. Ton projet est en sécurité sur ce téléphone ; réessaie quand ça revient.',
   partageEchoue: 'Le partage a échoué. Réessaie tout à l’heure.',
 
+  pythonTitre: 'Python n’est pas encore sur ce téléphone',
+  pythonPourquoi: (taille) =>
+    `Python ne tient pas dans un navigateur : il faut y descendre un interpréteur entier, ${taille}.`,
+  pythonUneSeuleFois: 'Une seule fois. Ensuite il marche sans réseau, même en coupure.',
+  pythonTelecharger: (taille) => `Télécharger Python (${taille})`,
+  pythonEnCours: (fait) => `Téléchargement… ${fait} %`,
+  pythonEchoue: 'Le téléchargement s’est interrompu. Rien n’est perdu : ce qui est arrivé est gardé.',
+  pythonReessayer: 'Reprendre',
+  pythonPlusTard: 'Plus tard',
+  pythonIndisponible: 'Python n’est pas installé sur cette version de l’Établi.',
+
   langue: 'English',
 }
 
@@ -145,6 +166,17 @@ const EN: Textes = {
   surWhatsApp: 'Send on WhatsApp',
   pasDeReseau: 'No network. Your project is safe on this phone; try again when it comes back.',
   partageEchoue: 'Sharing failed. Try again in a moment.',
+
+  pythonTitre: 'Python is not on this phone yet',
+  pythonPourquoi: (taille) =>
+    `Python does not fit in a browser: a whole interpreter has to come down, ${taille}.`,
+  pythonUneSeuleFois: 'Once only. After that it runs with no network, even during an outage.',
+  pythonTelecharger: (taille) => `Download Python (${taille})`,
+  pythonEnCours: (fait) => `Downloading… ${fait}%`,
+  pythonEchoue: 'The download stopped. Nothing is lost: what arrived is kept.',
+  pythonReessayer: 'Resume',
+  pythonPlusTard: 'Later',
+  pythonIndisponible: 'Python is not installed in this build of the Établi.',
 
   langue: 'Français',
 }

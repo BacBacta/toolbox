@@ -1,7 +1,12 @@
-import type { Langue, MessageApercu, Projet, Textes } from '@a237/etabli'
-import { BAC_A_SABLE, expliquer, lireMessageDApercu, pourApercu } from '@a237/etabli'
+import type { EnvoiPython, Langue, ManifestePython, MessageApercu, Projet, Textes } from '@a237/etabli'
+import {
+  BAC_A_SABLE, enMegaoctets, estProjetPython, expliquer, lireMessageDApercu,
+  pourApercu, pourApercuPython,
+} from '@a237/etabli'
 import type { JSX } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
+import type { Avancement } from './python-moteur.js'
+import { dejaDescendu, manifestePython, moteurPython, posterMoteur } from './python-moteur.js'
 
 /**
  * Ce que le code fait, et ce qu'il dit.
@@ -27,6 +32,8 @@ export function Apercu(props: {
   const cadre = useRef<HTMLIFrameElement | null>(null)
   const [journal, setJournal] = useState<readonly MessageApercu[]>([])
   const [ouverte, setOuverte] = useState(false)
+  const python = estProjetPython(props.projet)
+  const moteur = useMoteurPython(python)
 
   // Chaque lancement repart d'une console vide : mélanger deux exécutions fait
   // chercher une erreur qu'on vient déjà de corriger.
@@ -54,6 +61,21 @@ export function Apercu(props: {
 
   const erreurs = journal.filter((m) => m.sorte === 'erreur').length
 
+  /*
+   * Un projet Python n'affiche rien tant que le moteur n'est pas là.
+   *
+   * Le proposer avant de l'avoir serait un bouton qui échoue ; le télécharger
+   * sans demander serait dépenser le forfait de quelqu'un à sa place. Entre les
+   * deux, il n'y a qu'une chose honnête à faire : dire le prix.
+   */
+  if (python && moteur.envoi === null) {
+    return (
+      <div class="apercu">
+        <Python moteur={moteur} langue={props.langue} t={props.t} />
+      </div>
+    )
+  }
+
   return (
     <div class="apercu">
       <iframe
@@ -73,7 +95,21 @@ export function Apercu(props: {
         class="apercu-cadre"
         title={props.t.cadreTitre}
         sandbox={BAC_A_SABLE}
-        srcdoc={pourApercu(props.projet, props.langue)}
+        srcdoc={python
+          ? pourApercuPython(props.projet, props.langue)
+          : pourApercu(props.projet, props.langue)}
+        onLoad={() => {
+          /*
+           * Le moteur part **après** que le cadre est là, jamais avant.
+           *
+           * Poster dans un cadre qui n'a pas fini de charger fait disparaître le
+           * message sans erreur : l'écouteur n'existe pas encore. C'est le genre
+           * de panne qui ne se reproduit que sur un téléphone lent.
+           */
+          if (moteur.envoi === null || cadre.current === null) return
+          const fenetre = cadre.current.contentWindow
+          if (fenetre !== null) posterMoteur(fenetre, moteur.envoi)
+        }}
       />
 
       <button
@@ -91,7 +127,9 @@ export function Apercu(props: {
         <div class="console" role="log">
           {journal.length === 0 ? (
             <p class="console-vide">
-              {props.t.consoleVide} <code>console.log("hello")</code> {props.t.consoleVideExemple}
+              {props.t.consoleVide}{' '}
+              <code>{python ? 'print("hello")' : 'console.log("hello")'}</code>{' '}
+              {props.t.consoleVideExemple}
             </p>
           ) : (
             journal.map((m, i) => (
@@ -143,3 +181,115 @@ function Ligne(props: {
  * pourquoi sa boucle s'emballe — et c'est la fin de la ligne qui l'intéresse.
  */
 const MAX_LIGNES = 200
+
+/** Ce que l'écran sait de Python à un instant donné. */
+interface EtatPython {
+  readonly manifeste: ManifestePython | null | undefined
+  readonly envoi: EnvoiPython | null
+  readonly avancement: Avancement | null
+  readonly echoue: boolean
+  readonly descendre: () => void
+}
+
+/**
+ * Python, cherché puis descendu — jamais sans qu'on l'ait demandé.
+ *
+ * `manifeste` vaut `undefined` tant qu'on cherche, `null` quand cette
+ * installation n'a pas Python du tout. Les deux ne se confondent pas : le
+ * premier est passager, le second est définitif, et afficher « indisponible »
+ * pendant qu'on cherche encore ferait renoncer quelqu'un pour rien.
+ */
+function useMoteurPython(actif: boolean): EtatPython {
+  const [manifeste, setManifeste] = useState<ManifestePython | null | undefined>(undefined)
+  const [envoi, setEnvoi] = useState<EnvoiPython | null>(null)
+  const [avancement, setAvancement] = useState<Avancement | null>(null)
+  const [echoue, setEchoue] = useState(false)
+  const [demande, setDemande] = useState(0)
+
+  useEffect(() => {
+    if (!actif) return
+    let vivant = true
+    void (async () => {
+      const m = await manifestePython()
+      if (!vivant) return
+      setManifeste(m)
+      // Déjà sur le téléphone : on le charge sans rien demander. Le prix a
+      // été payé une fois, il n'y a plus de choix à poser.
+      if (m !== null && (await dejaDescendu(m))) setDemande((d) => (d === 0 ? 1 : d))
+    })()
+    return () => { vivant = false }
+  }, [actif])
+
+  useEffect(() => {
+    if (demande === 0 || manifeste === null || manifeste === undefined) return
+    let vivant = true
+    setEchoue(false)
+    void (async () => {
+      try {
+        const e = await moteurPython(manifeste, (a) => { if (vivant) setAvancement(a) })
+        if (vivant) setEnvoi(e)
+      } catch {
+        // Le réseau a coupé, ou un fichier est arrivé tronqué. Ce qui est déjà
+        // gardé l'est bien : reprendre ne repart pas de zéro.
+        if (vivant) { setEchoue(true); setAvancement(null) }
+      }
+    })()
+    return () => { vivant = false }
+  }, [demande, manifeste])
+
+  return { manifeste, envoi, avancement, echoue, descendre: () => setDemande((d) => d + 1) }
+}
+
+/**
+ * Le prix, puis le bouton.
+ *
+ * Cinq mégaoctets sur un forfait compté à l'octet, ce n'est pas un détail
+ * technique : c'est de l'argent, et quelqu'un qui ne l'apprend qu'en voyant son
+ * solde ne reviendra pas. Le chiffre est donc écrit avant, en gros, et il vient
+ * du manifeste mesuré à la construction — pas d'une constante tapée à la main
+ * qui mentirait à la version suivante.
+ */
+function Python(props: {
+  readonly moteur: EtatPython
+  readonly langue: Langue
+  readonly t: Textes
+}): JSX.Element {
+  const { manifeste, avancement, echoue } = props.moteur
+
+  if (manifeste === undefined) return <p class="vide">{props.t.unInstant}</p>
+  if (manifeste === null) return <p class="vide">{props.t.pythonIndisponible}</p>
+
+  const taille = enMegaoctets(manifeste.surLeFil, props.langue)
+
+  if (avancement !== null && !echoue) {
+    const fait = Math.min(100, Math.round((avancement.recus / avancement.total) * 100))
+    return (
+      <div class="python">
+        <p class="python-etat">{props.t.pythonEnCours(fait)}</p>
+        {/*
+          * Une aiguille, pas un tourniquet.
+          *
+          * Sur une connexion lente, cinq mégaoctets prennent des minutes. Un
+          * tourniquet qui tourne ne dit pas si on en est au début ou à la fin,
+          * et au bout de deux minutes on coupe en croyant que c'est bloqué.
+          */}
+        <div class="python-jauge" role="progressbar" aria-valuenow={fait}
+          aria-valuemin={0} aria-valuemax={100} aria-label={props.t.pythonEnCours(fait)}>
+          <div class="python-jauge-faite" style={`width: ${fait}%`} />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div class="python">
+      <h2 class="python-titre">{props.t.pythonTitre}</h2>
+      <p class="python-pourquoi">{props.t.pythonPourquoi(taille)}</p>
+      <p class="python-fois">{props.t.pythonUneSeuleFois}</p>
+      {echoue && <p class="python-echoue">{props.t.pythonEchoue}</p>}
+      <button type="button" class="python-oui" onClick={props.moteur.descendre}>
+        {echoue ? props.t.pythonReessayer : props.t.pythonTelecharger(taille)}
+      </button>
+    </div>
+  )
+}

@@ -389,3 +389,57 @@ body {
 .console-explication .quoi { margin: 0; font-weight: 700; }
 .console-explication .faire { margin: 4px 0 0; opacity: .9; }
 .console-ligne.erreur .console-explication { border-left-color: #fca5a5; }
+
+/*
+ * --- Python, et son prix affiché avant ---
+ *
+ * Cet écran a un seul travail : faire lire un chiffre avant qu'on appuie. Le
+ * titre est donc court, la raison tient en une phrase, et le bouton porte la
+ * taille dans son libellé — pour que personne ne puisse appuyer sans l'avoir
+ * eue sous les yeux.
+ */
+.python {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 16px;
+  flex: 1;
+  justify-content: center;
+}
+
+.python-titre { margin: 0; font-size: 20px; color: var(--vert); }
+.python-pourquoi { margin: 0; line-height: 1.5; }
+.python-fois { margin: 0; color: var(--gris); font-size: 14px; line-height: 1.5; }
+.python-echoue { margin: 0; color: var(--rouge); line-height: 1.5; }
+
+.python-oui {
+  /* Quarante-quatre pixels : en dessous, on rate la cible dans un taxi. */
+  min-height: 44px;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--vert);
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.python-etat { margin: 0; color: var(--gris); font-variant-numeric: tabular-nums; }
+
+.python-jauge {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bord);
+  overflow: hidden;
+}
+
+.python-jauge-faite {
+  height: 100%;
+  background: var(--vert);
+  /* Le saut d'un morceau à l'autre est brutal sans ça, et lit comme un à-coup. */
+  transition: width 200ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .python-jauge-faite { transition: none; }
+}

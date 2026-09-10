@@ -53,6 +53,20 @@ const MOTS_JS = new Set([
   'switch', 'case', 'default', 'of', 'in', 'async', 'await', 'import', 'export',
 ])
 
+/*
+ * Les mots-clefs de Python, et rien d'autre.
+ *
+ * Pas « print » ni « len » : ce sont des fonctions, pas des mots du langage.
+ * Les colorer pareil apprendrait à quelqu'un une grammaire fausse — et il
+ * faudrait la désapprendre le jour où il écrirait sa propre fonction.
+ */
+const MOTS_PY = new Set([
+  'def', 'return', 'if', 'elif', 'else', 'for', 'while', 'break', 'continue',
+  'import', 'from', 'as', 'class', 'try', 'except', 'finally', 'raise', 'with',
+  'lambda', 'pass', 'and', 'or', 'not', 'in', 'is', 'None', 'True', 'False',
+  'global', 'nonlocal', 'assert', 'del', 'yield', 'async', 'await',
+])
+
 const LETTRE = /[A-Za-z_$]/
 const LETTRE_OU_CHIFFRE = /[A-Za-z0-9_$]/
 /*
@@ -280,10 +294,54 @@ function jetonsDeBalise(balise: string): readonly Jeton[] {
   })
 }
 
+function colorerPy(texte: string): readonly Jeton[] {
+  return parcourir(texte, (i, r) => {
+    const c = texte[i] ?? ''
+
+    if (c === '#') {
+      const fin = texte.indexOf('\n', i)
+      const stop = fin === -1 ? texte.length : fin
+      r.pousser(texte.slice(i, stop), 'commentaire')
+      return stop
+    }
+    /*
+     * Les triples guillemets d'abord, sinon la chaîne simple mange les deux
+     * premiers et le reste du fichier part en couleur de chaîne.
+     */
+    const trois = texte.slice(i, i + 3)
+    if (trois === '"""' || trois === "'''") {
+      const stop = jusqua(texte, i + 3, trois)
+      r.pousser(texte.slice(i, stop), 'chaine')
+      return stop
+    }
+    if (c === '"' || c === "'") {
+      const stop = finDeChaine(texte, i, c)
+      r.pousser(texte.slice(i, stop), 'chaine')
+      return stop
+    }
+    if (CHIFFRE.test(c)) {
+      let j = i
+      while (j < texte.length && /[0-9._]/.test(texte[j] ?? '')) j += 1
+      r.pousser(texte.slice(i, j), 'nombre')
+      return j
+    }
+    if (LETTRE.test(c)) {
+      let j = i
+      while (j < texte.length && LETTRE_OU_CHIFFRE.test(texte[j] ?? '')) j += 1
+      const mot = texte.slice(i, j)
+      r.pousser(mot, MOTS_PY.has(mot) ? 'motcle' : 'texte')
+      return j
+    }
+    r.pousser(c, ESPACE.test(c) ? 'texte' : 'ponctuation')
+    return i + 1
+  })
+}
+
 const PAR_SORTE: Readonly<Record<string, (t: string) => readonly Jeton[]>> = {
   js: colorerJs,
   css: colorerCss,
   html: colorerHtml,
+  py: colorerPy,
 }
 
 /**

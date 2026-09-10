@@ -1,9 +1,11 @@
 import { jsx as _jsx } from "preact/jsx-runtime";
 // @vitest-environment happy-dom
+import 'fake-indexeddb/auto';
 import { render as monter } from 'preact';
 import { act } from 'preact/test-utils';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Apercu } from '../src/apercu.js';
+import { clear, createStore } from 'idb-keyval';
 import { textes } from '@a237/etabli';
 const PROJET = {
     id: 'p1', nom: 'Ma page', maj: 0,
@@ -13,9 +15,18 @@ let hote;
 function poser(tour = 0) {
     act(() => { monter(_jsx(Apercu, { projet: PROJET, tour: tour, langue: "fr", t: textes('fr') }), hote); });
 }
-beforeEach(() => {
+/*
+ * Le moteur Python est vidé entre les essais.
+ *
+ * Sans ça, les fichiers descendus par un essai restent en base pour le
+ * suivant : celui qui vérifie la coupure n'avait plus rien à télécharger, donc
+ * plus rien à couper. Il passait, sans rien garder.
+ */
+const MOTEUR_PY = createStore('etabli-python', 'moteur');
+beforeEach(async () => {
     hote = document.createElement('div');
     document.body.appendChild(hote);
+    await clear(MOTEUR_PY);
 });
 /**
  * L'isolement du cadre est la seule chose qui rend tout le reste acceptable.
@@ -188,5 +199,167 @@ describe('l’erreur, expliquée', () => {
         Object.defineProperty(e, 'source', { value: cadre.contentWindow });
         act(() => { dispatchEvent(e); });
         expect(hote.querySelector('.console-explication')).toBe(null);
+    });
+});
+/**
+ * Python, et le prix affiché avant qu'on appuie.
+ *
+ * C'est la règle du produit : personne ne dépense cinq mégaoctets de forfait
+ * sans l'avoir su et voulu. Ces essais gardent l'ordre des choses — le chiffre,
+ * puis le bouton, jamais l'inverse.
+ */
+const PYTHON = {
+    id: 'p2', nom: 'Mon calcul', maj: 0,
+    fichiers: [{ nom: 'main.py', contenu: 'print(2 + 2)' }],
+};
+function poserPython(langue = 'fr') {
+    act(() => {
+        monter(_jsx(Apercu, { projet: PYTHON, tour: 0, langue: langue, t: textes(langue) }), hote);
+    });
+}
+/** Le temps que les promesses du crochet se dénouent. */
+async function laisserRespirer() {
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+}
+/**
+ * Attendre qu'une condition tienne, pas un nombre de tours.
+ *
+ * IndexedDB rend la main par macro-tâches, pas par micro-tâches : compter les
+ * `Promise.resolve()` marchait pour le manifeste et pas pour le stockage. Un
+ * essai qui dépend d'un nombre de tours passe sur cette machine-ci et tombe sur
+ * une machine plus lente, ce qui est la pire sorte d'essai.
+ */
+async function attendre(tient, quoi) {
+    for (let i = 0; i < 200; i += 1) {
+        if (tient())
+            return;
+        await act(async () => { await new Promise((r) => { setTimeout(r, 1); }); });
+    }
+    throw new Error(`toujours pas : ${quoi}`);
+}
+const MANIFESTE = {
+    version: '0.28.3',
+    fichiers: [{
+            nom: 'pyodide.js', forme: 'texte', octets: 12_262_929, surLeFil: 5_304_678,
+            empreinte: 'a'.repeat(64),
+        }],
+    octets: 12_262_929,
+    surLeFil: 5_304_678,
+};
+describe('un projet Python', () => {
+    it('n’exécute rien tant que le moteur n’est pas là', async () => {
+        vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify(MANIFESTE))));
+        poserPython();
+        await laisserRespirer();
+        expect(hote.querySelector('iframe')).toBe(null);
+        vi.unstubAllGlobals();
+    });
+    /*
+     * Le chiffre est dans le libellé du bouton, pas seulement au-dessus. On ne
+     * peut donc pas appuyer sans l'avoir eu sous les yeux — c'est la seule
+     * garantie qui tienne quand quelqu'un appuie vite.
+     */
+    it('annonce le prix, dans le bouton même', async () => {
+        vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify(MANIFESTE))));
+        poserPython();
+        await laisserRespirer();
+        const bouton = hote.querySelector('.python-oui');
+        expect(bouton?.textContent).toContain('5,1 Mo');
+        vi.unstubAllGlobals();
+    });
+    it('et l’annonce en anglais avec le point décimal', async () => {
+        vi.stubGlobal('fetch', () => Promise.resolve(new Response(JSON.stringify(MANIFESTE))));
+        poserPython('en');
+        await laisserRespirer();
+        expect(hote.querySelector('.python-oui')?.textContent).toContain('5.1 MB');
+        vi.unstubAllGlobals();
+    });
+    /*
+     * Sans manifeste, cette installation n'a pas Python. Le dire vaut mieux qu'un
+     * bouton qui échoue — et il ne faut pas le dire pendant qu'on cherche encore.
+     */
+    it('le dit quand cette installation n’a pas Python du tout', async () => {
+        vi.stubGlobal('fetch', () => Promise.resolve(new Response('', { status: 404 })));
+        poserPython();
+        await laisserRespirer();
+        expect(hote.textContent).toContain('n’est pas installé');
+        expect(hote.querySelector('.python-oui')).toBe(null);
+        vi.unstubAllGlobals();
+    });
+    it('ne propose rien du tout pour un projet qui n’est pas Python', () => {
+        poser();
+        expect(hote.querySelector('.python')).toBe(null);
+        expect(hote.querySelector('iframe')).not.toBe(null);
+    });
+});
+/**
+ * Le parcours entier : le prix, l'appui, l'aiguille, puis Python qui tourne.
+ *
+ * Les essais précédents gardent l'ordre des écrans ; celui-ci garde le chemin
+ * complet, y compris la panne au milieu. C'est là que vivent les fautes qui
+ * coûtent de l'argent — un moteur qu'on redescend, un fichier tronqué qu'on
+ * garde — et aucune ne se voit sur un écran fixe.
+ */
+const CORPS_PY = {
+    'pyodide.js': 'la façade',
+    'pyodide.asm.js': 'le moteur',
+    'pyodide-lock.json': '{}',
+    'pyodide.asm.wasm': 'du wasm',
+    'python_stdlib.zip': 'la bibliothèque',
+};
+async function manifesteVrai() {
+    const fichiers = await Promise.all(Object.entries(CORPS_PY).map(async ([nom, corps]) => {
+        const brut = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(corps));
+        return {
+            nom,
+            forme: nom.endsWith('.wasm') || nom.endsWith('.zip') ? 'octets' : 'texte',
+            octets: new TextEncoder().encode(corps).byteLength,
+            surLeFil: 1_000_000,
+            empreinte: [...new Uint8Array(brut)].map((o) => o.toString(16).padStart(2, '0')).join(''),
+        };
+    }));
+    return {
+        version: '0.28.3',
+        fichiers,
+        octets: fichiers.reduce((t, f) => t + f.octets, 0),
+        surLeFil: fichiers.reduce((t, f) => t + f.surLeFil, 0),
+    };
+}
+function serveurPy(manifeste, casse = []) {
+    return ((url) => {
+        const nom = String(url).replace('pyodide/', '');
+        if (nom === 'manifeste.json')
+            return Promise.resolve(new Response(JSON.stringify(manifeste)));
+        if (casse.includes(nom))
+            return Promise.resolve(new Response('', { status: 500 }));
+        return Promise.resolve(new Response(CORPS_PY[nom] ?? ''));
+    });
+}
+describe('descendre Python depuis l’écran', () => {
+    it('l’appui fait descendre le moteur, puis le cadre exécute le Python', async () => {
+        vi.stubGlobal('fetch', serveurPy(await manifesteVrai()));
+        poserPython();
+        await laisserRespirer();
+        const bouton = hote.querySelector('.python-oui');
+        expect(bouton).not.toBe(null);
+        act(() => { bouton.click(); });
+        await attendre(() => hote.querySelector('iframe') !== null, 'le cadre Python');
+        const cadre = hote.querySelector('iframe');
+        expect(cadre?.getAttribute('sandbox')).toBe('allow-scripts');
+        expect(cadre?.getAttribute('srcdoc')).toContain('print(2 + 2)');
+        // Et le document Python, pas celui des pages.
+        expect(cadre?.getAttribute('srcdoc')).toContain('a237-py');
+        vi.unstubAllGlobals();
+    });
+    it('une coupure au milieu propose de reprendre, sans perdre ce qui est arrivé', async () => {
+        vi.stubGlobal('fetch', serveurPy(await manifesteVrai(), ['python_stdlib.zip']));
+        poserPython();
+        await laisserRespirer();
+        act(() => { hote.querySelector('.python-oui').click(); });
+        await attendre(() => hote.querySelector('.python-echoue') !== null, 'le reproche');
+        expect(hote.querySelector('.python-echoue')).not.toBe(null);
+        expect(hote.querySelector('.python-oui')?.textContent).toBe(textes('fr').pythonReessayer);
+        expect(hote.querySelector('iframe')).toBe(null);
+        vi.unstubAllGlobals();
     });
 });
