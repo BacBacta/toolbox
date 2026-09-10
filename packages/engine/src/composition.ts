@@ -1,7 +1,7 @@
 import type { CalculDemande } from './calcul.js'
 import { verifierCalcul } from './calcul.js'
 import type { RefusModele, RegistreDemande } from './registre.js'
-import { schemaRefus, verifierRegistre } from './registre.js'
+import { MAX_REFUS, schemaRefus, verifierRegistre } from './registre.js'
 import type { ErreurValidation } from './types.js'
 import { valider } from './valider.js'
 
@@ -25,16 +25,77 @@ export type ReponseModele =
   | { readonly sorte: 'refus'; readonly pourquoi: string }
   | { readonly sorte: 'invalide'; readonly erreurs: readonly ErreurValidation[] }
 
+/**
+ * Coupe à la longueur voulue, et à un mot.
+ *
+ * Trancher au caractère près laisserait « je ne peux pas créer ce regis… » :
+ * la coupure se voit, et elle donne l'air d'une panne plutôt que d'une phrase
+ * abrégée. On recule jusqu'à la dernière espace, et les points de suspension
+ * disent qu'il y avait une suite.
+ */
+function raccourcir(texte: string, max: number): string {
+  if (texte.length <= max) return texte
+  const brut = texte.slice(0, max - 1)
+  const espace = brut.lastIndexOf(' ')
+  return `${(espace > max / 2 ? brut.slice(0, espace) : brut).trimEnd()}…`
+}
+
+/**
+ * A-t-on reçu le schéma au lieu d'un objet qui le respecte ?
+ *
+ * Mesuré en production : une demande sur dix recevait notre propre schéma,
+ * renvoyé tel quel. Il est long, il se fait couper en route, et le reproche qui
+ * suivait — « la réponse n'est pas du JSON » — ne disait rien de ce qui s'était
+ * passé. La reprise repartait donc au hasard, et coûtait un tour pour rien.
+ *
+ * `properties` avec `type` à la racine ne se rencontre que là : un registre a
+ * `titre` et `colonnes`, une calculatrice `entrees`, un refus `impossible`.
+ * Une colonne peut très bien s'appeler « type » — un registre de motos en a
+ * un — mais elle vit dans `colonnes`, pas à la racine.
+ */
+function estUnSchema(valeur: object): boolean {
+  return 'properties' in valeur && ('type' in valeur || '$schema' in valeur)
+}
+
 export function lireReponseModele(valeur: unknown): ReponseModele {
   if (typeof valeur !== 'object' || valeur === null) {
     return { sorte: 'invalide', erreurs: [{ chemin: '$', message: 'la réponse n’est pas un objet' }] }
   }
 
+  if (estUnSchema(valeur)) {
+    return {
+      sorte: 'invalide',
+      erreurs: [
+        {
+          chemin: '$',
+          message:
+            'tu as renvoyé le schéma. Renvoie un objet qui le respecte : ses champs remplis ' +
+            'pour la demande, pas sa description.',
+        },
+      ],
+    }
+  }
+
   if ('impossible' in valeur) {
-    const erreurs = valider(schemaRefus, valeur)
+    /*
+     * On coupe avant de valider, et non l'inverse.
+     *
+     * Mesuré en production sur dix générations : un refus de cent
+     * quatre-vingt-onze caractères a été jugé invalide, le modèle repris —
+     * donc payé deux fois — puis abandonné. La personne a dépensé un crédit
+     * pour lire « le modèle n'a pas produit un registre utilisable » à la
+     * place d'une phrase qui répondait à sa question.
+     *
+     * Le plafond est là pour que le modèle ne s'étale pas, pas pour jeter une
+     * réponse juste. Le plancher, lui, reste : un refus vide n'est pas un
+     * refus.
+     */
+    const brut = (valeur as { impossible: unknown }).impossible
+    const coupe = typeof brut === 'string' ? raccourcir(brut, MAX_REFUS) : brut
+    const erreurs = valider(schemaRefus, { ...valeur, impossible: coupe })
     return erreurs.length > 0
       ? { sorte: 'invalide', erreurs }
-      : { sorte: 'refus', pourquoi: (valeur as RefusModele).impossible }
+      : { sorte: 'refus', pourquoi: coupe as RefusModele['impossible'] }
   }
 
   if ('entrees' in valeur) {

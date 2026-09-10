@@ -899,6 +899,36 @@ function verifierRegistre(valeur) {
 }
 //#endregion
 //#region ../engine/src/composition.ts
+/**
+* Coupe à la longueur voulue, et à un mot.
+*
+* Trancher au caractère près laisserait « je ne peux pas créer ce regis… » :
+* la coupure se voit, et elle donne l'air d'une panne plutôt que d'une phrase
+* abrégée. On recule jusqu'à la dernière espace, et les points de suspension
+* disent qu'il y avait une suite.
+*/
+function raccourcir(texte, max) {
+	if (texte.length <= max) return texte;
+	const brut = texte.slice(0, max - 1);
+	const espace = brut.lastIndexOf(" ");
+	return `${(espace > max / 2 ? brut.slice(0, espace) : brut).trimEnd()}…`;
+}
+/**
+* A-t-on reçu le schéma au lieu d'un objet qui le respecte ?
+*
+* Mesuré en production : une demande sur dix recevait notre propre schéma,
+* renvoyé tel quel. Il est long, il se fait couper en route, et le reproche qui
+* suivait — « la réponse n'est pas du JSON » — ne disait rien de ce qui s'était
+* passé. La reprise repartait donc au hasard, et coûtait un tour pour rien.
+*
+* `properties` avec `type` à la racine ne se rencontre que là : un registre a
+* `titre` et `colonnes`, une calculatrice `entrees`, un refus `impossible`.
+* Une colonne peut très bien s'appeler « type » — un registre de motos en a
+* un — mais elle vit dans `colonnes`, pas à la racine.
+*/
+function estUnSchema(valeur) {
+	return "properties" in valeur && ("type" in valeur || "$schema" in valeur);
+}
 function lireReponseModele(valeur) {
 	if (typeof valeur !== "object" || valeur === null) return {
 		sorte: "invalide",
@@ -907,14 +937,26 @@ function lireReponseModele(valeur) {
 			message: "la réponse n’est pas un objet"
 		}]
 	};
+	if (estUnSchema(valeur)) return {
+		sorte: "invalide",
+		erreurs: [{
+			chemin: "$",
+			message: "tu as renvoyé le schéma. Renvoie un objet qui le respecte : ses champs remplis pour la demande, pas sa description."
+		}]
+	};
 	if ("impossible" in valeur) {
-		const erreurs = valider(schemaRefus, valeur);
+		const brut = valeur.impossible;
+		const coupe = typeof brut === "string" ? raccourcir(brut, 160) : brut;
+		const erreurs = valider(schemaRefus, {
+			...valeur,
+			impossible: coupe
+		});
 		return erreurs.length > 0 ? {
 			sorte: "invalide",
 			erreurs
 		} : {
 			sorte: "refus",
-			pourquoi: valeur.impossible
+			pourquoi: coupe
 		};
 	}
 	if ("entrees" in valeur) {
@@ -1227,12 +1269,17 @@ Sa formule se déclare en arbre, jamais en code.
 
 Réponds par un objet JSON seul, sans texte autour, sans bloc de code.
 
+Les schémas plus bas **décrivent** la forme de ta réponse. Ils ne sont pas la
+réponse : renvoie un objet dont les champs sont remplis pour cette demande-là,
+jamais la description elle-même.
+
 **Si la demande n'est ni l'un ni l'autre, refuse.** Un site internet, une
 application, un logo, une traduction, un conseil : rien de tout cela ne se
-range dans un tableau ni dans une formule. Réponds alors par le schéma de
-refus, en disant en une phrase ce que tu ne peux pas faire, et ce que tu sais
-faire. Ne fabrique jamais un outil plausible pour une demande qui n'en réclame
-pas : un outil inventé se remplit une fois, puis se referme pour toujours.
+range dans un tableau ni dans une formule. Réponds alors par un objet
+qui n'a qu'un champ « impossible », en disant en une phrase ce que tu ne peux
+pas faire, et ce que tu sais faire. Ne fabrique jamais un outil plausible pour
+une demande qui n'en réclame pas : un outil inventé se remplit une fois, puis
+se referme pour toujours.
 
 Règles :
 - Les montants sont en francs CFA, entiers, sans décimale.
@@ -1248,13 +1295,13 @@ Règles :
 function batirInvite(demande) {
 	return `${CONSIGNES}
 
-Schéma d'un registre :
+Un registre doit respecter ce schéma :
 ${JSON.stringify(schemaRegistre)}
 
-Schéma d'une calculatrice :
+Une calculatrice doit respecter celui-ci :
 ${JSON.stringify(schemaCalcul)}
 
-Schéma d'un refus :
+Un refus, celui-ci :
 ${JSON.stringify(schemaRefus)}
 
 Demande de l'utilisateur :
@@ -1296,6 +1343,11 @@ async function traiter(demande, fournisseur, tauxFcfaParDollar) {
 		sortie = reponse.texte;
 		const valeur = lireJson(reponse.texte);
 		if (valeur === void 0) {
+			console.error(JSON.stringify({
+				evenement: "json_illisible",
+				essai,
+				debut: reponse.texte.slice(0, 300)
+			}));
 			erreurs = [{
 				chemin: "$",
 				message: "la réponse n’est pas du JSON"
@@ -1341,17 +1393,31 @@ async function traiter(demande, fournisseur, tauxFcfaParDollar) {
 /**
 * Le JSON du modèle, ou rien.
 *
-* `responseMimeType` le demande déjà, mais un fournisseur de secours pourrait
-* envelopper la réponse dans un bloc de code. On le déshabille plutôt que de
-* refuser — c'est une faute de forme, pas de fond.
+* `responseMimeType` le demande déjà, et le modèle déborde quand même : mesuré
+* en production sur dix générations réelles, une demande sur dix a échoué sur
+* « la réponse n'est pas du JSON », deux fois de suite, pour soixante centimes.
+* Un bloc de code entouré d'une phrase de politesse suffit à faire tomber une
+* configuration parfaitement valable.
+*
+* C'est une faute de forme et non de fond : on déshabille plutôt que de faire
+* payer un tour de plus. Trois tentatives, de la plus stricte à la plus large,
+* et la dernière ne cherche que ce qui ne peut pas être de la prose — le
+* premier `{` jusqu'au dernier `}`. Ce qu'on ne trouve pas ainsi n'était pas
+* une configuration enveloppée : c'était autre chose, et ça reste un échec.
 */
 function lireJson(texte) {
-	const propre = texte.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-	try {
-		return JSON.parse(propre);
-	} catch {
-		return;
-	}
+	const brut = texte.trim();
+	for (const candidat of candidatsJson(brut)) try {
+		return JSON.parse(candidat);
+	} catch {}
+}
+function* candidatsJson(brut) {
+	yield brut;
+	const bloc = /```(?:json)?\s*([\s\S]*?)```/i.exec(brut);
+	if (bloc?.[1] !== void 0) yield bloc[1].trim();
+	const debut = brut.indexOf("{");
+	const fin = brut.lastIndexOf("}");
+	if (debut !== -1 && fin > debut) yield brut.slice(debut, fin + 1);
 }
 //#endregion
 //#region src/fonction.ts

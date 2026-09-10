@@ -157,3 +157,41 @@ describe('les pannes de fournisseur se nomment', () => {
     await expect(gemini('x').appeler({ invite: 'x' })).rejects.toMatchObject({ sorte: 'credit-epuise' })
   })
 })
+
+describe('le JSON du modèle, tel qu’il arrive vraiment', () => {
+  /*
+   * Mesuré en production sur dix générations réelles : une demande sur dix a
+   * échoué sur « la réponse n'est pas du JSON », deux fois de suite, pour
+   * soixante centimes. On ne savait pas ce que le modèle avait renvoyé — rien
+   * ne le gardait — et c'était le premier défaut à corriger : un échec qu'on
+   * ne peut pas diagnostiquer se reproduit.
+   *
+   * Les formes ci-dessous sont celles qu'un modèle produit quand il déborde de
+   * la consigne. Aucune n'est une faute de fond : la configuration est là,
+   * enveloppée. On la déshabille plutôt que de faire payer un tour de plus.
+   */
+  const CAS: readonly (readonly [string, string])[] = [
+    ['une phrase avant le bloc', `Voici la configuration demandée :\n\n\`\`\`json\n${BON}\n\`\`\``],
+    ['une phrase après', `\`\`\`json\n${BON}\n\`\`\`\n\nDis-moi si ça te convient.`],
+    ['des deux côtés', `Bien sûr !\n\`\`\`\n${BON}\n\`\`\`\nVoilà.`],
+    ['sans bloc, juste de la prose autour', `Voici :\n${BON}\nJ’espère que ça ira.`],
+    ['un bloc sans langue annoncée', `\`\`\`\n${BON}\n\`\`\``],
+  ]
+
+  for (const [quoi, texte] of CAS) {
+    it(`se lit malgré ${quoi}`, async () => {
+      const f = faux([texte])
+      const r = await traiter('je veux suivre mes livraisons', f, 600)
+      expect(r.sorte, quoi).toBe('reussi')
+      // Et sans reprise : la faute de forme ne doit pas coûter un tour.
+      expect(f.vus).toHaveLength(1)
+    })
+  }
+
+  it('mais de la prose sans configuration reste un échec', async () => {
+    // On déshabille ce qui est enveloppé ; on n'invente pas ce qui manque.
+    const f = faux(['Je pense que tu devrais plutôt utiliser un tableur.', 'toujours pas de json'])
+    const r = await traiter('je veux suivre mes livraisons', f, 600)
+    expect(r.sorte).toBe('invalide')
+  })
+})

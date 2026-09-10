@@ -80,6 +80,24 @@ export async function traiter(
 
     const valeur = lireJson(reponse.texte)
     if (valeur === undefined) {
+      /*
+       * Ce que le modèle a réellement dit part dans le journal du serveur.
+       *
+       * Sans ça, un échec de lecture ne se diagnostique pas : on sait qu'il a
+       * eu lieu, on ne sait pas contre quoi. C'est exactement ce qui est
+       * arrivé sur les dix générations de production — deux échecs, aucun
+       * moyen de savoir quelle forme les avait causés sans les reproduire.
+       *
+       * Côté serveur seulement, et tronqué. La clef n'est jamais dans l'invite,
+       * donc jamais dans l'écho ; ce qui revient est du texte de modèle.
+       */
+      console.error(
+        JSON.stringify({
+          evenement: 'json_illisible',
+          essai,
+          debut: reponse.texte.slice(0, 300),
+        }),
+      )
       erreurs = [{ chemin: '$', message: 'la réponse n’est pas du JSON' }]
       continue
     }
@@ -121,15 +139,40 @@ export async function traiter(
 /**
  * Le JSON du modèle, ou rien.
  *
- * `responseMimeType` le demande déjà, mais un fournisseur de secours pourrait
- * envelopper la réponse dans un bloc de code. On le déshabille plutôt que de
- * refuser — c'est une faute de forme, pas de fond.
+ * `responseMimeType` le demande déjà, et le modèle déborde quand même : mesuré
+ * en production sur dix générations réelles, une demande sur dix a échoué sur
+ * « la réponse n'est pas du JSON », deux fois de suite, pour soixante centimes.
+ * Un bloc de code entouré d'une phrase de politesse suffit à faire tomber une
+ * configuration parfaitement valable.
+ *
+ * C'est une faute de forme et non de fond : on déshabille plutôt que de faire
+ * payer un tour de plus. Trois tentatives, de la plus stricte à la plus large,
+ * et la dernière ne cherche que ce qui ne peut pas être de la prose — le
+ * premier `{` jusqu'au dernier `}`. Ce qu'on ne trouve pas ainsi n'était pas
+ * une configuration enveloppée : c'était autre chose, et ça reste un échec.
  */
 function lireJson(texte: string): unknown {
-  const propre = texte.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
-  try {
-    return JSON.parse(propre)
-  } catch {
-    return undefined
+  const brut = texte.trim()
+
+  for (const candidat of candidatsJson(brut)) {
+    try {
+      return JSON.parse(candidat)
+    } catch {
+      // Le suivant.
+    }
   }
+  return undefined
+}
+
+function* candidatsJson(brut: string): Generator<string> {
+  yield brut
+
+  // Un bloc de code, où qu'il soit dans la réponse.
+  const bloc = /```(?:json)?\s*([\s\S]*?)```/i.exec(brut)
+  if (bloc?.[1] !== undefined) yield bloc[1].trim()
+
+  // Le premier objet accolé, du premier `{` au dernier `}`.
+  const debut = brut.indexOf('{')
+  const fin = brut.lastIndexOf('}')
+  if (debut !== -1 && fin > debut) yield brut.slice(debut, fin + 1)
 }

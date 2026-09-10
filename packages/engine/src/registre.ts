@@ -158,13 +158,16 @@ export interface RefusModele {
   readonly impossible: string
 }
 
+/** Ce qu'un refus peut faire de long avant qu'on le coupe. */
+export const MAX_REFUS = 160
+
 export const schemaRefus: JsonSchema = {
   type: 'object',
   additionalProperties: false,
   required: ['impossible'],
   properties: {
     impossible: {
-      type: 'string', minLength: 4, maxLength: 160,
+      type: 'string', minLength: 4, maxLength: MAX_REFUS,
       description:
         'Pourquoi la demande ne se range pas dans un registre. Une phrase, en français, adressée à l’utilisateur.',
     },

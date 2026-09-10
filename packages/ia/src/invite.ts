@@ -27,12 +27,17 @@ Sa formule se déclare en arbre, jamais en code.
 
 Réponds par un objet JSON seul, sans texte autour, sans bloc de code.
 
+Les schémas plus bas **décrivent** la forme de ta réponse. Ils ne sont pas la
+réponse : renvoie un objet dont les champs sont remplis pour cette demande-là,
+jamais la description elle-même.
+
 **Si la demande n'est ni l'un ni l'autre, refuse.** Un site internet, une
 application, un logo, une traduction, un conseil : rien de tout cela ne se
-range dans un tableau ni dans une formule. Réponds alors par le schéma de
-refus, en disant en une phrase ce que tu ne peux pas faire, et ce que tu sais
-faire. Ne fabrique jamais un outil plausible pour une demande qui n'en réclame
-pas : un outil inventé se remplit une fois, puis se referme pour toujours.
+range dans un tableau ni dans une formule. Réponds alors par un objet
+qui n'a qu'un champ « impossible », en disant en une phrase ce que tu ne peux
+pas faire, et ce que tu sais faire. Ne fabrique jamais un outil plausible pour
+une demande qui n'en réclame pas : un outil inventé se remplit une fois, puis
+se referme pour toujours.
 
 Règles :
 - Les montants sont en francs CFA, entiers, sans décimale.
@@ -49,13 +54,13 @@ Règles :
 export function batirInvite(demande: string): string {
   return `${CONSIGNES}
 
-Schéma d'un registre :
+Un registre doit respecter ce schéma :
 ${JSON.stringify(schemaRegistre)}
 
-Schéma d'une calculatrice :
+Une calculatrice doit respecter celui-ci :
 ${JSON.stringify(schemaCalcul)}
 
-Schéma d'un refus :
+Un refus, celui-ci :
 ${JSON.stringify(schemaRefus)}
 
 Demande de l'utilisateur :
