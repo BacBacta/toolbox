@@ -1,0 +1,96 @@
+import { describe, expect, it } from 'vitest'
+import { couter } from '../src/cout.js'
+import { batirInviteAgent } from '../src/agent.js'
+
+/**
+ * L'invite de l'agent, et son prix.
+ *
+ * Une conversation fait plusieurs appels là où un bouton en faisait un. Ce qui
+ * la rend abordable n'est pas un rabais : c'est que **seul le premier tour a
+ * besoin de choisir**. Dès que la famille est connue, les tours suivants
+ * n'emportent que son schéma — un affinage n'a aucune raison de payer la
+ * description d'un formulaire quand on retouche une page.
+ */
+
+const PRIX = { entree: 0.1, sortie: 0.4 }
+const TAUX_FCFA = 600
+const CAR_PAR_JETON = 3.5
+const JETONS_SORTIE = 900
+
+const francs = (invite: string): number =>
+  couter(
+    { entree: Math.ceil(invite.length / CAR_PAR_JETON), sortie: JETONS_SORTIE },
+    PRIX,
+    TAUX_FCFA,
+  ).fcfa
+
+describe('le prix d’un tour', () => {
+  it('tient sous le franc du § 8, au premier tour comme aux suivants', () => {
+    expect(francs(batirInviteAgent())).toBeLessThan(1)
+    expect(francs(batirInviteAgent('page'))).toBeLessThan(1)
+  })
+
+  it('un affinage coûte nettement moins que le premier tour', () => {
+    // C'est ce qui fait qu'on peut discuter plutôt que de tout redemander.
+    const premier = batirInviteAgent().length
+    const suivant = batirInviteAgent('page').length
+    expect(suivant).toBeLessThan(premier * 0.6)
+  })
+
+  it('et une conversation de quatre tours reste sous deux francs', () => {
+    // Un outil vaut cinquante francs de recette à l'abonnement : la marge est
+    // large. Ce qui compte est de savoir le chiffre, pas de le minimiser.
+    const total =
+      francs(batirInviteAgent()) + 3 * francs(batirInviteAgent('registre'))
+    expect(total).toBeLessThan(2)
+  })
+})
+
+describe('ce que l’invite dit', () => {
+  it('donne le droit de ne rendre qu’un mot', () => {
+    // Personne ne décrit du premier coup l'outil qu'il veut, et une question
+    // coûte le même tour qu'un outil inventé.
+    expect(batirInviteAgent()).toContain('droit de ne rendre que le mot')
+  })
+
+  it('demande l’outil entier à chaque modification, pas une différence', () => {
+    expect(batirInviteAgent('page')).toContain('renvoie l’outil\nentier')
+  })
+
+  it('met le mot avant l’outil dans l’enveloppe', () => {
+    /*
+     * Le modèle écrit ses clefs dans l'ordre du schéma : la phrase arrive donc
+     * avant l'outil, et s'écrit dans la conversation pendant que l'outil se
+     * construit à côté. L'inverse laisserait quelqu'un devant un aperçu qui
+     * bouge sans un mot d'explication.
+     */
+    const invite = batirInviteAgent()
+    expect(invite.indexOf('"mot"')).toBeLessThan(invite.indexOf('"outil"'))
+  })
+
+  it('interdit d’inventer ce qui engage ou déplace quelqu’un', () => {
+    const invite = batirInviteAgent().replace(/\s+/g, ' ')
+    expect(invite).toContain('N’invente jamais un numéro de téléphone, une adresse, une date ni un prix')
+    expect(invite).toContain('un numéro inventé appartient à quelqu’un')
+  })
+
+  it('n’emporte que le schéma de la famille en cours', () => {
+    const page = batirInviteAgent('page')
+    expect(page).toContain('"sections"')
+    expect(page).not.toContain('"colonnes"')
+    expect(page).not.toContain('"champs"')
+  })
+
+  it('les emporte tous au premier tour, où il faut pouvoir choisir', () => {
+    const premier = batirInviteAgent()
+    for (const clef of ['"colonnes"', '"entrees"', '"sections"', '"champs"']) {
+      expect(premier).toContain(clef)
+    }
+  })
+
+  it('ne montre au modèle rien de ce qui ne sert qu’à l’écran', () => {
+    const invite = batirInviteAgent()
+    expect(invite).not.toContain('"title"')
+    expect(invite).not.toContain('"ecran"')
+  })
+})

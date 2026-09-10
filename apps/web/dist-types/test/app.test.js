@@ -28,8 +28,9 @@ beforeEach(async () => {
     // le premier chargement du fragment est déplacé hors du chemin mesuré.
     await Promise.all(Object.values(CHARGEURS).map((chargeur) => chargeur()));
     // L'écran du compte se charge de la même façon, et se préchauffe pour la
-    // même raison.
+    // même raison. Celui de l'agent aussi.
     await import('../src/ecran-compte.js');
+    await import('../src/ecran-agent.js');
     for (const o of await listerOutils())
         await supprimerOutil(o.id);
     hote = document.createElement('div');
@@ -102,16 +103,80 @@ describe('l’atelier comprend la demande, sans appeler personne', () => {
         demander('je veux un devis puis une facture');
         expect(hote.textContent).toContain('Lequel veux-tu ?');
     });
-    it('le dit quand c’est hors de sa portée, et propose de composer', () => {
+    it('le dit quand c’est hors de sa portée, et propose d’en parler', () => {
         demander('il me faut un contrat de bail');
         expect(hote.textContent).toContain('Aucun de mes outils ne correspond');
-        // La composition part sur un geste, jamais en tapant : chaque appel coûte.
-        expect(hote.textContent).toContain('Compose-le pour moi');
+        // La conversation part sur un geste, jamais en tapant : chaque tour coûte.
+        expect(hote.textContent).toContain('En parler à l’atelier');
     });
     it('garde la grille complète sous la main', () => {
         // La demande ne cache pas les autres outils : on peut toujours parcourir.
         demander('devis');
         expect(hote.textContent).toContain('Carnet de njangi');
+    });
+});
+describe('l’atelier passe la main à l’agent', () => {
+    const vraiFetch = globalThis.fetch;
+    afterEach(() => {
+        globalThis.fetch = vraiFetch;
+    });
+    const REGISTRE = {
+        titre: 'Suivi des livraisons',
+        kicker: 'SUIVI DES LIVRAISONS',
+        titreNom: 'Nom du dépôt',
+        colonnes: [{ clef: 'client', titre: 'Client', type: 'texte' }],
+        libelleVide: 'Aucune livraison.',
+        libelleAjout: 'Ajouter',
+        relancesVides: 'Un suivi ne se relance pas.',
+    };
+    function agentRepond() {
+        const corps = 'data: {"sorte":"fin","tour":{"sorte":"outil","mot":"Voilà ton suivi.",' +
+            `"outil":{"sorte":"registre","registre":${JSON.stringify(REGISTRE)}}},` +
+            '"fcfa":0.31,"conversation":"c.1.9e15.s","plan":"essai","credits":4}\n\n';
+        const octets = new TextEncoder().encode(corps);
+        globalThis.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            status: 200,
+            body: new ReadableStream({
+                start(f) {
+                    f.enqueue(octets);
+                    f.close();
+                },
+            }),
+            json: () => Promise.resolve({}),
+        });
+    }
+    it('ouvre la conversation avec la phrase déjà tapée', async () => {
+        agentRepond();
+        demander('il me faut un contrat de bail');
+        cliquerTexte('En parler à l’atelier');
+        await reposer(12);
+        expect(hote.textContent).toContain('il me faut un contrat de bail');
+        expect(hote.querySelector('.agent-fenetre')).not.toBeNull();
+    });
+    it('crée l’outil composé, et dit ce qu’il a coûté', async () => {
+        agentRepond();
+        demander('il me faut un contrat de bail');
+        cliquerTexte('En parler à l’atelier');
+        await reposer(16);
+        cliquerTexte('Ouvrir cet outil');
+        await reposer(16);
+        const [range] = await listerOutils();
+        expect(range?.skeleton).toBe('compose');
+        expect(range?.registre).toMatchObject({ titre: 'Suivi des livraisons' });
+        // « 0 F » sous une dépense de trente et un centimes est le début d'une
+        // facture qu'on découvre à la fin du mois.
+        expect(hote.textContent).toContain('0,31');
+    });
+    it('revient à l’accueil sans rien créer quand on referme', async () => {
+        agentRepond();
+        demander('il me faut un contrat de bail');
+        cliquerTexte('En parler à l’atelier');
+        await reposer(12);
+        cliquerTexte('Mes outils');
+        await reposer();
+        expect(await listerOutils()).toHaveLength(0);
+        expect(hote.textContent).toContain('Tous les outils');
     });
 });
 describe('créer et rouvrir un outil', () => {

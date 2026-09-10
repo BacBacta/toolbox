@@ -103,6 +103,11 @@ export {
 export type {
   ChampDemande, Depouille, FormulaireDemande, Reponse, SorteChamp,
 } from './formulaire.js'
+export {
+  composeDe, ebaucheFinie, ebaucher, familleDe, lireTour, squeletteDe,
+} from './agent.js'
+export type { Ebauche, FamilleOutil, LectureTour, TourModele } from './agent.js'
+export { lireJsonPartiel } from './partiel.js'
 export { pourLeModele } from './schema-modele.js'
 export type { ReponseModele } from './composition.js'
 export { lireReponseModele } from './composition.js'

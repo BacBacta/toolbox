@@ -23,7 +23,7 @@ describe('strategiePour', () => {
         expect(strategiePour(requete({ mode: 'navigate', destination: 'document', url: `${ORIGINE}/d/K7M2XQ4BN9PZ` }), ORIGINE)).toBe('reseau');
     });
     it('laisse passer l’API, navigation ou non', () => {
-        expect(strategiePour(requete({ mode: 'navigate', destination: 'document', url: `${ORIGINE}/api/ai` }), ORIGINE)).toBe('reseau');
+        expect(strategiePour(requete({ mode: 'navigate', destination: 'document', url: `${ORIGINE}/api/chat` }), ORIGINE)).toBe('reseau');
     });
     it('ne confond pas un chemin de l’application avec un chemin du serveur', () => {
         // `/depart` commence par `/d` sans être `/d/`.

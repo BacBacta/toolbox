@@ -1,6 +1,5 @@
 import type { Extrait, FicheSquelette } from '@a237/engine';
 import type { JSX } from 'preact';
-import type { Compose } from './outils.js';
 /**
  * L'atelier : on dit ce dont on a besoin, l'outil s'ouvre.
  *
@@ -23,11 +22,15 @@ import type { Compose } from './outils.js';
  */
 export interface ProprietesAtelier {
     readonly fiches: readonly FicheSquelette[];
+    readonly onCreer: (skeleton: string, extrait: Extrait) => void;
     /**
-     * `fcfa` est ce que la composition a coûté. Il ne sert pas à décorer : la
-     * consommation se paie à l'appel, et une dépense qu'on ne voit pas est une
-     * dépense qu'on découvre à la fin du mois.
+     * Ouvrir la conversation avec l'agent, la phrase déjà tapée en main.
+     *
+     * L'atelier ne compose plus lui-même. Un bouton qui lançait une génération
+     * et rendait un outil marchait, mais il ne laissait aucune place à la
+     * deuxième phrase — et personne ne décrit du premier coup l'outil qu'il
+     * veut.
      */
-    readonly onCreer: (skeleton: string, extrait: Extrait, compose?: Compose, fcfa?: number) => void;
+    readonly onDiscuter: (demande: string) => void;
 }
 export declare function Atelier(props: ProprietesAtelier): JSX.Element;

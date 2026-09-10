@@ -16,6 +16,20 @@ export interface DemandeModele {
   readonly invite: string
   /** Le tour de reprise, s'il y en a un : ce que le modèle a dit, et pourquoi c'était faux. */
   readonly reprise?: { readonly sortie: string; readonly reproches: string }
+  /**
+   * La conversation, quand il y en a une.
+   *
+   * L'invite porte les consignes et le schéma ; ceci porte ce qui s'est dit.
+   * Les deux sont séparés parce que le premier est constant — un fournisseur
+   * qui sait mettre en cache son préfixe ne paie qu'une fois ce qui ne change
+   * pas — et que le second grandit à chaque tour.
+   */
+  readonly conversation?: readonly TourConversation[]
+}
+
+export interface TourConversation {
+  readonly qui: 'personne' | 'agent'
+  readonly texte: string
 }
 
 export interface ReponseModele {
@@ -50,11 +64,32 @@ export class ErreurFournisseur extends Error {
   }
 }
 
+/** Ce qu'un flux rapporte : des morceaux, puis le compte des jetons. */
+export interface MorceauModele {
+  readonly texte: string
+}
+
 export interface Fournisseur {
   readonly nom: string
   /** Prix par million de jetons, en dollars. Sert au journal des coûts. */
   readonly prix: { readonly entree: number; readonly sortie: number }
   readonly appeler: (demande: DemandeModele) => Promise<ReponseModele>
+  /**
+   * Le même appel, mais rendu au fur et à mesure.
+   *
+   * C'est ce qui permet de montrer l'outil s'écrire plutôt que de faire
+   * patienter huit secondes devant un écran vide — et sur une connexion qui
+   * hoquette, huit secondes deviennent trente. La dernière valeur rendue porte
+   * le compte des jetons, qui n'arrive qu'à la fin.
+   *
+   * Facultatif : un fournisseur qui ne sait pas diffuser reste utilisable, et
+   * l'appelant retombe sur `appeler`. Mieux vaut un aperçu qui apparaît d'un
+   * coup qu'un modèle qu'on ne peut pas essayer.
+   */
+  readonly diffuser?: (
+    demande: DemandeModele,
+    signal?: AbortSignal,
+  ) => AsyncGenerator<MorceauModele, ReponseModele>
 }
 
 /**
@@ -71,7 +106,7 @@ export function gemini(clef: string, modele = 'gemini-2.5-flash-lite'): Fourniss
     // Relevés septembre 2026 (BRIEF.md § 5). Ne pas redériver sans source.
     prix: { entree: 0.1, sortie: 0.4 },
     async appeler(demande) {
-      const tours = [{ role: 'user', parts: [{ text: demande.invite }] }]
+      const tours = toursGemini(demande)
       if (demande.reprise !== undefined) {
         tours.push({ role: 'model', parts: [{ text: demande.reprise.sortie }] })
         tours.push({ role: 'user', parts: [{ text: demande.reprise.reproches }] })
@@ -146,9 +181,7 @@ export function openrouter(
     nom: modele,
     prix,
     async appeler(demande) {
-      const messages: { role: string; content: string }[] = [
-        { role: 'user', content: demande.invite },
-      ]
+      const messages = messagesOpenAI(demande)
       if (demande.reprise !== undefined) {
         messages.push({ role: 'assistant', content: demande.reprise.sortie })
         messages.push({ role: 'user', content: demande.reprise.reproches })
@@ -190,6 +223,135 @@ export function openrouter(
         ...(typeof dollars === 'number' ? { dollars } : {}),
       }
     },
+
+    /**
+     * Le même appel, rendu au fur et à mesure.
+     *
+     * Le compte des jetons n'arrive qu'à la toute fin du flux, dans le dernier
+     * événement : c'est pour ça que le générateur rend des morceaux et
+     * **retourne** un total. Un appel diffusé qui ne journaliserait pas son
+     * coût serait un appel qu'on ne compte pas, et le § 8 en fait un critère.
+     */
+    async *diffuser(demande, signal) {
+      const reponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${clef}`,
+          'content-type': 'application/json',
+          'http-referer': 'https://atelier237.pages.dev',
+          'x-title': 'Atelier 237',
+        },
+        body: JSON.stringify({
+          model: modele,
+          messages: messagesOpenAI(demande),
+          temperature: 0,
+          max_tokens: 2048,
+          stream: true,
+          usage: { include: true },
+        }),
+        ...(signal !== undefined ? { signal } : {}),
+      })
+
+      if (!reponse.ok || reponse.body === null) {
+        throw new ErreurFournisseur(
+          reponse.status === 402 ? 'credit-epuise' : reponse.status === 401 ? 'refuse' : 'panne',
+          `le routeur a répondu ${reponse.status}`,
+        )
+      }
+
+      let texte = ''
+      let jetonsEntree = 0
+      let jetonsSortie = 0
+      let dollars: number | undefined
+
+      for await (const ligne of lignesSSE(reponse.body)) {
+        if (!ligne.startsWith('data:')) continue
+        const charge = ligne.slice(5).trim()
+        if (charge === '' || charge === '[DONE]') continue
+
+        let evenement: {
+          choices?: { delta?: { content?: string } }[]
+          usage?: { prompt_tokens?: number; completion_tokens?: number; cost?: number }
+        }
+        try {
+          evenement = JSON.parse(charge)
+        } catch {
+          // Un commentaire de maintien en vie, ou une ligne coupée : la
+          // suivante dira la même chose en mieux.
+          continue
+        }
+
+        const morceau = evenement.choices?.[0]?.delta?.content
+        if (typeof morceau === 'string' && morceau !== '') {
+          texte += morceau
+          yield { texte: morceau }
+        }
+        if (evenement.usage !== undefined) {
+          jetonsEntree = evenement.usage.prompt_tokens ?? jetonsEntree
+          jetonsSortie = evenement.usage.completion_tokens ?? jetonsSortie
+          if (typeof evenement.usage.cost === 'number') dollars = evenement.usage.cost
+        }
+      }
+
+      return { texte, jetonsEntree, jetonsSortie, ...(dollars === undefined ? {} : { dollars }) }
+    },
+  }
+}
+
+/**
+ * La conversation, mise en messages.
+ *
+ * L'invite constante d'abord, seule dans son message : un fournisseur qui sait
+ * mettre en cache son préfixe ne paie qu'une fois ce qui ne change pas, et
+ * c'est ce qui rend une conversation abordable. Ce qui s'est dit suit, dans
+ * l'ordre où ça s'est dit.
+ */
+function messagesOpenAI(demande: DemandeModele): { role: string; content: string }[] {
+  const messages = [{ role: 'user', content: demande.invite }]
+  for (const tour of demande.conversation ?? []) {
+    messages.push({ role: tour.qui === 'agent' ? 'assistant' : 'user', content: tour.texte })
+  }
+  return messages
+}
+
+function toursGemini(demande: DemandeModele): { role: string; parts: { text: string }[] }[] {
+  const tours = [{ role: 'user', parts: [{ text: demande.invite }] }]
+  for (const tour of demande.conversation ?? []) {
+    tours.push({ role: tour.qui === 'agent' ? 'model' : 'user', parts: [{ text: tour.texte }] })
+  }
+  return tours
+}
+
+/**
+ * Les lignes d'un flux d'événements, une par une.
+ *
+ * Un morceau de réseau ne s'arrête pas à la fin d'une ligne : il coupe au
+ * milieu d'un mot, et parfois au milieu d'un caractère accentué. Le tampon
+ * garde ce qui dépasse, et `TextDecoder` en mode continu recolle les octets
+ * d'un « é » arrivé en deux fois — sans quoi l'aperçu afficherait des losanges
+ * là où le modèle a écrit du français.
+ */
+async function* lignesSSE(corps: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+  const lecteur = corps.getReader()
+  const decodeur = new TextDecoder()
+  let tampon = ''
+  try {
+    for (;;) {
+      const { done, value } = await lecteur.read()
+      if (done) break
+      tampon += decodeur.decode(value, { stream: true })
+      let coupure = tampon.indexOf('\n')
+      while (coupure !== -1) {
+        yield tampon.slice(0, coupure).trim()
+        tampon = tampon.slice(coupure + 1)
+        coupure = tampon.indexOf('\n')
+      }
+    }
+    if (tampon.trim() !== '') yield tampon.trim()
+  } finally {
+    // Abandonner sans relâcher le lecteur laisse la connexion ouverte, et un
+    // Worker qui garde des connexions ouvertes finit par ne plus en avoir.
+    lecteur.cancel().catch(() => undefined)
   }
 }
 

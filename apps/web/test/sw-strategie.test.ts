@@ -32,7 +32,7 @@ describe('strategiePour', () => {
 
   it('laisse passer l’API, navigation ou non', () => {
     expect(strategiePour(
-      requete({ mode: 'navigate', destination: 'document', url: `${ORIGINE}/api/ai` }),
+      requete({ mode: 'navigate', destination: 'document', url: `${ORIGINE}/api/chat` }),
       ORIGINE,
     )).toBe('reseau')
   })

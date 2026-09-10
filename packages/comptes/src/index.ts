@@ -22,6 +22,12 @@ export type { Amorce, DemandePaiement, EtatPaiement, Fournisseur, Paiement, Rapp
 export { ENTETE_SIGNATURE, fauxFournisseur, memeSignature, signer } from './faux.js'
 
 export {
+  DUREE_CONVERSATION_MS, TOURS_PAR_CONVERSATION, premierTour, relireLaissez, signerLaissez,
+  tourSuivant,
+} from './conversation.js'
+export type { Laissez } from './conversation.js'
+
+export {
   compteDeLAppareil, compteParCode, compteParId, coutMoyenXaf, ecrireSuite, journaliser,
   ouvrirPaiement, paiementParId, paiementParReference, poserCode, prendreUnCredit,
   rattacherAppareil, rendreUnCredit,

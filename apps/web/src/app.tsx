@@ -51,6 +51,7 @@ function Accueil(props: {
     compose?: Compose,
     fcfa?: number,
   ) => void
+  readonly onDiscuter: (demande: string) => void
   readonly onOuvrir: (id: string) => void
   readonly onSupprimer: (id: string) => void
 }): JSX.Element {
@@ -61,7 +62,7 @@ function Accueil(props: {
         <span class="app-baseline">hors ligne, sur ton téléphone</span>
       </header>
 
-      <Atelier fiches={DISPONIBLES} onCreer={props.onCreer} />
+      <Atelier fiches={DISPONIBLES} onCreer={props.onCreer} onDiscuter={props.onDiscuter} />
 
       <h2 class="outil-surtitre">Tous les outils</h2>
       <div class="grille">
@@ -124,6 +125,18 @@ export function App(): JSX.Element {
    * avant le premier affichage, sur la connexion qu'ils ont.
    */
   const [surLeCompte, setSurLeCompte] = useState(false)
+  /**
+   * La demande en cours de discussion, quand l'agent est ouvert.
+   *
+   * L'écran de l'agent se charge à la demande, comme les outils : il porte le
+   * fil, l'aperçu et le flux, et la plupart des gens ouvriront d'abord un
+   * devis. Deux kilo-octets dans la coquille initiale, ce sont deux
+   * kilo-octets payés par tout le monde avant le premier affichage.
+   */
+  const [discussion, setDiscussion] = useState<string | null>(null)
+  const [ecranAgent, setEcranAgent] = useState<
+    ((p: import('./ecran-agent.js').ProprietesAgent) => JSX.Element) | null
+  >(null)
   const [ecranCompte, setEcranCompte] = useState<((p: ProprietesCompte) => JSX.Element) | null>(null)
   const [ouvert, setOuvert] = useState<OutilEnregistre | null>(null)
   const [module, setModule] = useState<ModuleOutil | null>(null)
@@ -163,6 +176,14 @@ export function App(): JSX.Element {
     if (!surLeCompte) return
     void import('./ecran-compte.js').then((m) => setEcranCompte(() => m.EcranCompte))
   }, [surLeCompte])
+
+  useEffect(() => {
+    if (discussion === null) return
+    void import('./ecran-agent.js').then(
+      (m) => setEcranAgent(() => m.EcranAgent),
+      () => setErreur('L’atelier n’a pas pu s’ouvrir. Réessaie une fois en ligne.'),
+    )
+  }, [discussion])
 
   useEffect(() => {
     if (ouvert === null) {
@@ -321,6 +342,27 @@ export function App(): JSX.Element {
     )
   }
 
+  if (discussion !== null) {
+    const Ecran = ecranAgent
+    return (
+      <main class="app">
+        {erreur !== '' && <div class="alerte">{erreur}</div>}
+        {Ecran === null ? (
+          <p class="note">Un instant…</p>
+        ) : (
+          <Ecran
+            demande={discussion}
+            onCreer={(s, extrait, compose, fcfa) => {
+              setDiscussion(null)
+              tenter(() => creer(s, extrait, compose, fcfa), 'Création impossible')
+            }}
+            onFermer={() => setDiscussion(null)}
+          />
+        )}
+      </main>
+    )
+  }
+
   if (ouvert === null) {
     return (
       <main class="app">
@@ -330,6 +372,7 @@ export function App(): JSX.Element {
           onCreer={(s, extrait, compose, fcfa) =>
             tenter(() => creer(s, extrait, compose, fcfa), 'Création impossible')
           }
+          onDiscuter={setDiscussion}
           onOuvrir={(id) => tenter(() => ouvrir(id), 'Ouverture impossible')}
           onSupprimer={(id) => tenter(() => supprimer(id), 'Suppression impossible')}
         />

@@ -32,7 +32,7 @@ function glyphePour(skeleton) {
     return CATALOGUE.find((f) => f.id === skeleton)?.glyphe ?? '◇';
 }
 function Accueil(props) {
-    return (_jsxs(_Fragment, { children: [_jsxs("header", { class: "app-entete", children: [_jsx("h1", { class: "titre-app", children: "Atelier 237" }), _jsx("span", { class: "app-baseline", children: "hors ligne, sur ton t\u00E9l\u00E9phone" })] }), _jsx(Atelier, { fiches: DISPONIBLES, onCreer: props.onCreer }), _jsx("h2", { class: "outil-surtitre", children: "Tous les outils" }), _jsx("div", { class: "grille", children: DISPONIBLES.map((s) => (_jsxs("button", { type: "button", class: "carte-squelette", onClick: () => props.onCreer(s.id, EXTRAIT_VIDE), children: [_jsx("span", { class: "marque", "aria-hidden": "true", children: s.glyphe }), _jsxs("span", { class: "texte", children: [_jsx("b", { children: s.title }), _jsx("span", { children: s.group })] })] }, s.id))) }), _jsx("h2", { class: "outil-surtitre", children: "Mes outils" }), props.outils.length === 0 ? (_jsx("p", { class: "note", children: "Rien pour l\u2019instant. Choisis un outil ci-dessus." })) : (_jsx("div", { class: "outil-rangees", children: props.outils.map((o) => (_jsxs("div", { class: "outil-rangee", children: [_jsx("button", { type: "button", class: "identite lien-outil", onClick: () => props.onOuvrir(o.id), children: _jsxs("span", { class: "nom", children: [_jsx("span", { class: "n1", children: o.nom }), _jsx("span", { class: "n2", children: o.skeleton })] }) }), _jsx("button", { type: "button", class: "outil-retirer", "aria-label": `Supprimer ${o.nom}`, onClick: () => props.onSupprimer(o.id), children: "\u00D7" })] }, o.id))) }))] }));
+    return (_jsxs(_Fragment, { children: [_jsxs("header", { class: "app-entete", children: [_jsx("h1", { class: "titre-app", children: "Atelier 237" }), _jsx("span", { class: "app-baseline", children: "hors ligne, sur ton t\u00E9l\u00E9phone" })] }), _jsx(Atelier, { fiches: DISPONIBLES, onCreer: props.onCreer, onDiscuter: props.onDiscuter }), _jsx("h2", { class: "outil-surtitre", children: "Tous les outils" }), _jsx("div", { class: "grille", children: DISPONIBLES.map((s) => (_jsxs("button", { type: "button", class: "carte-squelette", onClick: () => props.onCreer(s.id, EXTRAIT_VIDE), children: [_jsx("span", { class: "marque", "aria-hidden": "true", children: s.glyphe }), _jsxs("span", { class: "texte", children: [_jsx("b", { children: s.title }), _jsx("span", { children: s.group })] })] }, s.id))) }), _jsx("h2", { class: "outil-surtitre", children: "Mes outils" }), props.outils.length === 0 ? (_jsx("p", { class: "note", children: "Rien pour l\u2019instant. Choisis un outil ci-dessus." })) : (_jsx("div", { class: "outil-rangees", children: props.outils.map((o) => (_jsxs("div", { class: "outil-rangee", children: [_jsx("button", { type: "button", class: "identite lien-outil", onClick: () => props.onOuvrir(o.id), children: _jsxs("span", { class: "nom", children: [_jsx("span", { class: "n1", children: o.nom }), _jsx("span", { class: "n2", children: o.skeleton })] }) }), _jsx("button", { type: "button", class: "outil-retirer", "aria-label": `Supprimer ${o.nom}`, onClick: () => props.onSupprimer(o.id), children: "\u00D7" })] }, o.id))) }))] }));
 }
 export function App() {
     const [outils, setOutils] = useState([]);
@@ -46,6 +46,16 @@ export function App() {
      * avant le premier affichage, sur la connexion qu'ils ont.
      */
     const [surLeCompte, setSurLeCompte] = useState(false);
+    /**
+     * La demande en cours de discussion, quand l'agent est ouvert.
+     *
+     * L'écran de l'agent se charge à la demande, comme les outils : il porte le
+     * fil, l'aperçu et le flux, et la plupart des gens ouvriront d'abord un
+     * devis. Deux kilo-octets dans la coquille initiale, ce sont deux
+     * kilo-octets payés par tout le monde avant le premier affichage.
+     */
+    const [discussion, setDiscussion] = useState(null);
+    const [ecranAgent, setEcranAgent] = useState(null);
     const [ecranCompte, setEcranCompte] = useState(null);
     const [ouvert, setOuvert] = useState(null);
     const [module, setModule] = useState(null);
@@ -84,6 +94,11 @@ export function App() {
             return;
         void import('./ecran-compte.js').then((m) => setEcranCompte(() => m.EcranCompte));
     }, [surLeCompte]);
+    useEffect(() => {
+        if (discussion === null)
+            return;
+        void import('./ecran-agent.js').then((m) => setEcranAgent(() => m.EcranAgent), () => setErreur('L’atelier n’a pas pu s’ouvrir. Réessaie une fois en ligne.'));
+    }, [discussion]);
     useEffect(() => {
         if (ouvert === null) {
             setModule(null);
@@ -213,8 +228,15 @@ export function App() {
         const Ecran = ecranCompte;
         return (_jsx("main", { class: "app", children: Ecran === null ? (_jsx("p", { class: "note", children: "Un instant\u2026" })) : (_jsx(Ecran, { etat: compte, onEtat: setCompte, onRetour: () => setSurLeCompte(false) })) }));
     }
+    if (discussion !== null) {
+        const Ecran = ecranAgent;
+        return (_jsxs("main", { class: "app", children: [erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), Ecran === null ? (_jsx("p", { class: "note", children: "Un instant\u2026" })) : (_jsx(Ecran, { demande: discussion, onCreer: (s, extrait, compose, fcfa) => {
+                        setDiscussion(null);
+                        tenter(() => creer(s, extrait, compose, fcfa), 'Création impossible');
+                    }, onFermer: () => setDiscussion(null) }))] }));
+    }
     if (ouvert === null) {
-        return (_jsxs("main", { class: "app", children: [erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), _jsx(Accueil, { outils: outils, onCreer: (s, extrait, compose, fcfa) => tenter(() => creer(s, extrait, compose, fcfa), 'Création impossible'), onOuvrir: (id) => tenter(() => ouvrir(id), 'Ouverture impossible'), onSupprimer: (id) => tenter(() => supprimer(id), 'Suppression impossible') }), compte !== null && (_jsx("button", { type: "button", class: "compte-ligne", onClick: () => setSurLeCompte(true), children: compte.plan === 'atelier'
+        return (_jsxs("main", { class: "app", children: [erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), _jsx(Accueil, { outils: outils, onCreer: (s, extrait, compose, fcfa) => tenter(() => creer(s, extrait, compose, fcfa), 'Création impossible'), onDiscuter: setDiscussion, onOuvrir: (id) => tenter(() => ouvrir(id), 'Ouverture impossible'), onSupprimer: (id) => tenter(() => supprimer(id), 'Suppression impossible') }), compte !== null && (_jsx("button", { type: "button", class: "compte-ligne", onClick: () => setSurLeCompte(true), children: compte.plan === 'atelier'
                         ? `Atelier · ${compte.credits} compositions`
                         : compte.credits === 0
                             ? 'Essai · plus de composition'

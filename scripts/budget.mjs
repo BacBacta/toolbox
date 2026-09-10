@@ -181,13 +181,14 @@ for (const requis of ['precache.json', 'sw.js']) {
  * passe par l'objet `env` reçu à chaque requête, et `process.env` ne doit pas
  * y figurer du tout.
  */
-const FONCTION = 'functions/api/ai.js'
+const FONCTION = 'functions/api/chat.js'
 try {
   const fonction = readFileSync(FONCTION, 'utf8')
   const exigences = [
     ['export { onRequest }', 'l’export nommé, sans quoi Pages ne voit aucune fonction'],
     ['env.A237_CLEF_IA', 'la lecture de la clef dans l’environnement du Worker'],
     ['generativelanguage.googleapis.com', 'l’appel au fournisseur, preuve que tout est inclus'],
+    ['text/event-stream', 'le flux, sans quoi l’agent n’écrit plus sous les yeux'],
   ]
   for (const [marqueur, quoi] of exigences) {
     if (!fonction.includes(marqueur)) {
@@ -244,7 +245,7 @@ for (const [chemin, marqueur, quoi] of [
  */
 {
   const attendus = new Set([
-    'functions/api/ai.js', 'functions/api/publier.js',
+    'functions/api/chat.js', 'functions/api/publier.js',
     'functions/api/compte/[[chemin]].js', 'functions/api/pay/[[chemin]].js',
     'functions/api/reponses/[lien].js',
     'functions/d/[lien].js', 'functions/c/[lien].js', 'functions/p/[lien].js',

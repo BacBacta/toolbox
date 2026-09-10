@@ -872,40 +872,6 @@ function verifierFormulaire(valeur) {
 	return erreurs;
 }
 //#endregion
-//#region ../engine/src/schema-modele.ts
-/**
-* Le schéma tel qu'il part au modèle : sans ce qui ne sert qu'à l'écran.
-*
-* Un même schéma fait deux métiers. Il dit au modèle quoi remplir, et il dresse
-* le formulaire qui permet de corriger ce qu'il a rempli — c'est ce qui fait
-* qu'une page composée se reprend : le contrat qui a servi à l'écrire sert à la
-* modifier, et un champ ajouté apparaît des deux côtés sans qu'on y pense.
-*
-* Mais les deux publics ne lisent pas la même chose. `title` nomme un champ
-* dans un formulaire ; le modèle, lui, a déjà la clef sous les yeux et n'en
-* fait rien. `montrerSi` dit à l'écran quand un champ a lieu d'être montré ;
-* pour le modèle, c'est un mot-clef inconnu au milieu d'un schéma qu'on lui
-* demande de respecter à la lettre.
-*
-* Chaque caractère d'invite se paie à chaque appel, sur un budget d'un franc
-* la génération (§ 8). Ce qui n'aide pas à remplir un JSON n'a rien à y faire.
-*/
-function pourLeModele(schema) {
-	const { title, ecran, ...reste } = schema;
-	if (reste.type === "array") return {
-		...reste,
-		items: pourLeModele(reste.items)
-	};
-	if (reste.type === "object") {
-		const proprietes = reste.properties;
-		return {
-			...reste,
-			properties: Object.fromEntries(Object.entries(proprietes).map(([clef, sous]) => [clef, pourLeModele(sous)]))
-		};
-	}
-	return reste;
-}
-//#endregion
 //#region ../engine/src/whatsapp.ts
 /**
 * Ce numéro était-il dans la demande ?
@@ -1351,10 +1317,7 @@ function lireReponseModele(valeur) {
 	if ("impossible" in valeur) {
 		const brut = valeur.impossible;
 		const coupe = typeof brut === "string" ? raccourcir(brut, 160) : brut;
-		const erreurs = valider(schemaRefus, {
-			...valeur,
-			impossible: coupe
-		});
+		const erreurs = valider(schemaRefus, { impossible: coupe });
 		return erreurs.length > 0 ? {
 			sorte: "invalide",
 			erreurs
@@ -1403,8 +1366,244 @@ function lireReponseModele(valeur) {
 	};
 }
 //#endregion
+//#region ../engine/src/partiel.ts
+/**
+* Lire du JSON qui n'est pas encore fini.
+*
+* Le modèle écrit sa réponse caractère par caractère. Attendre la fin pour
+* montrer quoi que ce soit, c'est laisser quelqu'un devant un écran vide
+* pendant huit secondes en se demandant si ça marche — et sur une connexion
+* qui hoquette, huit secondes deviennent trente. Ce qui arrive doit se voir
+* arriver.
+*
+* `{"titre":"Quincaill` n'est pas du JSON. Ce fichier le referme : la chaîne
+* ouverte se termine, les objets et les tableaux ouverts se ferment, et ce qui
+* en sort est une valeur qu'on peut dessiner. Elle sera remplacée par la
+* suivante au caractère d'après ; aucune de ces valeurs n'est prise pour
+* argent comptant — **rien de ce qui sort d'ici n'atteint un outil**. Seule la
+* réponse complète, passée par `lireReponseModele`, en fabrique un.
+*
+* C'est donc un lecteur d'aperçu, et il n'a le droit de rien casser : il ne
+* jette jamais, et rend `undefined` tant que le modèle n'a pas même ouvert son
+* objet. Une accolade seule rend `{}` — il a commencé, il n'a rien dit encore.
+*/
+/**
+* Ce qu'on referme, et jusqu'où.
+*
+* On ne devine pas la suite : une clef commencée mais sans valeur est
+* abandonnée, parce qu'inventer sa valeur ferait clignoter à l'écran quelque
+* chose que le modèle n'a pas écrit.
+*/
+function lireJsonPartiel(texte) {
+	const brut = degainer(texte);
+	if (brut === "") return void 0;
+	try {
+		return JSON.parse(brut);
+	} catch {}
+	const referme = refermer(brut);
+	if (referme === null) return void 0;
+	try {
+		return JSON.parse(referme);
+	} catch {
+		return;
+	}
+}
+/**
+* Retire ce qui entoure le JSON quand le modèle l'enveloppe.
+*
+* Le même déshabillage que pour une réponse complète, en plus simple : en
+* cours de route la clôture du bloc de code n'est pas encore arrivée, donc on
+* ne cherche que l'ouverture.
+*/
+function degainer(texte) {
+	const sansBloc = texte.replace(/^\s*```(?:json)?\s*/i, "");
+	const debut = sansBloc.indexOf("{");
+	return debut === -1 ? "" : sansBloc.slice(debut).trimEnd();
+}
+/** Rend `null` quand il n'y a rien de refermable — un `{` tout seul suffit. */
+function refermer(brut) {
+	const pile = [];
+	let dansUneChaine = false;
+	let echappe = false;
+	let clefCourante = false;
+	let dansUnLitteral = false;
+	/**
+	* Le dernier endroit où couper donne du JSON valide une fois refermé.
+	*
+	* Il avance après chaque membre complet, et **pas** après une clef : une clef
+	* sans sa valeur n'est pas un état qu'on peut montrer.
+	*/
+	let sur = -1;
+	const haut = () => pile.at(-1);
+	const finDeValeur = (i) => {
+		const c = haut();
+		if (c !== void 0) c.attend = "virgule";
+		sur = i;
+	};
+	for (let i = 0; i < brut.length; i++) {
+		const c = brut.charAt(i);
+		if (dansUneChaine) {
+			if (echappe) echappe = false;
+			else if (c === "\\") echappe = true;
+			else if (c === "\"") {
+				dansUneChaine = false;
+				if (clefCourante) {
+					const cadre = haut();
+					if (cadre !== void 0) cadre.attend = "deux-points";
+				} else finDeValeur(i + 1);
+			}
+			continue;
+		}
+		if (dansUnLitteral && /[\s,}\]]/.test(c)) {
+			dansUnLitteral = false;
+			finDeValeur(i);
+		}
+		if (c === "\"") {
+			dansUneChaine = true;
+			clefCourante = haut()?.attend === "clef";
+			continue;
+		}
+		if (c === "{" || c === "[") {
+			pile.push({
+				ouverture: c,
+				attend: c === "{" ? "clef" : "valeur"
+			});
+			sur = i + 1;
+			continue;
+		}
+		if (c === "}" || c === "]") {
+			pile.pop();
+			finDeValeur(i + 1);
+			continue;
+		}
+		if (c === ":") {
+			const cadre = haut();
+			if (cadre !== void 0) cadre.attend = "valeur";
+			continue;
+		}
+		if (c === ",") {
+			const cadre = haut();
+			if (cadre !== void 0) cadre.attend = cadre.ouverture === "{" ? "clef" : "valeur";
+			sur = i;
+			continue;
+		}
+		if (!/\s/.test(c)) dansUnLitteral = true;
+	}
+	if (pile.length === 0) return null;
+	const fermetures = [...pile].reverse().map((c) => c.ouverture === "{" ? "}" : "]").join("");
+	if (dansUneChaine && !clefCourante) return `${echappe ? brut.slice(0, -1) : brut}"${fermetures}`;
+	if (sur < 0) return null;
+	const coupe = brut.slice(0, sur).replace(/,\s*$/, "");
+	return coupe === "" ? null : coupe + fermetures;
+}
+//#endregion
+//#region ../engine/src/agent.ts
+/**
+* Lit un tour complet.
+*
+* Un tour sans outil n'est pas un échec : le modèle a le droit de demander une
+* précision avant de fabriquer quoi que ce soit, et c'est souvent ce qu'il faut
+* faire d'une demande de trois mots. Ce qui serait un échec, c'est un tour sans
+* mot — la personne resterait devant un écran qui a bougé sans rien dire.
+*/
+function lireTour(valeur) {
+	if (typeof valeur !== "object" || valeur === null) return null;
+	const tour = valeur;
+	const mot = typeof tour.mot === "string" ? tour.mot.trim() : "";
+	if (mot === "") return null;
+	if (tour.outil === void 0 || tour.outil === null) return {
+		sorte: "mot",
+		mot
+	};
+	return {
+		sorte: "outil",
+		mot,
+		outil: lireReponseModele(tour.outil)
+	};
+}
+/** La famille se lit sur la forme, comme partout ailleurs. */
+function familleDe(outil) {
+	if (typeof outil !== "object" || outil === null) return null;
+	if ("impossible" in outil) return "refus";
+	if ("champs" in outil) return "formulaire";
+	if ("sections" in outil) return "page";
+	if ("entrees" in outil) return "calcul";
+	if ("colonnes" in outil) return "registre";
+	return null;
+}
+var PIECES = {
+	registre: "colonnes",
+	calcul: "entrees",
+	page: "sections",
+	formulaire: "champs"
+};
+function ebaucher(texte) {
+	const valeur = lireJsonPartiel(texte);
+	if (typeof valeur !== "object" || valeur === null) return null;
+	const tour = valeur;
+	const mot = typeof tour.mot === "string" ? tour.mot : "";
+	const outil = tour.outil;
+	const famille = familleDe(outil);
+	if (typeof outil !== "object" || outil === null) return {
+		mot,
+		famille: null,
+		titre: "",
+		pieces: []
+	};
+	const o = outil;
+	const titre = typeof o.titre === "string" ? o.titre : "";
+	const liste = famille === null || famille === "refus" ? void 0 : o[PIECES[famille]];
+	return {
+		mot,
+		famille,
+		titre,
+		pieces: Array.isArray(liste) ? liste.map(nommer).filter((n) => n !== "") : []
+	};
+}
+/** Le nom d'une pièce, quel que soit le champ qui le porte selon la famille. */
+function nommer(piece) {
+	if (typeof piece !== "object" || piece === null) return "";
+	const p = piece;
+	if (typeof p.titre === "string") return p.titre;
+	return typeof p.nom === "string" ? p.nom : "";
+}
+//#endregion
+//#region ../engine/src/schema-modele.ts
+/**
+* Le schéma tel qu'il part au modèle : sans ce qui ne sert qu'à l'écran.
+*
+* Un même schéma fait deux métiers. Il dit au modèle quoi remplir, et il dresse
+* le formulaire qui permet de corriger ce qu'il a rempli — c'est ce qui fait
+* qu'une page composée se reprend : le contrat qui a servi à l'écrire sert à la
+* modifier, et un champ ajouté apparaît des deux côtés sans qu'on y pense.
+*
+* Mais les deux publics ne lisent pas la même chose. `title` nomme un champ
+* dans un formulaire ; le modèle, lui, a déjà la clef sous les yeux et n'en
+* fait rien. `montrerSi` dit à l'écran quand un champ a lieu d'être montré ;
+* pour le modèle, c'est un mot-clef inconnu au milieu d'un schéma qu'on lui
+* demande de respecter à la lettre.
+*
+* Chaque caractère d'invite se paie à chaque appel, sur un budget d'un franc
+* la génération (§ 8). Ce qui n'aide pas à remplir un JSON n'a rien à y faire.
+*/
+function pourLeModele(schema) {
+	const { title, ecran, ...reste } = schema;
+	if (reste.type === "array") return {
+		...reste,
+		items: pourLeModele(reste.items)
+	};
+	if (reste.type === "object") {
+		const proprietes = reste.properties;
+		return {
+			...reste,
+			properties: Object.fromEntries(Object.entries(proprietes).map(([clef, sous]) => [clef, pourLeModele(sous)]))
+		};
+	}
+	return reste;
+}
+//#endregion
 //#region ../comptes/src/identite.ts
-function hex(octets) {
+function hex$1(octets) {
 	return Array.from(octets, (o) => o.toString(16).padStart(2, "0")).join("");
 }
 function jetonValide(jeton) {
@@ -1413,7 +1612,83 @@ function jetonValide(jeton) {
 /** Ce que le serveur range à la place du jeton. */
 async function empreinte(secret) {
 	const condense = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret));
-	return hex(new Uint8Array(condense));
+	return hex$1(new Uint8Array(condense));
+}
+//#endregion
+//#region ../comptes/src/faux.ts
+function hex(octets) {
+	return Array.from(octets, (o) => o.toString(16).padStart(2, "0")).join("");
+}
+async function clef(secret) {
+	return crypto.subtle.importKey("raw", new TextEncoder().encode(secret), {
+		name: "HMAC",
+		hash: "SHA-256"
+	}, false, ["sign"]);
+}
+/** La signature d'un corps. Publique : le faux fournisseur s'en sert aussi. */
+async function signer(corps, secret) {
+	const octets = await crypto.subtle.sign("HMAC", await clef(secret), new TextEncoder().encode(corps));
+	return hex(new Uint8Array(octets));
+}
+/**
+* Comparaison à durée constante.
+*
+* Un `===` sur des chaînes s'arrête au premier caractère qui diffère, et le
+* temps que ça prend dit combien de caractères étaient bons. On compare donc
+* tout, toujours.
+*/
+function memeSignature(a, b) {
+	if (a.length !== b.length) return false;
+	let ecart = 0;
+	for (let i = 0; i < a.length; i++) ecart |= a.charCodeAt(i) ^ b.charCodeAt(i);
+	return ecart === 0;
+}
+/** Une conversation abandonnée ne doit pas servir de laissez-passer un mois plus tard. */
+var DUREE_CONVERSATION_MS = 72e5;
+function corpsDe(l) {
+	return `${l.compteId}.${l.tours}.${l.expire}`;
+}
+async function signerLaissez(l, secret) {
+	return `${corpsDe(l)}.${await signer(corpsDe(l), secret)}`;
+}
+/**
+* Relit un laissez-passer, ou rend `null`.
+*
+* Toutes les raisons de refuser se ressemblent de l'extérieur — mal formé,
+* signature fausse, périmé, épuisé — et c'est voulu : distinguer « ta
+* signature est fausse » de « ton jeton est périmé » apprend à qui essaie
+* lequel des deux corriger.
+*/
+async function relireLaissez(jeton, secret, maintenant) {
+	const bouts = jeton.split(".");
+	if (bouts.length !== 4) return null;
+	const [compteId = "", brutTours = "", brutExpire = "", signature = ""] = bouts;
+	const tours = Number(brutTours);
+	const expire = Number(brutExpire);
+	if (compteId === "" || !Number.isSafeInteger(tours) || !Number.isSafeInteger(expire)) return null;
+	if (!memeSignature(signature, await signer(`${compteId}.${tours}.${expire}`, secret))) return null;
+	if (expire <= maintenant.getTime()) return null;
+	if (tours >= 8) return null;
+	return {
+		compteId,
+		tours,
+		expire
+	};
+}
+/** Le laissez-passer du tour suivant, à partir de celui du tour servi. */
+function tourSuivant(l) {
+	return {
+		...l,
+		tours: l.tours + 1
+	};
+}
+/** Le premier laissez-passer d'une conversation, celui qui a coûté un crédit. */
+function premierTour(compteId, maintenant) {
+	return {
+		compteId,
+		tours: 1,
+		expire: maintenant.getTime() + DUREE_CONVERSATION_MS
+	};
 }
 //#endregion
 //#region ../comptes/src/base.ts
@@ -1500,6 +1775,234 @@ async function ouvrirSeance(db, jeton, maintenant) {
 		}, maintenant)
 	};
 }
+/**
+* Les messages, ramenés à ce qu'on accepte d'envoyer.
+*
+* On ne fait confiance à rien de ce qui arrive : ni au nombre de messages, ni à
+* leur longueur, ni à qui les a dits. Un client qui enverrait cinquante tours
+* ferait une invite que personne n'a budgétée.
+*/
+function messagesPropres(brut) {
+	if (!Array.isArray(brut) || brut.length === 0 || brut.length > 16) return null;
+	const propres = [];
+	for (const m of brut) {
+		if (typeof m !== "object" || m === null) return null;
+		const { qui, texte } = m;
+		if (typeof texte !== "string") return null;
+		const coupe = texte.trim().slice(0, 400);
+		if (coupe === "") continue;
+		propres.push({
+			qui: qui === "agent" ? "agent" : "personne",
+			texte: coupe
+		});
+	}
+	const dernier = propres.at(-1);
+	if (dernier === void 0 || dernier.qui !== "personne") return null;
+	return propres;
+}
+/**
+* L'outil sur la table, remis dans la conversation.
+*
+* C'est ainsi que l'affinage marche, et sans protocole de différences : le
+* modèle voit ce qu'il a rendu au tour d'avant, et la personne lui dit quoi y
+* changer. Il n'y a qu'un seul état de l'outil dans l'invite, le dernier —
+* garder les précédents doublerait le coût de chaque tour pour montrer des
+* versions que personne ne veut plus.
+*/
+function avecLOutil(messages, outil) {
+	if (outil === void 0 || outil === null) return messages;
+	const rappel = {
+		qui: "agent",
+		texte: `Voici l’outil tel qu’il est en ce moment :\n${JSON.stringify(outil)}`
+	};
+	return [
+		...messages.slice(0, -1),
+		rappel,
+		...messages.slice(-1)
+	];
+}
+/**
+* Décide si ce tour a lieu, et à quel prix.
+*
+* Le crédit se prend au premier tour d'une conversation, jamais aux suivants —
+* mais « c'est la suite d'une conversation » ne se croit pas sur parole : il
+* faut le laissez-passer que le serveur a signé au tour d'avant.
+*/
+async function accorder(recu, seance, secret) {
+	const messages = messagesPropres(recu.messages);
+	if (messages === null) return {
+		statut: 400,
+		corps: { erreur: "messages-illisibles" }
+	};
+	const etage = etageDe(messages.at(-1)?.texte ?? "", CATALOGUE);
+	const jeton = typeof recu.conversation === "string" ? recu.conversation : null;
+	const suite = jeton === null ? null : await relireLaissez(jeton, secret, seance.maintenant);
+	const enCours = suite !== null && suite.compteId === seance.compte.id ? suite : null;
+	if (enCours === null) {
+		const verdict = controlerQuota(seance.compte, etage, seance.maintenant);
+		if (verdict.sorte !== "passe") return {
+			statut: 402,
+			corps: {
+				erreur: verdict.sorte,
+				pourquoi: verdict.pourquoi
+			}
+		};
+		if (!await seance.prendreUnCredit()) return {
+			statut: 402,
+			corps: {
+				erreur: "credits-epuises",
+				pourquoi: "Tes compositions sont utilisées. L’abonnement en donne quarante par mois."
+			}
+		};
+	}
+	return {
+		conversation: avecLOutil(messages, recu.outil),
+		famille: familleDe(recu.outil),
+		etage,
+		laissez: enCours === null ? premierTour(seance.compte.id, seance.maintenant) : tourSuivant(enCours),
+		paye: enCours === null
+	};
+}
+/** Ce que le client renvoie au tour suivant pour ne pas repayer. */
+function laissezPourLeClient(accord, secret) {
+	return signerLaissez(accord.laissez, secret);
+}
+function estUnRefus(x) {
+	return "statut" in x;
+}
+//#endregion
+//#region src/agent.ts
+/**
+* L'invite de l'agent : une conversation, pas une commande.
+*
+* Elle diffère de celle du bouton sur un point qui change tout : le modèle rend
+* **un mot et un outil**, et il a le droit de ne rendre qu'un mot. Personne ne
+* décrit du premier coup l'outil qu'il veut ; poser une question vaut mieux que
+* de fabriquer au hasard, et coûte le même tour.
+*
+* Et sur un point qui change le prix : **au premier tour seulement**, les
+* quatre schémas partent, parce qu'il faut pouvoir choisir. Dès que la famille
+* est connue, les tours suivants n'emportent que le sien — un affinage n'a
+* aucune raison de payer la description d'un formulaire quand on retouche une
+* page. C'est ce qui rend une conversation abordable : le premier tour coûte ce
+* qu'un bouton coûtait, les suivants un tiers.
+*/
+var CONSIGNES = `Tu es l’atelier : tu fabriques des outils de gestion pour un
+petit commerçant camerounais, en discutant avec lui.
+
+À chaque tour tu réponds par un objet JSON qui a deux champs :
+
+- « mot » : ce que tu lui dis. Une ou deux phrases, en français, tutoiement,
+  comme un artisan qui montre ce qu’il vient de faire. Jamais un rapport,
+  jamais de liste à puces, jamais de balisage.
+- « outil » : ce que tu fabriques, quand tu as de quoi le fabriquer.
+
+**Tu as le droit de ne rendre que le mot.** Si la demande est trop vague pour
+qu’un outil en sorte — trois mots, une intention sans objet — pose **une**
+question, la plus courte qui débloque, et ne fabrique rien ce tour-ci. Une
+question coûte le même tour qu’un outil inventé, et elle, elle sert.
+
+Quand on te demande de modifier ce que tu viens de faire, **renvoie l’outil
+entier**, modifié. Pas un morceau, pas une différence : l’objet complet.
+
+Tu sais fabriquer quatre sortes d’outils.
+
+Un **registre** est un tableau de lignes qu’on tient à la main : des ventes,
+des dettes, un stock, des présences, des cotisations. Il répond à « qu’est-ce
+que j’ai noté ? ».
+
+Une **calculatrice** a quelques champs et un résultat. Elle répond à « combien
+ça fait ? ». Sa formule se déclare en arbre, jamais en code.
+
+Une **page** se publie derrière un lien qu’on envoie sur WhatsApp. Elle répond
+à « comment je me montre ? » — une vitrine, un menu de restaurant, une liste de
+prix, un profil d’artisan. C’est ce que demande « je veux un site internet » :
+ici, un site et une page sont la même chose, et « sommaire » met un menu en
+haut quand il y a plusieurs sujets. **Un événement est une page datée** :
+remplis « date » et la page dira d’elle-même dans combien de jours c’est.
+
+Un **formulaire** se publie et **reçoit** des réponses : les commandes du
+week-end, qui vient à la fête et ce que chacun apporte. C’est la seule des
+quatre qui reçoit.
+
+**Si la demande n’est aucune des quatre**, mets dans « outil » un objet qui n’a
+qu’un champ « impossible », disant en une phrase ce que tu ne peux pas faire et
+ce que tu sais faire. Un logo, une photo, une traduction, une application à
+installer : rien de cela ne se range dans un outil d’ici. Ne fabrique jamais un
+outil plausible pour une demande qui n’en réclame pas.
+
+Règles :
+- Les montants sont en francs CFA, entiers, sans décimale.
+- Les libellés sont en français, courts, sans jargon comptable.
+- 6 colonnes, 5 champs, 8 sections ou
+  8 questions au maximum : ça se lit sur un téléphone de 360 pixels.
+- **N’invente jamais un numéro de téléphone, une adresse, une date ni un prix.**
+  Laisse le champ vide si la demande ne le donne pas, et demande-le dans ton
+  mot. Un prix inventé se lit comme un engagement ; une date inventée fait
+  déplacer des gens ; un numéro inventé appartient à quelqu’un, et c’est lui
+  qu’on appellera.
+- N’invente pas de colonne, de section ni de question que la demande ne
+  réclame pas.
+- Si la demande décrit une dette entre personnes, ne mets aucun montant en
+  sur-titre : ça se partage, et humilier quelqu’un fait perdre le client avec
+  l’argent.`;
+/**
+* L'enveloppe, décrite au modèle.
+*
+* `mot` en premier, et ce n'est pas cosmétique : le modèle écrit ses clefs dans
+* l'ordre du schéma, donc la phrase arrive avant l'outil et s'écrit dans la
+* conversation pendant que l'outil se construit à côté. L'inverse laisserait
+* quelqu'un devant un aperçu qui bouge sans un mot d'explication.
+*/
+var ENVELOPPE = `{"type":"object","required":["mot"],"properties":{"mot":{"type":"string","minLength":2,"maxLength":300,"description":"Ce que tu dis à la personne. Une ou deux phrases. Écris-le en premier."},"outil":{"description":"L’outil, quand ce tour en fabrique un. Il respecte l'un des schémas ci-dessous."}}}`;
+var SCHEMAS = {
+	registre: schemaRegistre,
+	calcul: schemaCalcul,
+	page: schemaPage,
+	formulaire: schemaFormulaire
+};
+var NOMS = {
+	registre: "Un registre",
+	calcul: "Une calculatrice",
+	page: "Une page",
+	formulaire: "Un formulaire"
+};
+var NUS = new Map(Object.entries(SCHEMAS).map(([f, s]) => [f, JSON.stringify(pourLeModele(s))]));
+var REFUS = JSON.stringify(pourLeModele(schemaRefus));
+/**
+* Bâtit l'invite d'un tour.
+*
+* `famille` est celle de l'outil déjà sur la table. Absente au premier tour, où
+* il faut bien pouvoir choisir ; présente ensuite, et l'invite fond alors des
+* deux tiers.
+*/
+function batirInviteAgent(famille) {
+	return `${CONSIGNES}
+
+Ta réponse respecte cette enveloppe :
+${ENVELOPPE}
+
+${(famille === void 0 || famille === null || famille === "refus" ? [
+		"registre",
+		"calcul",
+		"page",
+		"formulaire"
+	] : [famille]).map((f) => `${NOMS[f]} respecte ce schéma :\n${NUS.get(f) ?? ""}`).join("\n\n")}
+
+Un refus, celui-ci :
+${REFUS}`;
+}
+//#endregion
+//#region src/cout.ts
+function couter(jetons, prix, tauxFcfaParDollar) {
+	const dollars = (jetons.entree * prix.entree + jetons.sortie * prix.sortie) / 1e6;
+	return {
+		dollars,
+		fcfa: Math.round(dollars * tauxFcfaParDollar * 100) / 100,
+		entree: jetons.entree,
+		sortie: jetons.sortie
+	};
+}
 //#endregion
 //#region src/fournisseur.ts
 /**
@@ -1535,10 +2038,7 @@ function gemini(clef, modele = "gemini-2.5-flash-lite") {
 			sortie: .4
 		},
 		async appeler(demande) {
-			const tours = [{
-				role: "user",
-				parts: [{ text: demande.invite }]
-			}];
+			const tours = toursGemini(demande);
 			if (demande.reprise !== void 0) {
 				tours.push({
 					role: "model",
@@ -1604,10 +2104,7 @@ function openrouter(clef, modele = "google/gemini-2.5-flash-lite", prix = {
 		nom: modele,
 		prix,
 		async appeler(demande) {
-			const messages = [{
-				role: "user",
-				content: demande.invite
-			}];
+			const messages = messagesOpenAI(demande);
 			if (demande.reprise !== void 0) {
 				messages.push({
 					role: "assistant",
@@ -1639,8 +2136,128 @@ function openrouter(clef, modele = "google/gemini-2.5-flash-lite", prix = {
 				jetonsSortie: corps.usage?.completion_tokens ?? 0,
 				...typeof dollars === "number" ? { dollars } : {}
 			};
+		},
+		/**
+		* Le même appel, rendu au fur et à mesure.
+		*
+		* Le compte des jetons n'arrive qu'à la toute fin du flux, dans le dernier
+		* événement : c'est pour ça que le générateur rend des morceaux et
+		* **retourne** un total. Un appel diffusé qui ne journaliserait pas son
+		* coût serait un appel qu'on ne compte pas, et le § 8 en fait un critère.
+		*/
+		async *diffuser(demande, signal) {
+			const reponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+				method: "POST",
+				headers: {
+					authorization: `Bearer ${clef}`,
+					"content-type": "application/json",
+					"http-referer": "https://atelier237.pages.dev",
+					"x-title": "Atelier 237"
+				},
+				body: JSON.stringify({
+					model: modele,
+					messages: messagesOpenAI(demande),
+					temperature: 0,
+					max_tokens: 2048,
+					stream: true,
+					usage: { include: true }
+				}),
+				...signal !== void 0 ? { signal } : {}
+			});
+			if (!reponse.ok || reponse.body === null) throw new ErreurFournisseur(reponse.status === 402 ? "credit-epuise" : reponse.status === 401 ? "refuse" : "panne", `le routeur a répondu ${reponse.status}`);
+			let texte = "";
+			let jetonsEntree = 0;
+			let jetonsSortie = 0;
+			let dollars;
+			for await (const ligne of lignesSSE(reponse.body)) {
+				if (!ligne.startsWith("data:")) continue;
+				const charge = ligne.slice(5).trim();
+				if (charge === "" || charge === "[DONE]") continue;
+				let evenement;
+				try {
+					evenement = JSON.parse(charge);
+				} catch {
+					continue;
+				}
+				const morceau = evenement.choices?.[0]?.delta?.content;
+				if (typeof morceau === "string" && morceau !== "") {
+					texte += morceau;
+					yield { texte: morceau };
+				}
+				if (evenement.usage !== void 0) {
+					jetonsEntree = evenement.usage.prompt_tokens ?? jetonsEntree;
+					jetonsSortie = evenement.usage.completion_tokens ?? jetonsSortie;
+					if (typeof evenement.usage.cost === "number") dollars = evenement.usage.cost;
+				}
+			}
+			return {
+				texte,
+				jetonsEntree,
+				jetonsSortie,
+				...dollars === void 0 ? {} : { dollars }
+			};
 		}
 	};
+}
+/**
+* La conversation, mise en messages.
+*
+* L'invite constante d'abord, seule dans son message : un fournisseur qui sait
+* mettre en cache son préfixe ne paie qu'une fois ce qui ne change pas, et
+* c'est ce qui rend une conversation abordable. Ce qui s'est dit suit, dans
+* l'ordre où ça s'est dit.
+*/
+function messagesOpenAI(demande) {
+	const messages = [{
+		role: "user",
+		content: demande.invite
+	}];
+	for (const tour of demande.conversation ?? []) messages.push({
+		role: tour.qui === "agent" ? "assistant" : "user",
+		content: tour.texte
+	});
+	return messages;
+}
+function toursGemini(demande) {
+	const tours = [{
+		role: "user",
+		parts: [{ text: demande.invite }]
+	}];
+	for (const tour of demande.conversation ?? []) tours.push({
+		role: tour.qui === "agent" ? "model" : "user",
+		parts: [{ text: tour.texte }]
+	});
+	return tours;
+}
+/**
+* Les lignes d'un flux d'événements, une par une.
+*
+* Un morceau de réseau ne s'arrête pas à la fin d'une ligne : il coupe au
+* milieu d'un mot, et parfois au milieu d'un caractère accentué. Le tampon
+* garde ce qui dépasse, et `TextDecoder` en mode continu recolle les octets
+* d'un « é » arrivé en deux fois — sans quoi l'aperçu afficherait des losanges
+* là où le modèle a écrit du français.
+*/
+async function* lignesSSE(corps) {
+	const lecteur = corps.getReader();
+	const decodeur = new TextDecoder();
+	let tampon = "";
+	try {
+		for (;;) {
+			const { done, value } = await lecteur.read();
+			if (done) break;
+			tampon += decodeur.decode(value, { stream: true });
+			let coupure = tampon.indexOf("\n");
+			while (coupure !== -1) {
+				yield tampon.slice(0, coupure).trim();
+				tampon = tampon.slice(coupure + 1);
+				coupure = tampon.indexOf("\n");
+			}
+		}
+		if (tampon.trim() !== "") yield tampon.trim();
+	} finally {
+		lecteur.cancel().catch(() => void 0);
+	}
 }
 function envoyer(clef, corps) {
 	return fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -1655,308 +2272,165 @@ function envoyer(clef, corps) {
 	});
 }
 //#endregion
-//#region src/cout.ts
-function couter(jetons, prix, tauxFcfaParDollar) {
-	const dollars = (jetons.entree * prix.entree + jetons.sortie * prix.sortie) / 1e6;
+//#region src/flux.ts
+/**
+* Ce que le tour a rendu, une fois le flux fini.
+*
+* `null` quand rien d'utilisable n'en est sorti — un JSON illisible, un tour
+* sans mot. Le crédit n'est pas rendu pour autant : les jetons, eux, ont été
+* consommés, et une conversation garde ses tours restants pour réessayer.
+*/
+function lireLaFin(texte, demande) {
+	const lu = lireTour(lireJsonSouple(texte));
+	if (lu === null || lu.sorte !== "outil" || lu.outil.sorte !== "page") return lu;
 	return {
-		dollars,
-		fcfa: Math.round(dollars * tauxFcfaParDollar * 100) / 100,
-		entree: jetons.entree,
-		sortie: jetons.sortie
-	};
-}
-//#endregion
-//#region src/invite.ts
-/**
-* L'invite qui impose la sortie en JSON conforme au schéma (§ 3).
-*
-* Elle est courte exprès. Le schéma porte déjà les consignes là où le modèle
-* les lit vraiment — dans les `description` de chaque champ — et rallonger
-* l'invite pour redire ce que le schéma dit coûte des jetons d'entrée à chaque
-* appel, sur un budget d'un franc.
-*
-* Trois choses seulement ne peuvent pas vivre dans le schéma : le métier
-* (Cameroun, francs CFA, téléphone), l'interdiction de sortir du cadre, et le
-* fait que la réponse doit être du JSON nu.
-*
-* Les quatre schémas pèsent ensemble à peu près deux mille jetons d'entrée,
-* soit environ un quart de franc par génération — mesuré, pas estimé. Le
-* plafond du § 8 est d'un franc : tant qu'on est là, envoyer tous les schémas
-* vaut mieux que deviner lequel envoyer. Se tromper de famille ferait payer un
-* refus à quelqu'un dont la demande était parfaitement faisable, et c'est le
-* plus cher des deux échecs. Le jour où le total s'approche du franc, c'est le
-* routage qu'il faudra écrire, et cette note sera le point de départ.
-*/
-var CONSIGNES = `Tu fabriques un outil pour un petit commerçant camerounais.
-
-Tu sais fabriquer quatre sortes de choses, et choisir entre elles.
-
-Un **registre** est un tableau de lignes qu'on tient à la main : des ventes,
-des dettes, un stock, des présences, des cotisations. Il répond à « qu'est-ce
-que j'ai noté ? ».
-
-Une **calculatrice** a quelques champs et un résultat. Elle répond à « combien
-ça fait ? » — ce qu'il reste à payer, la part de chacun, une marge, une remise.
-Sa formule se déclare en arbre, jamais en code.
-
-Une **page** se publie derrière un lien qu'on envoie sur WhatsApp. Elle répond
-à « comment je me montre ? » — une vitrine de boutique, un menu de restaurant,
-une liste de prix, un profil d'artisan. C'est ce que demande « je veux un site
-internet » : ici, un site et une page sont la même chose, et le champ
-« sommaire » met un menu en haut quand il y a plusieurs sujets.
-
-**Un événement est une page datée.** Une annonce de mariage, une réunion de
-tontine, une vente de fin d'année ont un nom, un lieu, un programme et une
-phrase — tout ce qu'une page porte déjà. Remplis « date » et la page dira
-d'elle-même dans combien de jours c'est. Mets le programme en section
-« liste », l'heure de chaque moment dans « valeur ».
-
-N'invente jamais un numéro de téléphone, une adresse, une date ni un prix :
-laisse le champ vide si la demande ne le donne pas — un prix inventé se lit
-comme un engagement, et une date inventée fait déplacer des gens.
-
-Un **formulaire** se publie derrière un lien et **reçoit** des réponses. Il
-répond à « comment je ramasse ce que les gens me disent ? » — les commandes du
-week-end, les inscriptions à une réunion, qui vient à la fête, ce que chacun
-apporte. C'est la seule des quatre qui reçoit ; les trois autres se lisent.
-Mets le moins de questions possible : chacune de plus est une réponse de moins.
-
-Réponds par un objet JSON seul, sans texte autour, sans bloc de code.
-
-Les schémas plus bas **décrivent** la forme de ta réponse. Ils ne sont pas la
-réponse : renvoie un objet dont les champs sont remplis pour cette demande-là,
-jamais la description elle-même.
-
-**Si la demande n'est aucune des quatre, refuse.** Une application à installer,
-un logo, une photo, une traduction, un conseil : rien de cela ne se range dans
-un tableau, dans une formule, dans une page ni dans un formulaire. Réponds
-alors par un objet qui
-n'a qu'un champ « impossible », en disant en une phrase ce que tu ne peux pas
-faire, et ce que tu sais faire. Ne fabrique jamais un outil plausible pour une
-demande qui n'en réclame pas : un outil inventé se remplit une fois, puis se
-referme pour toujours.
-
-Règles :
-- Les montants sont en francs CFA, entiers, sans décimale.
-- Les libellés sont en français, courts, tutoiement, sans jargon comptable.
-- 6 colonnes, 5 champs, 8 sections ou
-  8 questions au maximum : ça se lit sur un téléphone de 360 pixels.
-- La première colonne nomme la ligne : mets devant celle qui l'identifie.
-- Au plus une colonne de type bascule.
-- N'invente pas de colonne que la demande ne réclame pas.
-- Si la demande décrit une dette entre personnes, ne mets aucun montant en
-  sur-titre : ça se partage, et humilier quelqu'un fait perdre le client avec
-  l'argent.`;
-var REGISTRE = JSON.stringify(pourLeModele(schemaRegistre));
-var CALCUL = JSON.stringify(pourLeModele(schemaCalcul));
-var PAGE = JSON.stringify(pourLeModele(schemaPage));
-var FORMULAIRE = JSON.stringify(pourLeModele(schemaFormulaire));
-var REFUS = JSON.stringify(pourLeModele(schemaRefus));
-function batirInvite(demande) {
-	return `${CONSIGNES}
-
-Un registre doit respecter ce schéma :
-${REGISTRE}
-
-Une calculatrice doit respecter celui-ci :
-${CALCUL}
-
-Une page, celui-ci :
-${PAGE}
-
-Un formulaire, celui-ci :
-${FORMULAIRE}
-
-Un refus, celui-ci :
-${REFUS}
-
-Demande de l'utilisateur :
-${demande}`;
-}
-/**
-* Le tour de reprise. Un seul est prévu (§ 3), donc il doit porter.
-*
-* On renvoie les reproches tels que `verifierRegistre` les a écrits — chemin et
-* message — parce qu'ils nomment le champ fautif et la correction. « Ce n'est
-* pas valide » ferait recommencer au hasard.
-*/
-function batirReproches(erreurs) {
-	return `Ta réponse n'est pas conforme. Corrige exactement ceci et renvoie l'objet JSON entier :
-
-${erreurs.map((e) => `- ${e.chemin} : ${e.message}`).join("\n")}`;
-}
-//#endregion
-//#region src/traiter.ts
-async function traiter(demande, fournisseur, tauxFcfaParDollar) {
-	const jetons = {
-		entree: 0,
-		sortie: 0
-	};
-	let dollarsAnnonces = null;
-	let sortie = "";
-	let erreurs = [];
-	for (let essai = 1; essai <= 2; essai++) {
-		const reponse = await fournisseur.appeler(essai === 1 ? { invite: batirInvite(demande) } : {
-			invite: batirInvite(demande),
-			reprise: {
-				sortie,
-				reproches: batirReproches(erreurs)
-			}
-		});
-		jetons.entree += reponse.jetonsEntree;
-		jetons.sortie += reponse.jetonsSortie;
-		if (reponse.dollars !== void 0) dollarsAnnonces = (dollarsAnnonces ?? 0) + reponse.dollars;
-		sortie = reponse.texte;
-		const valeur = lireJson(reponse.texte);
-		if (valeur === void 0) {
-			console.error(JSON.stringify({
-				evenement: "json_illisible",
-				essai,
-				debut: reponse.texte.slice(0, 300)
-			}));
-			erreurs = [{
-				chemin: "$",
-				message: "la réponse n’est pas du JSON"
-			}];
-			continue;
+		...lu,
+		outil: {
+			...lu.outil,
+			page: sansNumeroInvente(lu.outil.page, demande)
 		}
-		const lu = lireReponseModele(valeur);
-		if (lu.sorte === "registre") return {
-			sorte: "reussi",
-			registre: lu.registre,
-			cout: cout(),
-			essais: essai
-		};
-		if (lu.sorte === "calcul") return {
-			sorte: "calcule",
-			calcul: lu.calcul,
-			cout: cout(),
-			essais: essai
-		};
-		if (lu.sorte === "page") return {
-			sorte: "page",
-			page: sansNumeroInvente(lu.page, demande),
-			cout: cout(),
-			essais: essai
-		};
-		if (lu.sorte === "formulaire") return {
-			sorte: "formulaire",
-			formulaire: lu.formulaire,
-			cout: cout(),
-			essais: essai
-		};
-		if (lu.sorte === "refus") return {
-			sorte: "hors-sujet",
-			pourquoi: lu.pourquoi,
-			cout: cout(),
-			essais: essai
-		};
-		erreurs = lu.erreurs;
-	}
-	return {
-		sorte: "invalide",
-		erreurs,
-		cout: cout(),
-		essais: 2
 	};
-	function cout() {
-		return dollarsAnnonces === null ? couter(jetons, fournisseur.prix, tauxFcfaParDollar) : {
-			dollars: dollarsAnnonces,
-			fcfa: Math.round(dollarsAnnonces * tauxFcfaParDollar * 100) / 100,
-			entree: jetons.entree,
-			sortie: jetons.sortie
-		};
-	}
+}
+/** Le même déshabillage que le chemin non diffusé : le modèle enveloppe parfois. */
+function lireJsonSouple(texte) {
+	const brut = texte.trim();
+	const candidats = [brut];
+	const bloc = /```(?:json)?\s*([\s\S]*?)```/i.exec(brut);
+	if (bloc?.[1] !== void 0) candidats.push(bloc[1].trim());
+	const debut = brut.indexOf("{");
+	const fin = brut.lastIndexOf("}");
+	if (debut !== -1 && fin > debut) candidats.push(brut.slice(debut, fin + 1));
+	for (const c of candidats) try {
+		return JSON.parse(c);
+	} catch {}
 }
 /**
 * Retire un numéro que la demande ne contenait pas.
 *
-* Mesuré en production, deux fois : le modèle remplit le champ « téléphone »
-* d'une page même quand la demande n'en donne aucun. Il a d'abord recopié
-* l'exemple du schéma, puis — l'exemple retiré — il en a inventé un, valide et
-* appartenant donc à quelqu'un. Une interdiction dans l'invite n'a pas suffi,
-* et ne pouvait pas suffire : un champ vide appelle une valeur plus fort
-* qu'une phrase ne l'en dissuade.
+* La même règle que sur le chemin non diffusé, et pour la même raison mesurée
+* en production : le modèle remplit le champ « téléphone » même quand la
+* demande n'en donne aucun, et un numéro inventé appartient à quelqu'un.
 *
-* On retire plutôt que de reprendre : une reprise coûte un tour entier pour
-* corriger un seul champ, et le reste de la page est bon. Sans numéro, la page
-* n'a pas son bouton WhatsApp — c'est une perte, et elle vaut mieux qu'un
-* bouton qui appelle un inconnu. Le propriétaire l'ajoute dans l'écran de
-* modification, où il est le seul à savoir quoi mettre.
-*
-* L'adresse n'est pas traitée de même, et il faut le dire : elle ne se vérifie
-* pas mécaniquement. Le pari est qu'un commerçant voit qu'une rue n'est pas la
-* sienne — il sait où est sa boutique — alors que personne ne relit dix
-* chiffres. Ce qui distingue vraiment les deux : un numéro inventé fait du tort
-* à un tiers qui n'a rien demandé.
+* Ici la demande est la conversation entière, pas seulement le dernier
+* message : quelqu'un donne son numéro au deuxième tour et parle d'autre chose
+* au troisième, et il ne doit pas le perdre en chemin.
 */
 function sansNumeroInvente(page, demande) {
 	const tel = page.telephone;
 	if (tel === void 0 || tel === "" || numeroDansLaDemande(tel, demande)) return page;
-	console.warn(JSON.stringify({ evenement: "numero_invente_retire" }));
-	const { telephone, ...sansTel } = page;
-	return sansTel;
+	const { telephone, ...sans } = page;
+	return sans;
 }
 /**
-* Le JSON du modèle, ou rien.
+* Le tour, du premier morceau au dernier événement.
 *
-* `responseMimeType` le demande déjà, et le modèle déborde quand même : mesuré
-* en production sur dix générations réelles, une demande sur dix a échoué sur
-* « la réponse n'est pas du JSON », deux fois de suite, pour soixante centimes.
-* Un bloc de code entouré d'une phrase de politesse suffit à faire tomber une
-* configuration parfaitement valable.
-*
-* C'est une faute de forme et non de fond : on déshabille plutôt que de faire
-* payer un tour de plus. Trois tentatives, de la plus stricte à la plus large,
-* et la dernière ne cherche que ce qui ne peut pas être de la prose — le
-* premier `{` jusqu'au dernier `}`. Ce qu'on ne trouve pas ainsi n'était pas
-* une configuration enveloppée : c'était autre chose, et ça reste un échec.
+* Il ne jette pas : une panne de fournisseur devient un événement `panne`, et
+* le client a déjà de quoi l'afficher. Un flux qui se coupe en jetant laisse
+* l'écran figé sur une phrase à moitié écrite.
 */
-function lireJson(texte) {
-	const brut = texte.trim();
-	for (const candidat of candidatsJson(brut)) try {
-		return JSON.parse(candidat);
-	} catch {}
+async function* jouerLeTour(accord, fournisseur, seance, reglages) {
+	const invite = batirInviteAgent(accord.famille);
+	const demande = accord.conversation.filter((t) => t.qui === "personne").map((t) => t.texte).join(" ");
+	let texte = "";
+	let cout = {
+		dollars: 0,
+		fcfa: 0,
+		entree: 0,
+		sortie: 0
+	};
+	try {
+		const flux = fournisseur.diffuser?.({
+			invite,
+			conversation: accord.conversation
+		});
+		if (flux === void 0) {
+			const reponse = await fournisseur.appeler({
+				invite,
+				conversation: accord.conversation
+			});
+			texte = reponse.texte;
+			cout = chiffrer(reponse, fournisseur, reglages.tauxFcfa);
+		} else {
+			let suivant = await flux.next();
+			let derniere = "";
+			while (suivant.done !== true) {
+				texte += suivant.value.texte;
+				const ebauche = ebaucher(texte);
+				if (ebauche !== null) {
+					const empreinte = `${ebauche.mot}|${ebauche.famille}|${ebauche.titre}|${ebauche.pieces.join("|")}`;
+					if (empreinte !== derniere) {
+						derniere = empreinte;
+						yield {
+							sorte: "ebauche",
+							ebauche
+						};
+					}
+				}
+				suivant = await flux.next();
+			}
+			cout = chiffrer(suivant.value, fournisseur, reglages.tauxFcfa);
+		}
+	} catch (cause) {
+		console.error("tour_agent_echoue", cause);
+		if (cause instanceof ErreurFournisseur && cause.sorte === "credit-epuise") {
+			yield {
+				sorte: "panne",
+				pourquoi: "plus de crédit pour composer",
+				sansCredit: true
+			};
+			return;
+		}
+		yield {
+			sorte: "panne",
+			pourquoi: "le modèle n’a pas répondu"
+		};
+		return;
+	}
+	const tour = lireLaFin(texte, demande);
+	await seance.journaliser({
+		etage: accord.etage,
+		jetonsEntree: cout.entree,
+		jetonsSortie: cout.sortie,
+		coutXaf: cout.fcfa,
+		ok: tour !== null
+	});
+	console.log(JSON.stringify({
+		evenement: "tour_agent",
+		modele: fournisseur.nom,
+		tours: accord.laissez.tours,
+		paye: accord.paye,
+		fcfa: cout.fcfa,
+		issue: tour === null ? "illisible" : tour.sorte
+	}));
+	if (tour === null) {
+		yield {
+			sorte: "panne",
+			pourquoi: "je n’ai pas su répondre — redis-le autrement ?"
+		};
+		return;
+	}
+	yield {
+		sorte: "fin",
+		tour,
+		fcfa: cout.fcfa,
+		conversation: await laissezPourLeClient(accord, reglages.secret),
+		plan: seance.compte.plan,
+		credits: seance.compte.credits - (accord.paye ? 1 : 0)
+	};
 }
-function* candidatsJson(brut) {
-	yield brut;
-	const bloc = /```(?:json)?\s*([\s\S]*?)```/i.exec(brut);
-	if (bloc?.[1] !== void 0) yield bloc[1].trim();
-	const debut = brut.indexOf("{");
-	const fin = brut.lastIndexOf("}");
-	if (debut !== -1 && fin > debut) yield brut.slice(debut, fin + 1);
+function chiffrer(reponse, fournisseur, tauxFcfa) {
+	const jetons = {
+		entree: reponse.jetonsEntree,
+		sortie: reponse.jetonsSortie
+	};
+	if (reponse.dollars === void 0) return couter(jetons, fournisseur.prix, tauxFcfa);
+	return {
+		dollars: reponse.dollars,
+		fcfa: Math.round(reponse.dollars * tauxFcfa * 100) / 100,
+		entree: jetons.entree,
+		sortie: jetons.sortie
+	};
 }
-//#endregion
-//#region src/fonction.ts
-/**
-* Le proxy IA (§ 3, « Appeler l'IA »).
-*
-* Il existe pour une seule raison : **aucune clef d'API dans le client, jamais**
-* (invariant § 2.8). La clef est lue ici, dans l'environnement de la fonction,
-* et ne traverse pas la frontière. Le client ne reçoit qu'une configuration
-* déjà validée — jamais de HTML, jamais de code (§ 3, point 5).
-*
-* Il ne connaît pas son hébergeur. `repondre` prend une demande et des
-* réglages, et rend un code et un corps ; l'adaptateur qui la relie à un
-* `Request` tient en dix lignes et vit ailleurs. C'est ce qui a permis de
-* passer de Vercel à Cloudflare sans toucher à une seule décision — et ce qui
-* permet d'éprouver tout ce fichier sans réseau, sans clef et sans serveur.
-*
-* Les réglages arrivent en argument et ne se lisent pas dans
-* `process.env` : un Worker n'a pas de `process`, ses variables arrivent dans
-* un objet passé à chaque requête. Les lire au chargement du module aurait
-* marché sur Vercel et rendu partout `undefined` sur Cloudflare.
-*
-* Le quota et le journal des coûts sont **obligatoires**, et c'est voulu : il
-* n'existe pas de chemin par lequel une génération se paie sans être comptée.
-* `repondre` ne connaît pourtant ni D1 ni les comptes — elle reçoit une séance,
-* qui porte le compte déjà lu et sait retirer, rendre et journaliser. Ce qui
-* décide du droit de composer reste dans `@a237/comptes` ; ce fichier
-* l'applique.
-*/
-/** Une demande plus longue qu'un paragraphe n'est pas une demande d'outil. */
-var MAX_DEMANDE = 400;
-var MODELE_PAR_DEFAUT = "google/gemini-2.5-flash-lite";
 function nombre(brut, defaut) {
 	const n = Number(brut);
 	return Number.isFinite(n) ? n : defaut;
@@ -1966,132 +2440,14 @@ function reglagesDe(env) {
 		clef: env.A237_CLEF_IA ?? "",
 		ouverte: env.A237_IA_OUVERTE === "1",
 		fournisseur: env.A237_FOURNISSEUR ?? "openrouter",
-		modele: env.A237_MODELE ?? MODELE_PAR_DEFAUT,
+		modele: env.A237_MODELE ?? "google/gemini-2.5-flash-lite",
 		prixEntree: nombre(env.A237_PRIX_ENTREE, .1),
 		prixSortie: nombre(env.A237_PRIX_SORTIE, .4),
 		tauxFcfa: nombre(env.A237_TAUX_FCFA, 600)
 	};
 }
-/**
-* Le fournisseur et le modèle se choisissent dans l'environnement.
-*
-* Le brief pose un **budget** — moins d'un franc la génération (§ 8) — et non
-* une marque. Pouvoir changer de modèle sans redéployer, c'est pouvoir tenir
-* ce budget quand les prix bougent, et essayer mieux quand un modèle plus
-* fidèle au schéma apparaît. Une reprise double le coût : un modèle qui se
-* trompe moins peut revenir moins cher qu'un modèle moins cher.
-*
-* Le prix sert au journal quand le fournisseur ne dit pas ce qu'il a facturé.
-* OpenRouter, lui, le dit, et son chiffre l'emporte — il applique sa marge.
-*/
-function fournisseurChoisi(r) {
-	return r.fournisseur === "gemini" ? gemini(r.clef, r.modele === MODELE_PAR_DEFAUT ? "gemini-2.5-flash-lite" : r.modele) : openrouter(r.clef, r.modele, {
-		entree: r.prixEntree,
-		sortie: r.prixSortie
-	});
-}
-async function repondre(corpsRecu, r, seance) {
-	if (r.clef === "" || !r.ouverte) return {
-		statut: 503,
-		corps: { erreur: "la composition par le modèle n’est pas encore ouverte" }
-	};
-	const recu = corpsRecu;
-	const demande = typeof recu?.demande === "string" ? recu.demande.trim() : "";
-	if (demande === "" || demande.length > MAX_DEMANDE) return {
-		statut: 400,
-		corps: { erreur: "demande absente ou trop longue" }
-	};
-	const etage = etageDe(demande, CATALOGUE);
-	const verdict = controlerQuota(seance.compte, etage, seance.maintenant);
-	if (verdict.sorte !== "passe") return {
-		statut: 402,
-		corps: {
-			erreur: verdict.sorte,
-			pourquoi: verdict.pourquoi
-		}
-	};
-	if (!await seance.prendreUnCredit()) return {
-		statut: 402,
-		corps: {
-			erreur: "credits-epuises",
-			pourquoi: "Tes compositions sont utilisées. L’abonnement en donne quarante par mois."
-		}
-	};
-	try {
-		const resultat = await traiter(demande, fournisseurChoisi(r), r.tauxFcfa);
-		await seance.journaliser({
-			etage,
-			jetonsEntree: resultat.cout.entree,
-			jetonsSortie: resultat.cout.sortie,
-			coutXaf: resultat.cout.fcfa,
-			ok: resultat.sorte === "reussi" || resultat.sorte === "calcule" || resultat.sorte === "page" || resultat.sorte === "formulaire"
-		});
-		console.log(JSON.stringify({
-			evenement: "appel_ia",
-			modele: r.modele,
-			essais: resultat.essais,
-			fcfa: resultat.cout.fcfa,
-			issue: resultat.sorte
-		}));
-		if (resultat.sorte === "hors-sujet") return {
-			statut: 200,
-			corps: {
-				impossible: resultat.pourquoi,
-				fcfa: resultat.cout.fcfa
-			}
-		};
-		if (resultat.sorte === "calcule") return {
-			statut: 200,
-			corps: {
-				calcul: resultat.calcul,
-				fcfa: resultat.cout.fcfa
-			}
-		};
-		if (resultat.sorte === "page") return {
-			statut: 200,
-			corps: {
-				page: resultat.page,
-				fcfa: resultat.cout.fcfa
-			}
-		};
-		if (resultat.sorte === "formulaire") return {
-			statut: 200,
-			corps: {
-				formulaire: resultat.formulaire,
-				fcfa: resultat.cout.fcfa
-			}
-		};
-		if (resultat.sorte !== "reussi") return {
-			statut: 422,
-			corps: {
-				erreur: "le modèle n’a pas produit un outil utilisable",
-				details: resultat.erreurs.map((e) => `${e.chemin} : ${e.message}`),
-				fcfa: resultat.cout.fcfa
-			}
-		};
-		return {
-			statut: 200,
-			corps: {
-				registre: resultat.registre,
-				fcfa: resultat.cout.fcfa
-			}
-		};
-	} catch (cause) {
-		console.error("appel_ia_echoue", cause);
-		await seance.rendreUnCredit();
-		if (cause instanceof ErreurFournisseur && cause.sorte === "credit-epuise") return {
-			statut: 402,
-			corps: { erreur: "plus de crédit pour composer" }
-		};
-		return {
-			statut: 502,
-			corps: { erreur: "le modèle n’a pas répondu" }
-		};
-	}
-}
 //#endregion
-//#region src/worker.ts
-/** Ce que `reglagesDe` sait lire : les chaînes, et elles seules. */
+//#region src/worker-chat.ts
 function chainesDe(env) {
 	const propre = {};
 	for (const [clef, valeur] of Object.entries(env)) if (typeof valeur === "string") propre[clef] = valeur;
@@ -2106,29 +2462,76 @@ function json(statut, corps) {
 		}
 	});
 }
+/**
+* Le fournisseur et le modèle se choisissent dans l'environnement.
+*
+* Le brief pose un **budget** — moins d'un franc la génération (§ 8) — et non
+* une marque. Pouvoir changer de modèle sans redéployer, c'est pouvoir tenir
+* ce budget quand les prix bougent, et essayer mieux quand un modèle plus
+* fidèle au schéma apparaît. Une reprise double le coût : un modèle qui se
+* trompe moins peut revenir moins cher qu'un modèle moins cher.
+*
+* Le prix sert au journal quand le fournisseur ne dit pas ce qu'il a facturé.
+* OpenRouter, lui, le dit, et son chiffre l'emporte — il applique sa marge.
+*/
+function fournisseurChoisi(r) {
+	return r.fournisseur === "gemini" ? gemini(r.clef, r.modele === "google/gemini-2.5-flash-lite" ? "gemini-2.5-flash-lite" : r.modele) : openrouter(r.clef, r.modele, {
+		entree: r.prixEntree,
+		sortie: r.prixSortie
+	});
+}
+/**
+* Les événements, mis sur le fil.
+*
+* Une ligne `data:` par événement, et une ligne vide pour la clore : c'est tout
+* le protocole, et il tient dans un navigateur sans bibliothèque. Le saut de
+* ligne est interdit à l'intérieur — d'où le JSON, qui échappe les siens.
+*/
+function evenement(e) {
+	return `data: ${JSON.stringify(e)}\n\n`;
+}
 async function onRequest(contexte) {
 	if (contexte.request.method !== "POST") return json(405, { erreur: "méthode non permise" });
 	const base = contexte.env.COMPTES;
 	if (base === void 0) return json(503, { erreur: "la composition par le modèle n’est pas encore ouverte" });
+	const reglages = reglagesDe(chainesDe(contexte.env));
+	if (reglages.clef === "" || !reglages.ouverte) return json(503, { erreur: "la composition par le modèle n’est pas encore ouverte" });
+	const secret = typeof contexte.env.A237_PAIEMENT_SECRET === "string" ? contexte.env.A237_PAIEMENT_SECRET : "";
+	if (secret === "") return json(503, { erreur: "la composition par le modèle n’est pas encore ouverte" });
 	const jeton = jetonDeLEntete(contexte.request.headers);
 	if (jeton === null || !jetonValide(jeton)) return json(401, {
 		erreur: "appareil-inconnu",
 		pourquoi: "Cet appareil ne s’est pas présenté."
 	});
-	let corps;
+	let recu;
 	try {
-		corps = await contexte.request.json();
+		recu = await contexte.request.json();
 	} catch {
-		corps = void 0;
+		return json(400, { erreur: "messages-illisibles" });
 	}
 	const seance = await ouvrirSeance(base, jeton, /* @__PURE__ */ new Date());
-	const { statut, corps: reponse } = await repondre(corps, reglagesDe(chainesDe(contexte.env)), seance);
-	const restants = statut === 200 ? Math.max(0, seance.compte.credits - 1) : seance.compte.credits;
-	return json(statut, {
-		...reponse,
-		credits: restants,
-		plan: seance.compte.plan
-	});
+	const accord = await accorder(recu, seance, secret);
+	if (estUnRefus(accord)) return json(accord.statut, accord.corps);
+	const fournisseur = fournisseurChoisi(reglages);
+	const encodeur = new TextEncoder();
+	const flux = new ReadableStream({ async start(file) {
+		try {
+			for await (const e of jouerLeTour(accord, fournisseur, seance, {
+				tauxFcfa: reglages.tauxFcfa,
+				secret
+			})) file.enqueue(encodeur.encode(evenement(e)));
+		} catch (cause) {
+			console.error("flux_agent_interrompu", cause);
+		} finally {
+			file.close();
+		}
+	} });
+	return new Response(flux, { headers: {
+		"content-type": "text/event-stream; charset=utf-8",
+		"cache-control": "no-store",
+		connection: "keep-alive",
+		"x-accel-buffering": "no"
+	} });
 }
 //#endregion
 export { onRequest };

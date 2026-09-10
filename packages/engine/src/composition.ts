@@ -99,7 +99,16 @@ export function lireReponseModele(valeur: unknown): ReponseModele {
      */
     const brut = (valeur as { impossible: unknown }).impossible
     const coupe = typeof brut === 'string' ? raccourcir(brut, MAX_REFUS) : brut
-    const erreurs = valider(schemaRefus, { ...valeur, impossible: coupe })
+    /*
+     * On valide **le refus seul**, et non l'objet qui le porte.
+     *
+     * `schemaRefus` interdit tout champ supplémentaire, et un modèle qui dit
+     * « je ne peux pas » laisse parfois traîner à côté un `colonnes: []` qu'il
+     * n'a pas fini d'effacer. Juger l'objet entier rejetait alors un refus
+     * parfaitement clair, et coûtait un tour à lui faire redire la même chose.
+     * Ce qui compte est ce qu'il a dit, pas ce qu'il a oublié d'enlever.
+     */
+    const erreurs = valider(schemaRefus, { impossible: coupe })
     return erreurs.length > 0
       ? { sorte: 'invalide', erreurs }
       : { sorte: 'refus', pourquoi: coupe as RefusModele['impossible'] }
