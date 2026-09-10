@@ -129,3 +129,18 @@ body {
   body { padding: 0; background: #fff; }
   .lecture-pied { display: none; }
 }
+
+/*
+ * « Enregistrer en PDF » : un lien, pas un bouton.
+ *
+ * La page n'a aucun script, et c'est ce qui la rend fiable dans le navigateur
+ * intégré de WhatsApp, sur un téléphone d'entrée de gamme. Un lien de
+ * téléchargement n'en demande pas.
+ */
+.lecture-pdf { margin: 10px 0 0; }
+.lecture-pdf a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+}

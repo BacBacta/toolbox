@@ -30,7 +30,11 @@ export interface MetaPage {
  * un devis doit pouvoir répondre « celui du 9 septembre » sans ouvrir un
  * fichier.
  */
-export function PiedLecture(props: { readonly instantane: Instantane }): JSX.Element {
+export function PiedLecture(props: {
+  readonly instantane: Instantane
+  /** L'adresse du PDF, quand ce document en a un. */
+  readonly pdf?: string
+}): JSX.Element {
   const quand = new Date(props.instantane.publieLe)
   return (
     <footer class="lecture-pied">
@@ -38,6 +42,19 @@ export function PiedLecture(props: { readonly instantane: Instantane }): JSX.Ele
         Arrêté le {Number.isNaN(quand.getTime()) ? '—' : dateLongue(quand)}.
         Document en lecture seule.
       </p>
+      {/*
+        Un lien, pas un bouton : la page n'a pas de script, et un client qui
+        reçoit un devis veut souvent le fichier — pour l'imprimer chez le
+        photocopieur du coin, ou le garder dans son dossier. Il ne s'affiche
+        que pour les écrits A4 : un registre n'a pas de feuille.
+      */}
+      {props.pdf !== undefined && (
+        <p class="lecture-pdf">
+          <a href={props.pdf} download>
+            Enregistrer en PDF
+          </a>
+        </p>
+      )}
       <p class="lecture-marque">Atelier&nbsp;237</p>
     </footer>
   )

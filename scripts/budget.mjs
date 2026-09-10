@@ -223,6 +223,8 @@ for (const [chemin, marqueur, quoi] of [
   // Sans la vérification de signature, n'importe qui s'offre un abonnement
   // avec `curl` : c'est la seule ligne de ce fichier qui protège de l'argent.
   ['functions/api/pay/[[chemin]].js', 'memeSignature', 'la vérification de signature du rappel'],
+  ['functions/p/[lien].js', EXPORTE_ONREQUEST, 'l’export nommé que Pages appelle'],
+  ['functions/p/[lien].js', 'application/pdf', 'le service des PDF'],
 ]) {
   try {
     const source = readFileSync(chemin, 'utf8')
@@ -244,7 +246,7 @@ for (const [chemin, marqueur, quoi] of [
   const attendus = new Set([
     'functions/api/ai.js', 'functions/api/publier.js',
     'functions/api/compte/[[chemin]].js', 'functions/api/pay/[[chemin]].js',
-    'functions/d/[lien].js', 'functions/c/[lien].js',
+    'functions/d/[lien].js', 'functions/c/[lien].js', 'functions/p/[lien].js',
   ])
   const vus = []
   const parcourir = (dossier) => {

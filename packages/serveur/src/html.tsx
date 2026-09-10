@@ -155,7 +155,8 @@ function dessiner(
     return envelopper(
       meta,
       CSS_A4 + CSS_LECTURE,
-      `<main class="lecture">${enChaine(document)}</main>${enChaine(<PiedLecture instantane={instantane} />)}`,
+      `<main class="lecture">${enChaine(document)}</main>` +
+        enChaine(<PiedLecture instantane={instantane} pdf={`${lien.replace('/d/', '/p/')}`} />),
     )
   }
 

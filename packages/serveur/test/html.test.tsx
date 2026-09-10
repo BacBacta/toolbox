@@ -87,7 +87,13 @@ describe('un registre, qui n’est pas un document', () => {
   it('rend sa carte plutôt que de rejouer un écran à boutons', () => {
     expect(page).toContain('lecture-carte')
     expect(page).not.toContain('<button')
-    expect(page).not.toContain('a4-cadre')
+    /*
+     * Le balisage, pas la chaîne. `.a4-cadre` est une règle de la feuille de
+     * style, présente sur toute page qui l'inline : chercher le mot nu passait
+     * pour une garde alors que la feuille était vide sous Vitest.
+     */
+    expect(page).not.toContain('class="a4-cadre"')
+    expect(page).not.toContain('<article class="a4"')
   })
 
   it('porte le titre et le grand chiffre de la carte', () => {
@@ -210,5 +216,42 @@ describe('un outil composé par le modèle', () => {
     expect(page).toContain('Marge')
     expect(page).not.toContain('ne mène à rien')
     expect(rendable(CALCUL)).toBe(true)
+  })
+})
+
+describe('le lien vers le PDF', () => {
+  it('s’offre sur un écrit A4', () => {
+    // Un client qui reçoit un devis veut souvent le fichier : pour l'imprimer
+    // chez le photocopieur du coin, ou le garder dans son dossier.
+    const page = pageDeLecture(DEVIS, CTX, LIEN)
+    expect(page).toContain('Enregistrer en PDF')
+    expect(page).toContain('href="https://atelier237.pages.dev/p/K7M2XQ4BN9PZ"')
+  })
+
+  it('mais pas sur un registre : il n’a pas de feuille', () => {
+    // Sa page est une carte, un résumé d'écran. Un PDF d'un résumé serait un
+    // papier qui ne sert à rien — ni preuve, ni pièce comptable.
+    const njangi = instantane('njangi', { nom: 'Njangi', membres: [], versements: [] }, 'Njangi')
+    const page = pageDeLecture(njangi, CTX, LIEN)
+    expect(page).not.toContain('Enregistrer en PDF')
+  })
+
+  it('et il ne met pas de script dans la page', () => {
+    const page = pageDeLecture(DEVIS, CTX, LIEN)
+    expect(page).not.toContain('<script')
+    expect(page).not.toMatch(/\son[a-z]+=/)
+  })
+})
+
+describe('une date de publication qu’on ne sait pas lire', () => {
+  it('met un tiret plutôt qu’une date inventée', () => {
+    /*
+     * `publieLe` vient du dépôt, et rien n'oblige un client — ou `curl` — à y
+     * mettre une date. « Arrêté le Invalid Date » sur un devis remis à un
+     * client vaut moins qu'un tiret, qui dit franchement qu'on ne sait pas.
+     */
+    const page = pageDeLecture({ ...DEVIS, publieLe: 'pas une date' }, CTX, LIEN)
+    expect(page).toContain('Arrêté le —')
+    expect(page).not.toContain('Invalid')
   })
 })
