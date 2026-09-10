@@ -73,20 +73,43 @@ export function composeDe(reponse: ReponseModele): {
 }
 
 /**
+ * Ce qu'on dit quand le modèle a fabriqué sans rien dire.
+ *
+ * Court exprès : c'est une doublure, pas une phrase d'auteur. Elle ne se lit
+ * que dans le cas rare où le modèle a rendu l'outil sans l'enveloppe.
+ */
+const MOT_PAR_DEFAUT = 'Voilà.'
+
+/**
  * Lit un tour complet.
  *
  * Un tour sans outil n'est pas un échec : le modèle a le droit de demander une
  * précision avant de fabriquer quoi que ce soit, et c'est souvent ce qu'il faut
- * faire d'une demande de trois mots. Ce qui serait un échec, c'est un tour sans
- * mot — la personne resterait devant un écran qui a bougé sans rien dire.
+ * faire d'une demande de trois mots.
+ *
+ * Un tour **sans mot** n'en est pas un non plus, et ça a coûté un tour réel de
+ * l'apprendre. Le refuser semblait juste — la personne resterait devant un
+ * écran qui a bougé sans rien dire — mais l'alternative au silence n'était pas
+ * une phrase : c'était une panne, écran figé et tour payé. Un outil sans
+ * commentaire vaut mieux que rien du tout, et on met le commentaire à sa
+ * place.
+ *
+ * Ce qui reste refusé est ce qui ne porte **ni mot ni outil** : là, il n'y a
+ * vraiment rien à montrer.
  */
 export function lireTour(valeur: unknown): LectureTour | null {
   if (typeof valeur !== 'object' || valeur === null) return null
   const tour = valeur as { mot?: unknown; outil?: unknown }
   const mot = typeof tour.mot === 'string' ? tour.mot.trim() : ''
-  if (mot === '') return null
-  if (tour.outil === undefined || tour.outil === null) return { sorte: 'mot', mot }
-  return { sorte: 'outil', mot, outil: lireReponseModele(tour.outil) }
+
+  const outil = tour.outil ?? (familleDe(valeur) === null ? undefined : valeur)
+  if (outil === undefined || outil === null) return mot === '' ? null : { sorte: 'mot', mot }
+
+  return {
+    sorte: 'outil',
+    mot: mot === '' ? MOT_PAR_DEFAUT : mot,
+    outil: lireReponseModele(outil),
+  }
 }
 
 /**

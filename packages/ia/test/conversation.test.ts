@@ -174,7 +174,16 @@ describe('ce qui arrive du client, et qui n’est pas cru', () => {
     if (estUnRefus(a)) throw new Error('refusé')
     expect(a.conversation.at(-1)?.texte).toBe('ajoute une colonne date')
     expect(a.conversation.at(-2)?.texte).toContain('"clef":"client"')
-    expect(a.conversation.at(-2)?.qui).toBe('agent')
+    /*
+     * Dans la bouche de **la personne**, et non de l'agent. Mesuré sur un vrai
+     * deuxième tour : posé comme un message d'agent, le rappel porte du JSON
+     * nu, et le modèle imite ce qu'il croit être sa propre dernière réponse —
+     * il répond alors par l'outil seul, sans l'enveloppe.
+     */
+    expect(a.conversation.at(-2)?.qui).toBe('personne')
+    // Et la forme de la réponse est redite juste avant : ce qui est dit une
+    // fois au début d'un long échange ne pèse plus assez à la fin.
+    expect(a.conversation.at(-2)?.texte).toContain('un objet JSON avec « mot » et « outil »')
   })
 
   it('n’emporte qu’un seul état de l’outil, le dernier', async () => {

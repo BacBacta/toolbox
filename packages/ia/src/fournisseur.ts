@@ -233,24 +233,36 @@ export function openrouter(
      * coût serait un appel qu'on ne compte pas, et le § 8 en fait un critère.
      */
     async *diffuser(demande, signal) {
-      const reponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${clef}`,
-          'content-type': 'application/json',
-          'http-referer': 'https://atelier237.pages.dev',
-          'x-title': 'Atelier 237',
-        },
-        body: JSON.stringify({
-          model: modele,
-          messages: messagesOpenAI(demande),
-          temperature: 0,
-          max_tokens: 2048,
-          stream: true,
-          usage: { include: true },
-        }),
-        ...(signal !== undefined ? { signal } : {}),
-      })
+      /*
+       * `response_format` sur le flux aussi, et ce n'est pas un détail.
+       *
+       * Il était posé sur l'appel d'un seul tenant et oublié ici. Mesuré sur
+       * de vrais deuxièmes tours : deux fois sur trois, le modèle répondait en
+       * **prose** — « Voilà, j'ai retiré la date et ajouté la colonne » — sans
+       * une accolade. Une conversation qui ressemble à une conversation le
+       * fait glisser dans le registre de la conversation, et le contrat JSON,
+       * énoncé une seule fois au début, ne pèse plus assez.
+       *
+       * La prose était pire qu'illisible : elle **affirmait** une modification
+       * qui n'était nulle part. L'accepter comme réponse aurait montré à
+       * quelqu'un « j'ai retiré la date » au-dessus d'un outil où la date est
+       * toujours là.
+       */
+      const base = {
+        model: modele,
+        messages: messagesOpenAI(demande),
+        temperature: 0,
+        max_tokens: 2048,
+        stream: true,
+        usage: { include: true },
+      }
+
+      let reponse = await diffuserVers(clef, { ...base, response_format: { type: 'json_object' } }, signal)
+      if (reponse.status >= 400 && reponse.status < 500 && reponse.status !== 401) {
+        // Le modèle choisi ne sait peut-être pas contraindre son format. Ce
+        // n'est pas une raison de le refuser : l'invite le demande déjà.
+        reponse = await diffuserVers(clef, base, signal)
+      }
 
       if (!reponse.ok || reponse.body === null) {
         throw new ErreurFournisseur(
@@ -353,6 +365,20 @@ async function* lignesSSE(corps: ReadableStream<Uint8Array>): AsyncGenerator<str
     // Worker qui garde des connexions ouvertes finit par ne plus en avoir.
     lecteur.cancel().catch(() => undefined)
   }
+}
+
+function diffuserVers(clef: string, corps: unknown, signal?: AbortSignal): Promise<Response> {
+  return fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${clef}`,
+      'content-type': 'application/json',
+      'http-referer': 'https://atelier237.pages.dev',
+      'x-title': 'Atelier 237',
+    },
+    body: JSON.stringify(corps),
+    ...(signal !== undefined ? { signal } : {}),
+  })
 }
 
 function envoyer(clef: string, corps: unknown): Promise<Response> {

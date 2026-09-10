@@ -1499,26 +1499,42 @@ function refermer(brut) {
 //#endregion
 //#region ../engine/src/agent.ts
 /**
+* Ce qu'on dit quand le modèle a fabriqué sans rien dire.
+*
+* Court exprès : c'est une doublure, pas une phrase d'auteur. Elle ne se lit
+* que dans le cas rare où le modèle a rendu l'outil sans l'enveloppe.
+*/
+var MOT_PAR_DEFAUT = "Voilà.";
+/**
 * Lit un tour complet.
 *
 * Un tour sans outil n'est pas un échec : le modèle a le droit de demander une
 * précision avant de fabriquer quoi que ce soit, et c'est souvent ce qu'il faut
-* faire d'une demande de trois mots. Ce qui serait un échec, c'est un tour sans
-* mot — la personne resterait devant un écran qui a bougé sans rien dire.
+* faire d'une demande de trois mots.
+*
+* Un tour **sans mot** n'en est pas un non plus, et ça a coûté un tour réel de
+* l'apprendre. Le refuser semblait juste — la personne resterait devant un
+* écran qui a bougé sans rien dire — mais l'alternative au silence n'était pas
+* une phrase : c'était une panne, écran figé et tour payé. Un outil sans
+* commentaire vaut mieux que rien du tout, et on met le commentaire à sa
+* place.
+*
+* Ce qui reste refusé est ce qui ne porte **ni mot ni outil** : là, il n'y a
+* vraiment rien à montrer.
 */
 function lireTour(valeur) {
 	if (typeof valeur !== "object" || valeur === null) return null;
 	const tour = valeur;
 	const mot = typeof tour.mot === "string" ? tour.mot.trim() : "";
-	if (mot === "") return null;
-	if (tour.outil === void 0 || tour.outil === null) return {
+	const outil = tour.outil ?? (familleDe(valeur) === null ? void 0 : valeur);
+	if (outil === void 0 || outil === null) return mot === "" ? null : {
 		sorte: "mot",
 		mot
 	};
 	return {
 		sorte: "outil",
-		mot,
-		outil: lireReponseModele(tour.outil)
+		mot: mot === "" ? MOT_PAR_DEFAUT : mot,
+		outil: lireReponseModele(outil)
 	};
 }
 /** La famille se lit sur la forme, comme partout ailleurs. */
@@ -1812,8 +1828,8 @@ function messagesPropres(brut) {
 function avecLOutil(messages, outil) {
 	if (outil === void 0 || outil === null) return messages;
 	const rappel = {
-		qui: "agent",
-		texte: `Voici l’outil tel qu’il est en ce moment :\n${JSON.stringify(outil)}`
+		qui: "personne",
+		texte: `Voici l’outil tel qu’il est en ce moment :\n${JSON.stringify(outil)}\n\nRéponds comme d’habitude : un objet JSON avec « mot » et « outil », et l’outil entier.`
 	};
 	return [
 		...messages.slice(0, -1),
@@ -2146,24 +2162,19 @@ function openrouter(clef, modele = "google/gemini-2.5-flash-lite", prix = {
 		* coût serait un appel qu'on ne compte pas, et le § 8 en fait un critère.
 		*/
 		async *diffuser(demande, signal) {
-			const reponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-				method: "POST",
-				headers: {
-					authorization: `Bearer ${clef}`,
-					"content-type": "application/json",
-					"http-referer": "https://atelier237.pages.dev",
-					"x-title": "Atelier 237"
-				},
-				body: JSON.stringify({
-					model: modele,
-					messages: messagesOpenAI(demande),
-					temperature: 0,
-					max_tokens: 2048,
-					stream: true,
-					usage: { include: true }
-				}),
-				...signal !== void 0 ? { signal } : {}
-			});
+			const base = {
+				model: modele,
+				messages: messagesOpenAI(demande),
+				temperature: 0,
+				max_tokens: 2048,
+				stream: true,
+				usage: { include: true }
+			};
+			let reponse = await diffuserVers(clef, {
+				...base,
+				response_format: { type: "json_object" }
+			}, signal);
+			if (reponse.status >= 400 && reponse.status < 500 && reponse.status !== 401) reponse = await diffuserVers(clef, base, signal);
 			if (!reponse.ok || reponse.body === null) throw new ErreurFournisseur(reponse.status === 402 ? "credit-epuise" : reponse.status === 401 ? "refuse" : "panne", `le routeur a répondu ${reponse.status}`);
 			let texte = "";
 			let jetonsEntree = 0;
@@ -2258,6 +2269,19 @@ async function* lignesSSE(corps) {
 	} finally {
 		lecteur.cancel().catch(() => void 0);
 	}
+}
+function diffuserVers(clef, corps, signal) {
+	return fetch("https://openrouter.ai/api/v1/chat/completions", {
+		method: "POST",
+		headers: {
+			authorization: `Bearer ${clef}`,
+			"content-type": "application/json",
+			"http-referer": "https://atelier237.pages.dev",
+			"x-title": "Atelier 237"
+		},
+		body: JSON.stringify(corps),
+		...signal !== void 0 ? { signal } : {}
+	});
 }
 function envoyer(clef, corps) {
 	return fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -2387,6 +2411,10 @@ async function* jouerLeTour(accord, fournisseur, seance, reglages) {
 		return;
 	}
 	const tour = lireLaFin(texte, demande);
+	if (tour === null) console.error(JSON.stringify({
+		evenement: "tour_illisible",
+		debut: texte.slice(0, 300)
+	}));
 	await seance.journaliser({
 		etage: accord.etage,
 		jetonsEntree: cout.entree,

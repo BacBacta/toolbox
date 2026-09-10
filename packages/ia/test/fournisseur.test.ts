@@ -219,6 +219,41 @@ describe('Gemini, appelé directement', () => {
   })
 })
 
+describe('le flux contraint son format, comme l’appel d’un seul tenant', () => {
+  it('demande du JSON, et recommence sans la contrainte si le modèle la refuse', async () => {
+    /*
+     * `response_format` était posé sur l'appel d'un seul tenant et oublié sur
+     * le flux. Mesuré sur de vrais deuxièmes tours : deux fois sur trois, le
+     * modèle répondait en prose — « Voilà, j'ai retiré la date » — sans une
+     * accolade, et en affirmant une modification qui n'était nulle part.
+     */
+    const corps = () => new ReadableStream({
+      start(f) {
+        f.enqueue(new TextEncoder().encode(sse(['{}'])))
+        f.close()
+      },
+    })
+    const appel = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 400, body: null })
+      .mockResolvedValueOnce({ ok: true, status: 200, body: corps() })
+    vi.stubGlobal('fetch', appel)
+
+    await tout(openrouter('clef'))
+    expect(appel).toHaveBeenCalledTimes(2)
+    const premier = JSON.parse((appel.mock.calls[0]?.[1] as { body: string }).body) as object
+    const second = JSON.parse((appel.mock.calls[1]?.[1] as { body: string }).body) as object
+    expect(premier).toHaveProperty('response_format')
+    expect(second).not.toHaveProperty('response_format')
+  })
+
+  it('ne recommence pas sur une clef refusée', async () => {
+    const appel = vi.fn().mockResolvedValue({ ok: false, status: 401, body: null })
+    vi.stubGlobal('fetch', appel)
+    await expect(tout(openrouter('clef'))).rejects.toMatchObject({ sorte: 'refuse' })
+    expect(appel).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('la conversation, mise en messages', () => {
   it('met l’invite d’abord, seule, pour qu’un cache serve à quelque chose', async () => {
     // Un fournisseur qui sait mettre en cache son préfixe ne paie qu'une fois

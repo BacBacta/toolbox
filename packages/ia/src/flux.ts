@@ -164,6 +164,19 @@ export async function* jouerLeTour(
 
   const tour = lireLaFin(texte, demande)
 
+  if (tour === null) {
+    /*
+     * Ce que le modèle a réellement dit part dans le journal du serveur.
+     *
+     * Sans ça, un échec de lecture ne se diagnostique pas : on sait qu'il a eu
+     * lieu, on ne sait pas contre quoi. C'est exactement ce qui est arrivé au
+     * premier vrai deuxième tour — il fallait deviner. Côté serveur seulement,
+     * et tronqué : la clef n'est jamais dans l'invite, donc jamais dans
+     * l'écho, mais ce qui revient est du texte de modèle.
+     */
+    console.error(JSON.stringify({ evenement: 'tour_illisible', debut: texte.slice(0, 300) }))
+  }
+
   /*
    * Le journal, et il n'a pas de chemin de contournement.
    *

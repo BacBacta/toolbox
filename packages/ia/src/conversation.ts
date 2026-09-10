@@ -81,9 +81,31 @@ function avecLOutil(
   outil: unknown,
 ): readonly TourConversation[] {
   if (outil === undefined || outil === null) return messages
+  /*
+   * Le rappel vient de **la personne**, et non de l'agent.
+   *
+   * Mesuré sur un vrai deuxième tour : posé comme un message d'agent, il porte
+   * du JSON nu — et le modèle imite ce qu'il croit être sa propre dernière
+   * réponse. Il répondait donc par l'outil seul, sans l'enveloppe, et le tour
+   * était perdu alors qu'il avait bien travaillé. Mis dans la bouche de la
+   * personne, c'est ce que c'est : quelqu'un qui montre l'outil qu'il a sous
+   * les yeux avant de dire quoi y changer.
+   */
   const rappel: TourConversation = {
-    qui: 'agent',
-    texte: `Voici l’outil tel qu’il est en ce moment :\n${JSON.stringify(outil)}`,
+    qui: 'personne',
+    /*
+     * La forme de la réponse est redite ici, et pas seulement dans l'invite.
+     *
+     * Une conversation qui ressemble à une conversation fait glisser le modèle
+     * dans le registre de la conversation : mesuré sur de vrais deuxièmes
+     * tours, il répondait en prose — « Voilà, j'ai retiré la date » — sans une
+     * accolade, et en affirmant une modification qui n'était nulle part. Ce
+     * qui est dit une fois au début d'un long échange ne pèse plus assez à la
+     * fin ; ce qui est dit juste avant pèse.
+     */
+    texte:
+      `Voici l’outil tel qu’il est en ce moment :\n${JSON.stringify(outil)}\n\n` +
+      'Réponds comme d’habitude : un objet JSON avec « mot » et « outil », et l’outil entier.',
   }
   // Avant le dernier mot de la personne : elle parle de cet outil-là.
   return [...messages.slice(0, -1), rappel, ...messages.slice(-1)]

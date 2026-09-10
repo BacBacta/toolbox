@@ -42,9 +42,28 @@ describe('un tour de conversation', () => {
     }
   })
 
-  it('refuse un tour sans mot : l’écran aurait bougé sans rien dire', () => {
-    expect(lireTour({ outil: REGISTRE })).toBeNull()
-    expect(lireTour({ mot: '   ', outil: REGISTRE })).toBeNull()
+  it('accepte un outil sans commentaire, plutôt que de perdre le tour', () => {
+    /*
+     * Ça a coûté un vrai deuxième tour de l'apprendre. Refuser semblait juste
+     * — la personne resterait devant un écran qui a bougé sans rien dire —
+     * mais l'alternative au silence n'était pas une phrase : c'était une
+     * panne, écran figé et tour payé.
+     */
+    const lu = lireTour({ outil: REGISTRE })
+    expect(lu?.sorte).toBe('outil')
+    expect(lu?.mot).not.toBe('')
+  })
+
+  it('et même un outil rendu tout nu, sans enveloppe', () => {
+    // Le modèle imite ce qu'il voit : un rappel de l'outil dans la
+    // conversation lui a fait répondre par l'outil seul.
+    const lu = lireTour(REGISTRE)
+    expect(lu?.sorte === 'outil' && lu.outil.sorte).toBe('registre')
+  })
+
+  it('mais refuse ce qui ne porte ni mot ni outil', () => {
+    expect(lireTour({})).toBeNull()
+    expect(lireTour({ mot: '   ' })).toBeNull()
     expect(lireTour('bonjour')).toBeNull()
     expect(lireTour(null)).toBeNull()
   })
