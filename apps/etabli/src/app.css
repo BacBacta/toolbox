@@ -443,3 +443,67 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .python-jauge-faite { transition: none; }
 }
+
+/*
+ * --- Les leçons ---
+ *
+ * Elles sont sur l'écran d'accueil, sous les modèles : quelqu'un qui ouvre
+ * l'Établi sans savoir quoi faire tombe dessus sans avoir à chercher. L'énoncé
+ * est visible depuis la liste — choisir une leçon dont on ne sait pas ce
+ * qu'elle demande, c'est choisir au hasard.
+ */
+.lecons { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.lecons li { display: flex; align-items: center; gap: 8px; }
+
+.lecon {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 44px;
+  padding: 12px;
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  background: white;
+  text-align: left;
+  font-size: 15px;
+}
+
+.lecon b { color: var(--vert); }
+.lecon span { color: var(--gris); font-size: 13px; line-height: 1.4; }
+
+.lecon-faite {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--vert-clair);
+  color: var(--vert);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/*
+ * --- La copie rendue ---
+ *
+ * Jamais « faux ». On montre ce qui était demandé, ce que le code a rendu, et
+ * une piste — les trois choses qu'un professeur dirait en se penchant sur le
+ * cahier. Quelqu'un qui apprend seul n'a personne pour relativiser un refus.
+ */
+.copie {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--bord);
+  background: white;
+  font-size: 14px;
+}
+
+.copie.reussie { background: var(--vert-clair); color: var(--vert); }
+.copie.reussie span { color: var(--vert); }
+
+.copie-manque { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.copie-manque li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.copie-manque code { font-family: var(--mono); font-size: 13px; }
+.copie-manque span { color: var(--gris); font-size: 13px; }
+.copie-indice { margin: 0; color: var(--encre); line-height: 1.5; }

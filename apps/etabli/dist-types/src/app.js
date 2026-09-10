@@ -1,5 +1,5 @@
 import { Fragment as _Fragment, jsx as _jsx, jsxs as _jsxs } from "preact/jsx-runtime";
-import { fichierAExporter, langueDuNavigateur, modeles, textes } from '@a237/etabli';
+import { fichierAExporter, langueDuNavigateur, lecons, modeles, textes } from '@a237/etabli';
 import { lienDemande, recuperer } from './partage.js';
 import { useEffect, useState } from 'preact/hooks';
 import { Apercu } from './apercu.js';
@@ -19,6 +19,24 @@ import { enregistrer, lireProjets, supprimer } from './stockage.js';
  * partout.
  */
 const CLEF_LANGUE = 'etabli:langue';
+const CLEF_LECONS = 'etabli:lecons';
+/**
+ * Les leçons déjà réussies, relues du stockage.
+ *
+ * Ce qui en sort a été écrit par une version d'avant, ou par personne. Une
+ * valeur mal formée ne doit pas faire tomber l'écran d'accueil : on repart
+ * d'une liste vide, et la personne refait une leçon — ce qui est ennuyeux, pas
+ * grave, contrairement à un écran blanc.
+ */
+function leconsRetenues() {
+    try {
+        const brut = JSON.parse(localStorage.getItem(CLEF_LECONS) ?? '[]');
+        return Array.isArray(brut) ? brut.filter((x) => typeof x === 'string') : [];
+    }
+    catch {
+        return [];
+    }
+}
 function langueRetenue() {
     try {
         const retenue = localStorage.getItem(CLEF_LANGUE);
@@ -34,6 +52,7 @@ export function App() {
     const [langue, setLangue] = useState(langueRetenue());
     const t = textes(langue);
     const [projets, setProjets] = useState(null);
+    const [faites, setFaites] = useState(leconsRetenues);
     const [ecran, setEcran] = useState({ quoi: 'liste' });
     const [ouverture, setOuverture] = useState('non');
     useEffect(() => {
@@ -70,6 +89,48 @@ export function App() {
             history.replaceState(null, '', location.pathname);
         });
     }, []);
+    /*
+     * Les leçons réussies, gardées sur l'appareil.
+     *
+     * Pas de compte, donc pas de progression qui suit la personne d'un téléphone
+     * à l'autre — c'est le prix de ne rien demander, et il est assumé. Ce que ça
+     * garde est ce qui compte le jour même : rouvrir l'Établi et voir où on en
+     * était.
+     */
+    function marquerReussie(id) {
+        setFaites((f) => {
+            if (f.includes(id))
+                return f;
+            const suite = [...f, id];
+            try {
+                localStorage.setItem(CLEF_LECONS, JSON.stringify(suite));
+            }
+            catch { /* stockage refusé : ça tient pour cette visite */ }
+            return suite;
+        });
+    }
+    function commencerLecon(leconId) {
+        const lecon = lecons(langue).find((l) => l.id === leconId);
+        if (lecon === undefined)
+            return;
+        // Un devoir déjà commencé se rouvre : le recréer effacerait ce qui a été
+        // écrit, et c'est justement le travail de la personne.
+        const deja = (projets ?? []).find((p) => p.lecon === leconId);
+        if (deja !== undefined) {
+            setEcran({ quoi: 'projet', id: deja.id });
+            return;
+        }
+        const projet = {
+            id: `p${Date.now().toString(36)}`,
+            nom: lecon.titre,
+            fichiers: lecon.fichiers.map((f) => ({ ...f })),
+            maj: Date.now(),
+            lecon: lecon.id,
+        };
+        setProjets((p) => [projet, ...(p ?? [])]);
+        setEcran({ quoi: 'projet', id: projet.id });
+        void enregistrer(projet);
+    }
     function creer(modeleId) {
         const modele = modeles(langue).find((m) => m.id === modeleId);
         if (modele === undefined)
@@ -107,9 +168,9 @@ export function App() {
         const projet = projets.find((p) => p.id === ecran.id);
         if (projet === undefined)
             return _jsx("main", { class: "chargement", children: t.projetDisparu });
-        return (_jsx(EcranProjet, { projet: projet, langue: langue, t: t, onChanger: remplacer, onFermer: () => setEcran({ quoi: 'liste' }) }));
+        return (_jsx(EcranProjet, { projet: projet, langue: langue, t: t, lecon: lecons(langue).find((l) => l.id === projet.lecon), onReussie: marquerReussie, onChanger: remplacer, onFermer: () => setEcran({ quoi: 'liste' }) }));
     }
-    return (_jsxs("main", { class: "liste", children: [_jsxs("div", { class: "entete", children: [_jsx("h1", { children: "\u00C9tabli" }), _jsx("button", { type: "button", class: "langue", onClick: () => changerLangue(langue === 'fr' ? 'en' : 'fr'), children: t.langue })] }), _jsx("p", { class: "sous-titre", children: t.accroche }), ouverture === 'en-cours' && _jsx("p", { class: "mot", children: t.ouvertureEnCours }), ouverture === 'introuvable' && _jsx("p", { class: "mot alerte", children: t.lienMort }), ouverture === 'echouee' && _jsx("p", { class: "mot alerte", children: t.lienIllisible }), _jsx("h2", { children: t.commencer }), _jsx("div", { class: "modeles", children: modeles(langue).map((m) => (_jsxs("button", { type: "button", class: "modele", onClick: () => creer(m.id), children: [_jsx("b", { children: m.nom }), _jsx("span", { children: m.dit })] }, m.id))) }), projets.length > 0 && (_jsxs(_Fragment, { children: [_jsx("h2", { children: t.tesProjets }), _jsx("ul", { class: "projets", children: projets.map((p) => (_jsxs("li", { children: [_jsxs("button", { type: "button", class: "projet", onClick: () => setEcran({ quoi: 'projet', id: p.id }), children: [_jsx("b", { children: p.nom }), _jsx("span", { children: t.fichiers(p.fichiers.length) })] }), _jsx("button", { type: "button", class: "effacer", "aria-label": t.effacer(p.nom), onClick: () => effacer(p.id), children: "\u2715" })] }, p.id))) })] }))] }));
+    return (_jsxs("main", { class: "liste", children: [_jsxs("div", { class: "entete", children: [_jsx("h1", { children: "\u00C9tabli" }), _jsx("button", { type: "button", class: "langue", onClick: () => changerLangue(langue === 'fr' ? 'en' : 'fr'), children: t.langue })] }), _jsx("p", { class: "sous-titre", children: t.accroche }), ouverture === 'en-cours' && _jsx("p", { class: "mot", children: t.ouvertureEnCours }), ouverture === 'introuvable' && _jsx("p", { class: "mot alerte", children: t.lienMort }), ouverture === 'echouee' && _jsx("p", { class: "mot alerte", children: t.lienIllisible }), _jsx("h2", { children: t.commencer }), _jsx("div", { class: "modeles", children: modeles(langue).map((m) => (_jsxs("button", { type: "button", class: "modele", onClick: () => creer(m.id), children: [_jsx("b", { children: m.nom }), _jsx("span", { children: m.dit })] }, m.id))) }), _jsx("h2", { children: t.lecons }), _jsx("ul", { class: "lecons", children: lecons(langue).map((l) => (_jsxs("li", { children: [_jsxs("button", { type: "button", class: "lecon", onClick: () => commencerLecon(l.id), children: [_jsx("b", { children: l.titre }), _jsx("span", { children: l.enonce })] }), faites.includes(l.id) && _jsx("span", { class: "lecon-faite", children: t.leconFaite })] }, l.id))) }), projets.length > 0 && (_jsxs(_Fragment, { children: [_jsx("h2", { children: t.tesProjets }), _jsx("ul", { class: "projets", children: projets.map((p) => (_jsxs("li", { children: [_jsxs("button", { type: "button", class: "projet", onClick: () => setEcran({ quoi: 'projet', id: p.id }), children: [_jsx("b", { children: p.nom }), _jsx("span", { children: t.fichiers(p.fichiers.length) })] }), _jsx("button", { type: "button", class: "effacer", "aria-label": t.effacer(p.nom), onClick: () => effacer(p.id), children: "\u2715" })] }, p.id))) })] }))] }));
 }
 /**
  * Un projet ouvert : on écrit, ou on regarde. Jamais les deux en même temps.
@@ -146,7 +207,7 @@ function EcranProjet(props) {
         setTour((t) => t + 1);
         setVue('voir');
     }
-    return (_jsxs("main", { class: "projet-ouvert", children: [_jsxs("header", { class: "barre", children: [_jsx("button", { type: "button", class: "retour", onClick: props.onFermer, children: props.t.mesProjets }), _jsx("b", { class: "nom", children: props.projet.nom }), vue === 'ecrire' ? (_jsx("button", { type: "button", class: "lancer", onClick: lancer, children: props.t.lancer })) : (_jsx("button", { type: "button", class: "lancer", onClick: () => setVue('ecrire'), children: props.t.ecrire }))] }), vue === 'ecrire' ? (_jsx(Editeur, { projet: props.projet, ouvert: ouvert, onOuvrir: setOuvert, onEcrire: ecrire, onAjouter: ajouter, langue: props.langue, t: props.t })) : (_jsxs(_Fragment, { children: [_jsx(Apercu, { projet: props.projet, tour: tour, langue: props.langue, t: props.t }), _jsxs("div", { class: "actions", children: [_jsx("button", { type: "button", onClick: () => setTour((n) => n + 1), children: props.t.relancer }), _jsx("button", { type: "button", onClick: () => telecharger(props.projet), children: props.t.exporter })] }), _jsx(Partage, { projet: props.projet, onChanger: props.onChanger, t: props.t })] }))] }));
+    return (_jsxs("main", { class: "projet-ouvert", children: [_jsxs("header", { class: "barre", children: [_jsx("button", { type: "button", class: "retour", onClick: props.onFermer, children: props.t.mesProjets }), _jsx("b", { class: "nom", children: props.projet.nom }), vue === 'ecrire' ? (_jsx("button", { type: "button", class: "lancer", onClick: lancer, children: props.t.lancer })) : (_jsx("button", { type: "button", class: "lancer", onClick: () => setVue('ecrire'), children: props.t.ecrire }))] }), vue === 'ecrire' ? (_jsx(Editeur, { projet: props.projet, ouvert: ouvert, onOuvrir: setOuvert, onEcrire: ecrire, onAjouter: ajouter, langue: props.langue, t: props.t })) : (_jsxs(_Fragment, { children: [_jsx(Apercu, { projet: props.projet, tour: tour, langue: props.langue, t: props.t, lecon: props.lecon, onReussie: props.onReussie }), _jsxs("div", { class: "actions", children: [_jsx("button", { type: "button", onClick: () => setTour((n) => n + 1), children: props.t.relancer }), _jsx("button", { type: "button", onClick: () => telecharger(props.projet), children: props.t.exporter })] }), _jsx(Partage, { projet: props.projet, onChanger: props.onChanger, t: props.t })] }))] }));
 }
 /**
  * Le fichier part sur le téléphone, et de là sur WhatsApp.

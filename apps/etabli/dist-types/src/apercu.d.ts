@@ -1,4 +1,4 @@
-import type { Langue, Projet, Textes } from '@a237/etabli';
+import type { Langue, Lecon, Projet, Textes } from '@a237/etabli';
 import type { JSX } from 'preact';
 /**
  * Ce que le code fait, et ce qu'il dit.
@@ -19,4 +19,7 @@ export declare function Apercu(props: {
     readonly tour: number;
     readonly langue: Langue;
     readonly t: Textes;
+    /** La leçon dont ce projet est le devoir, s'il en vient d'une. */
+    readonly lecon: Lecon | undefined;
+    readonly onReussie: (id: string) => void;
 }): JSX.Element;

@@ -50,6 +50,9 @@ function lireProjet(valeur) {
         maj: typeof p.maj === 'number' ? p.maj : 0,
         ...(typeof q.lien === 'string' ? { lien: q.lien } : {}),
         ...(typeof q.clef === 'string' ? { clef: q.clef } : {}),
+        // La leçon suit le projet : sans elle, rouvrir son devoir le transformerait
+        // en projet ordinaire et « Lancer » cesserait de corriger.
+        ...(typeof q.lecon === 'string' ? { lecon: q.lecon } : {}),
     };
 }
 /** Les projets, du plus récemment touché au plus ancien. */

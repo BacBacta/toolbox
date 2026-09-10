@@ -6,14 +6,16 @@ import { act } from 'preact/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Apercu } from '../src/apercu.js';
 import { clear, createStore } from 'idb-keyval';
-import { textes } from '@a237/etabli';
+import { MARQUE, lecons, textes } from '@a237/etabli';
 const PROJET = {
     id: 'p1', nom: 'Ma page', maj: 0,
     fichiers: [{ nom: 'index.html', contenu: '<h1>Salut</h1>' }],
 };
 let hote;
 function poser(tour = 0) {
-    act(() => { monter(_jsx(Apercu, { projet: PROJET, tour: tour, langue: "fr", t: textes('fr') }), hote); });
+    act(() => {
+        monter(_jsx(Apercu, { projet: PROJET, tour: tour, langue: "fr", t: textes('fr'), lecon: undefined, onReussie: () => { } }), hote);
+    });
 }
 /*
  * Le moteur Python est vidé entre les essais.
@@ -159,7 +161,9 @@ describe('l’erreur, expliquée', () => {
         act(() => { dispatchEvent(e); });
     }
     function poserEn(langue) {
-        act(() => { monter(_jsx(Apercu, { projet: PROJET, tour: 0, langue: langue, t: textes(langue) }), hote); });
+        act(() => {
+            monter(_jsx(Apercu, { projet: PROJET, tour: 0, langue: langue, t: textes(langue), lecon: undefined, onReussie: () => { } }), hote);
+        });
         act(() => { hote.querySelector('.console-titre').click(); });
     }
     it('dit ce qui s’est passé et quoi faire, en français', () => {
@@ -214,7 +218,7 @@ const PYTHON = {
 };
 function poserPython(langue = 'fr') {
     act(() => {
-        monter(_jsx(Apercu, { projet: PYTHON, tour: 0, langue: langue, t: textes(langue) }), hote);
+        monter(_jsx(Apercu, { projet: PYTHON, tour: 0, langue: langue, t: textes(langue), lecon: undefined, onReussie: () => { } }), hote);
     });
 }
 /** Le temps que les promesses du crochet se dénouent. */
@@ -361,5 +365,89 @@ describe('descendre Python depuis l’écran', () => {
         expect(hote.querySelector('.python-oui')?.textContent).toBe(textes('fr').pythonReessayer);
         expect(hote.querySelector('iframe')).toBe(null);
         vi.unstubAllGlobals();
+    });
+});
+/**
+ * Une leçon corrigée à l'écran.
+ *
+ * Ce qui se garde ici n'est pas l'affichage : c'est que **la correction ne
+ * traverse pas la console**, et qu'un verdict n'apparaît pas avant que toutes
+ * les réponses soient là. Annoncer « raté » à quelqu'un dont le programme
+ * n'avait pas fini de tourner est la façon la plus sûre de le faire abandonner.
+ */
+const LECON = lecons('fr')[0];
+const DEVOIR = {
+    id: 'p3', nom: LECON.titre, maj: 0, lecon: LECON.id,
+    fichiers: LECON.fichiers.map((f) => ({ ...f })),
+};
+function poserLecon() {
+    const reussies = [];
+    act(() => {
+        monter(_jsx(Apercu, { projet: DEVOIR, tour: 0, langue: "fr", t: textes('fr'), lecon: LECON, onReussie: (id) => reussies.push(id) }), hote);
+    });
+    return { reussies };
+}
+/** Fait comme si le cadre avait parlé. */
+function duCadre(texte, sorte = 'journal') {
+    const cadre = hote.querySelector('iframe');
+    act(() => {
+        dispatchEvent(Object.assign(new MessageEvent('message', { data: { a237: 'etabli', sorte, texte } }), { source: cadre.contentWindow }));
+    });
+}
+describe('une leçon corrigée', () => {
+    it('ajoute la correction au code exécuté, sans toucher au projet', () => {
+        poserLecon();
+        const srcdoc = hote.querySelector('iframe')?.getAttribute('srcdoc') ?? '';
+        expect(srcdoc).toContain('total(5800, 3)');
+        // Et le projet lui-même n'a pas gagné de fichier : il ne partirait pas
+        // dans l'export, et n'apparaîtrait pas dans les onglets.
+        expect(DEVOIR.fichiers.map((f) => f.nom)).not.toContain('correction.js');
+    });
+    it('ne dit rien tant que toutes les réponses ne sont pas arrivées', () => {
+        poserLecon();
+        expect(hote.querySelector('.copie')).toBe(null);
+        duCadre(`${MARQUE}0=17400`);
+        expect(hote.querySelector('.copie')).toBe(null);
+    });
+    it('dit que c’est réussi quand les trois tombent juste', () => {
+        const { reussies } = poserLecon();
+        duCadre(`${MARQUE}0=17400`);
+        duCadre(`${MARQUE}1=7000`);
+        duCadre(`${MARQUE}2=0`);
+        expect(hote.querySelector('.copie.reussie')).not.toBe(null);
+        expect(reussies).toEqual([LECON.id]);
+    });
+    /*
+     * Le cas qui compte pour l'honnêteté de l'exercice : afficher le bon nombre
+     * n'écrit aucune fonction, donc les appels échouent et la leçon reste à
+     * faire.
+     */
+    it('et pas réussi quand la personne a seulement affiché la réponse', () => {
+        const { reussies } = poserLecon();
+        duCadre('17400');
+        duCadre(`${MARQUE}0=!total is not defined`);
+        duCadre(`${MARQUE}1=!total is not defined`);
+        duCadre(`${MARQUE}2=!total is not defined`);
+        expect(hote.querySelector('.copie.reussie')).toBe(null);
+        expect(hote.querySelector('.copie-indice')?.textContent).toBe(LECON.indice);
+        expect(reussies).toEqual([]);
+    });
+    /*
+     * La correction écrit une ligne par épreuve. Les laisser passer noierait la
+     * sortie de la personne sous la nôtre — et c'est la sienne qu'elle regarde.
+     */
+    it('ne montre pas la correction dans la console, mais montre le reste', () => {
+        poserLecon();
+        duCadre('Bonjour Douala');
+        duCadre(`${MARQUE}0=17400`);
+        act(() => { hote.querySelector('.console-titre').click(); });
+        const lignes = Array.from(hote.querySelectorAll('.console-ligne')).map((l) => l.textContent);
+        expect(lignes).toHaveLength(1);
+        expect(lignes[0]).toContain('Bonjour Douala');
+    });
+    it('un projet ordinaire n’a ni correction ni copie', () => {
+        poser();
+        expect(hote.querySelector('iframe')?.getAttribute('srcdoc')).not.toContain('«a237»');
+        expect(hote.querySelector('.copie')).toBe(null);
     });
 });

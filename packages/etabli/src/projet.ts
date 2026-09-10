@@ -30,6 +30,13 @@ export interface Projet {
    * téléphone a disparu. Absent tant qu'on n'a rien sauvegardé : l'Établi
    * marche entier sans réseau, et le dépôt est un geste, pas une condition.
    */
+  /**
+   * La leçon dont ce projet est le devoir, s'il en vient d'une.
+   *
+   * C'est ce qui fait que « Lancer » corrige au lieu de seulement montrer. Un
+   * projet ordinaire ne porte rien ici, et rien ne change pour lui.
+   */
+  readonly lecon?: string
   readonly lien?: string
   /**
    * La clef qui autorise à réécrire sur ce lien. Ne quitte jamais l'appareil.

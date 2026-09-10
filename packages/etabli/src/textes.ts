@@ -66,6 +66,13 @@ export interface Textes {
   readonly pythonPlusTard: string
   readonly pythonIndisponible: string
 
+  readonly lecons: string
+  readonly leconFaite: string
+  readonly leconReussie: string
+  readonly leconSuivante: string
+  readonly leconPasEncore: string
+  readonly leconAttendu: (attendu: string, obtenu: string) => string
+
   readonly langue: string
 }
 
@@ -122,6 +129,13 @@ const FR: Textes = {
   pythonPlusTard: 'Plus tard',
   pythonIndisponible: 'Python n’est pas installé sur cette version de l’Établi.',
 
+  lecons: 'Apprendre, pas à pas',
+  leconFaite: 'Réussie',
+  leconReussie: '✓ C’est réussi.',
+  leconSuivante: 'Tu peux passer à la suivante.',
+  leconPasEncore: 'Pas encore — regarde ces cas :',
+  leconAttendu: (attendu, obtenu) => `devait rendre ${attendu}, a rendu ${obtenu}`,
+
   langue: 'English',
 }
 
@@ -177,6 +191,13 @@ const EN: Textes = {
   pythonReessayer: 'Resume',
   pythonPlusTard: 'Later',
   pythonIndisponible: 'Python is not installed in this build of the Établi.',
+
+  lecons: 'Learn, step by step',
+  leconFaite: 'Done',
+  leconReussie: '✓ That works.',
+  leconSuivante: 'You can move on to the next one.',
+  leconPasEncore: 'Not yet — look at these cases:',
+  leconAttendu: (attendu, obtenu) => `should give ${attendu}, gave ${obtenu}`,
 
   langue: 'Français',
 }

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import 'fake-indexeddb/auto'
-import { modeles } from '@a237/etabli'
+import { lecons, modeles, textes } from '@a237/etabli'
 import { render as monter } from 'preact'
 import { act } from 'preact/test-utils'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -40,6 +40,7 @@ function cliquer(selecteur: string, texte?: string): void {
 
 beforeEach(async () => {
   await clear(PROJETS)
+  localStorage.removeItem('etabli:lecons')
   /*
    * La langue est fixée, et non héritée du système.
    *
@@ -381,5 +382,66 @@ describe('les deux langues', () => {
     const html = (hote.querySelector('textarea') as HTMLTextAreaElement).value
     expect(html).toContain('Press the button')
     expect(html).not.toContain('Appuie')
+  })
+})
+
+/**
+ * Les leçons, depuis l'écran d'accueil.
+ *
+ * Deux choses se gardent ici, et elles ont le même sujet : **le travail de la
+ * personne**. Rouvrir une leçon déjà commencée ne doit pas la recommencer — ce
+ * qu'elle a écrit disparaîtrait sans un mot. Et un stockage abîmé ne doit pas
+ * faire tomber l'écran : refaire une leçon est ennuyeux, un écran blanc est
+ * définitif.
+ */
+describe('les leçons', () => {
+  it('sont proposées avec leur énoncé, pour qu’on ne choisisse pas au hasard', async () => {
+    await ouvrir()
+    const premieres = hote.querySelectorAll('.lecon')
+    expect(premieres.length).toBe(lecons('fr').length)
+    expect(premieres[0]?.textContent).toContain(lecons('fr')[0]?.enonce)
+  })
+
+  it('en ouvrir une crée le devoir avec son fichier de départ', async () => {
+    await ouvrir()
+    cliquer('.lecon')
+    expect(hote.querySelector('textarea')?.value).toContain('function total(prix, nombre)')
+    const gardes = await lireProjets()
+    expect(gardes[0]?.lecon).toBe('total')
+  })
+
+  /*
+   * Le cas qui protège le travail. Sans le « déjà commencé », chaque retour à
+   * l'accueil puis clic sur la leçon repartirait du fichier vide — et ce qui
+   * avait été écrit serait perdu sans un mot.
+   */
+  it('la rouvrir reprend le devoir, elle ne le recommence pas', async () => {
+    await ouvrir()
+    cliquer('.lecon')
+    const zone = hote.querySelector('textarea') as HTMLTextAreaElement
+    act(() => {
+      zone.value = 'function total(prix, nombre) { return prix * nombre }'
+      zone.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    cliquer('.retour')
+    cliquer('.lecon')
+
+    expect(hote.querySelector('textarea')?.value).toContain('return prix * nombre')
+    expect((await lireProjets()).filter((p) => p.lecon === 'total')).toHaveLength(1)
+  })
+
+  it('une leçon réussie se retient d’une visite à l’autre', async () => {
+    localStorage.setItem('etabli:lecons', JSON.stringify(['total']))
+    await ouvrir()
+    expect(hote.querySelector('.lecon-faite')?.textContent).toBe(textes('fr').leconFaite)
+  })
+
+  it('et un stockage abîmé n’emporte pas l’écran avec lui', async () => {
+    for (const abime of ['pas du json', '{"total":true}', '"total"', '[1, 2]']) {
+      localStorage.setItem('etabli:lecons', abime)
+      await ouvrir()
+      expect(hote.querySelectorAll('.lecon').length, abime).toBe(lecons('fr').length)
+      expect(hote.querySelector('.lecon-faite'), abime).toBe(null)
+    }
   })
 })
