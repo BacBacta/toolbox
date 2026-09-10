@@ -180,8 +180,8 @@ coûte quelque chose, et lui ouvre un compte à ce moment-là. Il ne range jamai
 le jeton, seulement son empreinte : une copie de la base ne distribue pas
 d'identités. Le numéro de téléphone n'apparaît qu'au premier paiement.
 
-**Deux plans.** Un essai de cinq compositions, puis mille francs pour trente
-jours et quarante compositions. Un abonnement échu ne fait rien perdre : les
+**Deux plans.** Un essai de cinq compositions, puis **deux mille francs**
+— le prix du § 1 — pour trente jours et quarante compositions. Un abonnement échu ne fait rien perdre : les
 outils vivent sur le téléphone et les publications restent en ligne, seule
 s'arrête la composition. Payer en avance prolonge au lieu de remplacer.
 

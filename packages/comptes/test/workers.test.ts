@@ -106,7 +106,7 @@ describe('/api/pay', () => {
     return (await r.json()) as { id: string }
   }
 
-  async function rappeler(db: BaseD1, reference: string, reussi = true, montantXaf = 1000): Promise<Response> {
+  async function rappeler(db: BaseD1, reference: string, reussi = true, montantXaf = 2000): Promise<Response> {
     const corps = JSON.stringify({ reference, reussi, montantXaf })
     return pay({
       request: new Request(`${BASE}/api/pay/rappel`, {
@@ -167,7 +167,7 @@ describe('/api/pay', () => {
     // Sans ce contrôle, n'importe qui s'offre un abonnement avec `curl`.
     const db = baseDEssai()
     const { id } = await demarrer(db)
-    const corps = JSON.stringify({ reference: await referenceDe(db, id), reussi: true, montantXaf: 1000 })
+    const corps = JSON.stringify({ reference: await referenceDe(db, id), reussi: true, montantXaf: 2000 })
 
     const r = await pay({
       request: new Request(`${BASE}/api/pay/rappel`, { method: 'POST', body: corps }),

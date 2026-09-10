@@ -3,7 +3,18 @@ import 'fake-indexeddb/auto'
 import { render as monter } from 'preact'
 import { act } from 'preact/test-utils'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { PRIX_MENSUEL_XAF } from '@a237/comptes'
+import { montantF } from '@a237/engine'
 import { EcranCompte } from '../src/ecran-compte.js'
+
+/*
+ * Le libellé se compose comme l'écran le compose.
+ *
+ * `montantF` sépare les milliers par une espace insécable : recopier « 2 000 F »
+ * avec une espace ordinaire ne trouve rien, et le prix se lit au même endroit
+ * que celui du code — il ne peut pas dériver.
+ */
+const PRIX = montantF(PRIX_MENSUEL_XAF)
 import type { EtatCompte } from '../src/compte.js'
 
 /**
@@ -247,8 +258,8 @@ describe('payer un mois', () => {
     await attendre()
     cliquer('Prendre un mois')
     remplir('compte-tel', '699412708')
-    reponses({ statut: 200, corps: { id: 'p1', montantXaf: 1000, consigne: 'Confirme sur ton téléphone.' } })
-    cliquer('Payer 1 000 F')
+    reponses({ statut: 200, corps: { id: 'p1', montantXaf: 2000, consigne: 'Confirme sur ton téléphone.' } })
+    cliquer(`Payer ${PRIX}`)
     await attendre()
     expect(hote.textContent).toContain('Confirme sur ton téléphone')
     expect(hote.textContent).toContain('Tu peux fermer')
@@ -266,7 +277,7 @@ describe('payer un mois', () => {
       statut: 400,
       corps: { erreur: 'telephone-invalide', pourquoi: 'Un numéro camerounais : neuf chiffres commençant par 6.' },
     })
-    cliquer('Payer 1 000 F')
+    cliquer(`Payer ${PRIX}`)
     await attendre()
     expect(hote.textContent).toContain('neuf chiffres commençant par 6')
   })
@@ -277,7 +288,7 @@ describe('payer un mois', () => {
     cliquer('Prendre un mois')
     remplir('compte-tel', '699412708')
     globalThis.fetch = vi.fn().mockRejectedValue(new TypeError('hors ligne')) as unknown as typeof fetch
-    cliquer('Payer 1 000 F')
+    cliquer(`Payer ${PRIX}`)
     await attendre()
     expect(hote.textContent).toContain('Pas de réseau')
     expect(hote.textContent).not.toContain('Tu peux fermer')
@@ -296,8 +307,8 @@ describe('l’attente du paiement', () => {
     await attendre()
     cliquer('Prendre un mois')
     remplir('compte-tel', '699412708')
-    reponses({ statut: 200, corps: { id: 'p1', montantXaf: 1000, consigne: 'Confirme.' } })
-    cliquer('Payer 1 000 F')
+    reponses({ statut: 200, corps: { id: 'p1', montantXaf: 2000, consigne: 'Confirme.' } })
+    cliquer(`Payer ${PRIX}`)
     await attendre()
   }
 

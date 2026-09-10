@@ -1,4 +1,5 @@
-import { dateLongue } from '@a237/engine'
+import { PRIX_MENSUEL_XAF } from '@a237/comptes'
+import { dateLongue, montantF } from '@a237/engine'
 import type { JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
 import {
@@ -252,7 +253,7 @@ export function EcranCompte(props: ProprietesCompte): JSX.Element {
             onClick={() => void payer()}
           >
             <span class="texte">
-              <b>Payer 1 000 F</b>
+              <b>Payer {montantF(PRIX_MENSUEL_XAF)}</b>
               <span>Un mois, quarante compositions</span>
             </span>
           </button>
@@ -283,7 +284,10 @@ export function EcranCompte(props: ProprietesCompte): JSX.Element {
               ◈
             </span>
             <span class="texte">
-              <b>{etat?.plan === 'atelier' ? 'Ajouter un mois — 1 000 F' : 'Prendre un mois — 1 000 F'}</b>
+              <b>
+                {etat?.plan === 'atelier' ? 'Ajouter un mois' : 'Prendre un mois'} —{' '}
+                {montantF(PRIX_MENSUEL_XAF)}
+              </b>
               <span>
                 {etat?.plan === 'atelier'
                   ? 'Les jours qui te restent ne sont pas perdus : ils s’ajoutent'

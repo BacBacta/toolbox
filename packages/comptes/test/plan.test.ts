@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { montantDuMois } from '../src/paiement.js'
 import {
-  CREDITS_ATELIER, CREDITS_ESSAI, DUREE_ABONNEMENT, abonne, apresPaiement, compteNeuf, planEffectif,
+  CREDITS_ATELIER, CREDITS_ESSAI, DUREE_ABONNEMENT, PRIX_MENSUEL_XAF, abonne, apresPaiement,
+  compteNeuf, planEffectif,
 } from '../src/plan.js'
 import type { Compte } from '../src/plan.js'
 
@@ -65,5 +67,23 @@ describe('ce qu’un paiement change', () => {
     // L'abonnement paie un mois d'usage, pas un stock qu'on accumule.
     const restant: Compte = { id: 'u1', plan: 'atelier', planExpire: dans(10), credits: 37 }
     expect(apresPaiement(restant, LE_9_SEPT).credits).toBe(CREDITS_ATELIER)
+  })
+})
+
+describe('le prix', () => {
+  it('est celui du brief, et ne se décide pas dans le code', () => {
+    /*
+     * « Essai gratuit limité, puis 2 000 F CFA / mois » (§ 1). Je l'avais fixé
+     * à mille : un prix inventé là où le brief en écrit un. C'est aussi le
+     * montant du critère d'arrêt de la phase 6.
+     */
+    expect(PRIX_MENSUEL_XAF).toBe(2000)
+    expect(montantDuMois()).toBe(PRIX_MENSUEL_XAF)
+  })
+
+  it('et il est le même partout : un seul endroit le dit', () => {
+    // Un prix écrit deux fois finit par différer, et c'est l'écran qui ment.
+    const c = apresPaiement(compteNeuf('u1'), LE_9_SEPT)
+    expect(c.credits).toBe(CREDITS_ATELIER)
   })
 })

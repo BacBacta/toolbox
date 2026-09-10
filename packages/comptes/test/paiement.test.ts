@@ -15,12 +15,12 @@ const RAPPEL: Rappel = { reference: 'ref-1', reussi: true, montantXaf: montantDu
 
 describe('la signature du rappel', () => {
   const f = fauxFournisseur(SECRET)
-  const corps = JSON.stringify({ reference: 'ref-1', reussi: true, montantXaf: 1000 })
+  const corps = JSON.stringify({ reference: 'ref-1', reussi: true, montantXaf: 2000 })
 
   it('laisse passer ce qui est signé', async () => {
     const entetes = new Headers({ [ENTETE_SIGNATURE]: await signer(corps, SECRET) })
     expect(await f.lireRappel(corps, entetes)).toEqual({
-      reference: 'ref-1', reussi: true, montantXaf: 1000,
+      reference: 'ref-1', reussi: true, montantXaf: 2000,
     })
   })
 
@@ -96,7 +96,7 @@ describe('ce qu’un rappel change', () => {
     const suite = appliquerRappel(EN_ATTENTE, compteNeuf('u1'), { ...RAPPEL, montantXaf: 100 }, LE_9_SEPT)
     expect(suite.sorte).toBe('echoue')
     if (suite.sorte !== 'echoue') throw new Error('impossible')
-    expect(suite.pourquoi).toContain('100 F sur 1000 F')
+    expect(suite.pourquoi).toContain('100 F sur 2000 F')
   })
 })
 

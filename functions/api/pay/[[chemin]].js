@@ -1,7 +1,14 @@
 /** Trente jours, en millisecondes. */
 var DUREE_ABONNEMENT = 2592e6;
-/** Le prix du mois, en francs CFA. */
-var PRIX_MENSUEL_XAF = 1e3;
+/**
+* Le prix du mois, en francs CFA.
+*
+* Il vient du brief (§ 1) et ne se décide pas ici : « essai gratuit limité,
+* puis 2 000 F CFA / mois ». C'est aussi le montant du critère d'arrêt de la
+* phase 6 — « quelqu'un que tu ne connais pas a payé 2 000 F sans que tu sois
+* dans la pièce ».
+*/
+var PRIX_MENSUEL_XAF = 2e3;
 /** Ce que devient un compte quand un paiement aboutit. */
 function apresPaiement(compte, maintenant) {
 	const depart = Math.max(compte.planExpire ?? 0, maintenant.getTime());

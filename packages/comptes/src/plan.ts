@@ -22,8 +22,15 @@ export const CREDITS_ATELIER = 40
 /** Trente jours, en millisecondes. */
 export const DUREE_ABONNEMENT = 30 * 24 * 60 * 60 * 1000
 
-/** Le prix du mois, en francs CFA. */
-export const PRIX_MENSUEL_XAF = 1000
+/**
+ * Le prix du mois, en francs CFA.
+ *
+ * Il vient du brief (§ 1) et ne se décide pas ici : « essai gratuit limité,
+ * puis 2 000 F CFA / mois ». C'est aussi le montant du critère d'arrêt de la
+ * phase 6 — « quelqu'un que tu ne connais pas a payé 2 000 F sans que tu sois
+ * dans la pièce ».
+ */
+export const PRIX_MENSUEL_XAF = 2000
 
 export interface Compte {
   readonly id: string

@@ -55,7 +55,7 @@ dit(etat0.plan === 'essai' && etat0.credits === 5, 'compte ouvert en essai, sans
 
 const d = await fetch(`${BASE}/api/pay/demarrer`, { method:'POST', headers: A(), body: JSON.stringify({ telephone: '6 99 41 27 08' }) })
 const amorce = await d.json()
-dit(d.status === 200 && amorce.montantXaf === 1000, 'paiement démarré', `${amorce.montantXaf} F`)
+dit(d.status === 200 && amorce.montantXaf === 2000, 'paiement démarré', `${amorce.montantXaf} F`)
 dit(!JSON.stringify(amorce).includes('reference'), 'la référence ne part pas au client')
 
 const suivi0 = await (await fetch(`${BASE}/api/pay/${amorce.id}`, { headers: A() })).json()
@@ -64,7 +64,7 @@ const vole = await fetch(`${BASE}/api/pay/${amorce.id}`, { headers: A(AUTRE) })
 dit(vole.status === 404, 'et on ne lit pas le paiement d’un autre', String(vole.status))
 
 const ref = refDe(amorce.id)
-const corps = JSON.stringify({ reference: ref, reussi: true, montantXaf: 1000 })
+const corps = JSON.stringify({ reference: ref, reussi: true, montantXaf: 2000 })
 const sig = createHmac('sha256', SECRET).update(corps).digest('hex')
 
 const nu = await fetch(`${BASE}/api/pay/rappel`, { method:'POST', headers:{'content-type':'application/json'}, body: corps })
