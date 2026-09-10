@@ -67,3 +67,31 @@ export function numeroLisible(brut: string): string {
   }
   return `+${numero}`
 }
+
+/**
+ * Ce numéro était-il dans la demande ?
+ *
+ * Mesuré en production, deux fois, sur deux invites différentes : le modèle
+ * remplit le champ « téléphone » d'une page même quand la demande n'en donne
+ * aucun. Il a d'abord recopié l'exemple du schéma, puis — l'exemple retiré — il
+ * en a inventé un : « 699 12 34 56 », qui est un numéro camerounais valide, et
+ * qui appartient donc à quelqu'un. La page serait publiée sous le nom d'un
+ * commerçant, et ses clients appelleraient un inconnu. Personne ne relit dix
+ * chiffres avant de partager un lien.
+ *
+ * Une interdiction dans l'invite n'a pas suffi, et ne pouvait pas suffire : un
+ * champ vide appelle une valeur plus fort qu'une phrase ne l'en dissuade. Ce
+ * qui suffit est une vérification, et elle est possible parce que la demande
+ * est là — c'est le seul endroit d'où un vrai numéro peut venir.
+ *
+ * On compare les neuf chiffres du local, indicatif retiré de part et d'autre :
+ * quelqu'un écrit son numéro comme il veut — « 699 41 27 08 », « +237 6.99.41 »
+ * — et ces espaces-là ne doivent rien décider.
+ */
+export function numeroDansLaDemande(numero: string, demande: string): boolean {
+  const chiffresDemande = demande.replace(/\D/g, '')
+  const chiffres = numero.replace(/\D/g, '')
+  if (chiffres.length < 8) return false
+  const local = chiffres.length > 9 ? chiffres.slice(-9) : chiffres
+  return chiffresDemande.includes(local)
+}

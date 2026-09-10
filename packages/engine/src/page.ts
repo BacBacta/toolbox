@@ -172,17 +172,38 @@ export const schemaPage: JsonSchema = {
       type: 'array', minItems: 1, maxItems: MAX_SECTIONS, items: schemaSection, title: 'Sections',
       ecran: { ajout: 'Ajouter une section', retrait: 'Retirer la section' },
     },
+    /*
+     * Ces trois-là n'ont **pas d'exemple**, et c'est la seule chose qui les
+     * protège.
+     *
+     * Mesuré sur une génération réelle : « je veux un site internet pour ma
+     * quincaillerie à Bépanda » a rendu le numéro, la rue et les horaires de
+     * l'exemple, recopiés au caractère près — alors que l'invite dit déjà
+     * « n'invente jamais un numéro ». Une valeur concrète posée à côté d'un
+     * champ est une démonstration de ce qu'il faut y mettre, et elle est plus
+     * forte qu'une interdiction écrite ailleurs.
+     *
+     * Le numéro est le pire des trois : il appartient à quelqu'un. La page
+     * serait publiée sous le nom d'un commerçant, et les clients appelleraient
+     * un inconnu. Personne ne relit dix chiffres avant de partager un lien.
+     *
+     * Les prix, eux, gardent leur exemple : c'est la matière de la page, un
+     * commerçant voit tout de suite qu'un prix n'est pas le sien, et une
+     * vitrine sans rien dessus ne sert à rien.
+     */
     telephone: {
       type: 'string', maxLength: 20, title: 'WhatsApp',
-      description: 'Le numéro qu’on peut écrire. Ex. « 6 99 41 27 08 ».',
+      description:
+        'Le numéro sur lequel on peut écrire, uniquement s’il est dans la demande. Ne l’invente sous aucun prétexte : un numéro inventé appartient à quelqu’un, et c’est lui qu’on appellera.',
     },
     adresse: {
       type: 'string', maxLength: 90, title: 'Où',
-      description: 'Le quartier et la rue. Ex. « Rue Bépanda-Omnisport, en face du marché ».',
+      description:
+        'Le quartier et la rue, uniquement s’ils sont dans la demande. N’invente pas un lieu : des gens s’y déplaceraient.',
     },
     horaires: {
       type: 'string', maxLength: 60, title: 'Quand',
-      description: 'Ex. « Lundi à samedi, 7 h – 19 h ».',
+      description: 'Les jours et les heures d’ouverture, uniquement s’ils sont dans la demande.',
     },
     date: {
       type: 'string', maxLength: 20, title: 'Jour de l’événement',

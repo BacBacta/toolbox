@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { lienWhatsApp, numeroInternational, numeroLisible } from '../src/whatsapp.js'
+import {
+  lienWhatsApp, numeroDansLaDemande, numeroInternational, numeroLisible,
+} from '../src/whatsapp.js'
 
 describe('numeroInternational — ce qu’un utilisateur tape vraiment', () => {
   it.each([
@@ -70,5 +72,32 @@ describe('le numéro tel qu’on l’écrit sur une enseigne', () => {
     // seule chose qu'il savait.
     expect(numeroLisible('au comptoir')).toBe('au comptoir')
     expect(numeroLisible('')).toBe('')
+  })
+})
+
+describe('un numéro que la demande ne contenait pas', () => {
+  /*
+   * Mesuré en production, deux fois : le modèle remplit le champ « téléphone »
+   * d'une page même quand la demande n'en donne aucun. Il a d'abord recopié
+   * l'exemple du schéma, puis — l'exemple retiré — il en a inventé un :
+   * « 699 12 34 56 », qui est un numéro camerounais valide, et qui appartient
+   * donc à quelqu'un.
+   */
+  it('se reconnaît, quelle que soit la façon dont chacun l’écrit', () => {
+    expect(numeroDansLaDemande('699412708', 'appelle-moi au 6 99 41 27 08')).toBe(true)
+    expect(numeroDansLaDemande('+237 6 99 41 27 08', 'mon numero est 699412708')).toBe(true)
+    expect(numeroDansLaDemande('6.99.41.27.08', 'ecris au +237699412708')).toBe(true)
+  })
+
+  it('et un numéro inventé ne s’y trouve pas', () => {
+    const demande = 'je veux un site internet pour ma quincaillerie a Bepanda'
+    expect(numeroDansLaDemande('699123456', demande)).toBe(false)
+    expect(numeroDansLaDemande('6 99 00 00 00', demande)).toBe(false)
+  })
+
+  it('ne se laisse pas convaincre par une bribe', () => {
+    // Un prix cité dans la demande ne fait pas un numéro.
+    expect(numeroDansLaDemande('699412708', 'des tôles à 12 500 F et du ciment à 5 800 F')).toBe(false)
+    expect(numeroDansLaDemande('412708', 'mon numero est 699412708')).toBe(false)
   })
 })

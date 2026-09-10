@@ -905,6 +905,35 @@ function pourLeModele(schema) {
 	}
 	return reste;
 }
+//#endregion
+//#region ../engine/src/whatsapp.ts
+/**
+* Ce numéro était-il dans la demande ?
+*
+* Mesuré en production, deux fois, sur deux invites différentes : le modèle
+* remplit le champ « téléphone » d'une page même quand la demande n'en donne
+* aucun. Il a d'abord recopié l'exemple du schéma, puis — l'exemple retiré — il
+* en a inventé un : « 699 12 34 56 », qui est un numéro camerounais valide, et
+* qui appartient donc à quelqu'un. La page serait publiée sous le nom d'un
+* commerçant, et ses clients appelleraient un inconnu. Personne ne relit dix
+* chiffres avant de partager un lien.
+*
+* Une interdiction dans l'invite n'a pas suffi, et ne pouvait pas suffire : un
+* champ vide appelle une valeur plus fort qu'une phrase ne l'en dissuade. Ce
+* qui suffit est une vérification, et elle est possible parce que la demande
+* est là — c'est le seul endroit d'où un vrai numéro peut venir.
+*
+* On compare les neuf chiffres du local, indicatif retiré de part et d'autre :
+* quelqu'un écrit son numéro comme il veut — « 699 41 27 08 », « +237 6.99.41 »
+* — et ces espaces-là ne doivent rien décider.
+*/
+function numeroDansLaDemande(numero, demande) {
+	const chiffresDemande = demande.replace(/\D/g, "");
+	const chiffres = numero.replace(/\D/g, "");
+	if (chiffres.length < 8) return false;
+	const local = chiffres.length > 9 ? chiffres.slice(-9) : chiffres;
+	return chiffresDemande.includes(local);
+}
 var schemaPage = {
 	type: "object",
 	additionalProperties: false,
@@ -1024,19 +1053,19 @@ var schemaPage = {
 			type: "string",
 			maxLength: 20,
 			title: "WhatsApp",
-			description: "Le numéro qu’on peut écrire. Ex. « 6 99 41 27 08 »."
+			description: "Le numéro sur lequel on peut écrire, uniquement s’il est dans la demande. Ne l’invente sous aucun prétexte : un numéro inventé appartient à quelqu’un, et c’est lui qu’on appellera."
 		},
 		adresse: {
 			type: "string",
 			maxLength: 90,
 			title: "Où",
-			description: "Le quartier et la rue. Ex. « Rue Bépanda-Omnisport, en face du marché »."
+			description: "Le quartier et la rue, uniquement s’ils sont dans la demande. N’invente pas un lieu : des gens s’y déplaceraient."
 		},
 		horaires: {
 			type: "string",
 			maxLength: 60,
 			title: "Quand",
-			description: "Ex. « Lundi à samedi, 7 h – 19 h »."
+			description: "Les jours et les heures d’ouverture, uniquement s’ils sont dans la demande."
 		},
 		date: {
 			type: "string",
@@ -1806,7 +1835,7 @@ async function traiter(demande, fournisseur, tauxFcfaParDollar) {
 		};
 		if (lu.sorte === "page") return {
 			sorte: "page",
-			page: lu.page,
+			page: sansNumeroInvente(lu.page, demande),
 			cout: cout(),
 			essais: essai
 		};
@@ -1838,6 +1867,35 @@ async function traiter(demande, fournisseur, tauxFcfaParDollar) {
 			sortie: jetons.sortie
 		};
 	}
+}
+/**
+* Retire un numéro que la demande ne contenait pas.
+*
+* Mesuré en production, deux fois : le modèle remplit le champ « téléphone »
+* d'une page même quand la demande n'en donne aucun. Il a d'abord recopié
+* l'exemple du schéma, puis — l'exemple retiré — il en a inventé un, valide et
+* appartenant donc à quelqu'un. Une interdiction dans l'invite n'a pas suffi,
+* et ne pouvait pas suffire : un champ vide appelle une valeur plus fort
+* qu'une phrase ne l'en dissuade.
+*
+* On retire plutôt que de reprendre : une reprise coûte un tour entier pour
+* corriger un seul champ, et le reste de la page est bon. Sans numéro, la page
+* n'a pas son bouton WhatsApp — c'est une perte, et elle vaut mieux qu'un
+* bouton qui appelle un inconnu. Le propriétaire l'ajoute dans l'écran de
+* modification, où il est le seul à savoir quoi mettre.
+*
+* L'adresse n'est pas traitée de même, et il faut le dire : elle ne se vérifie
+* pas mécaniquement. Le pari est qu'un commerçant voit qu'une rue n'est pas la
+* sienne — il sait où est sa boutique — alors que personne ne relit dix
+* chiffres. Ce qui distingue vraiment les deux : un numéro inventé fait du tort
+* à un tiers qui n'a rien demandé.
+*/
+function sansNumeroInvente(page, demande) {
+	const tel = page.telephone;
+	if (tel === void 0 || tel === "" || numeroDansLaDemande(tel, demande)) return page;
+	console.warn(JSON.stringify({ evenement: "numero_invente_retire" }));
+	const { telephone, ...sansTel } = page;
+	return sansTel;
 }
 /**
 * Le JSON du modèle, ou rien.

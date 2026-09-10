@@ -123,7 +123,9 @@ export { ID_COMPOSE } from './registre.js'
  * sur des chaînes — aucune API de navigateur — et deux copies finiraient par ne
  * plus accepter les mêmes numéros.
  */
-export { INDICATIF_CM, lienWhatsApp, numeroInternational, numeroLisible } from './whatsapp.js'
+export {
+  INDICATIF_CM, lienWhatsApp, numeroDansLaDemande, numeroInternational, numeroLisible,
+} from './whatsapp.js'
 export type { ColonneDemandee, RefusModele, RegistreDemande } from './registre.js'
 export { MAX_COLONNES, schemaRefus, schemaRegistre, verifierRegistre } from './registre.js'
 export type { AvecMotsClefs, Correspondance } from './match.js'

@@ -195,3 +195,43 @@ describe('le JSON du modèle, tel qu’il arrive vraiment', () => {
     expect(r.sorte).toBe('invalide')
   })
 })
+
+describe('un numéro que la demande ne contenait pas', () => {
+  /*
+   * Mesuré en production, deux fois : le modèle remplit le champ « téléphone »
+   * d'une page même quand la demande n'en donne aucun. Il a d'abord recopié
+   * l'exemple du schéma, puis — l'exemple retiré — il en a inventé un, valide
+   * et appartenant donc à quelqu'un. La page serait publiée sous le nom d'un
+   * commerçant, et ses clients appelleraient un inconnu.
+   */
+  const PAGE = {
+    titre: 'Quincaillerie Bépanda',
+    kicker: 'QUINCAILLERIE',
+    accroche: 'Tôles, ciment et outillage.',
+    sections: [{ titre: 'Prix', sorte: 'prix', lignes: [{ nom: 'Ciment', valeur: '5 800 F' }] }],
+  }
+
+  it('est retiré, plutôt que de coûter un tour de reprise', async () => {
+    const r = await traiter(
+      'je veux un site internet pour ma quincaillerie a Bepanda',
+      faux([JSON.stringify({ ...PAGE, telephone: '699 12 34 56' })]),
+      600,
+    )
+    expect(r.sorte).toBe('page')
+    if (r.sorte === 'page') {
+      expect(r.page.telephone).toBeUndefined()
+      // Le reste de la page est bon : on ne jette pas tout pour un champ.
+      expect(r.page.titre).toBe('Quincaillerie Bépanda')
+    }
+    expect(r.essais).toBe(1)
+  })
+
+  it('mais celui que la demande donnait reste', async () => {
+    const r = await traiter(
+      'une page pour ma quincaillerie, mon whatsapp est le 6 99 41 27 08',
+      faux([JSON.stringify({ ...PAGE, telephone: '699412708' })]),
+      600,
+    )
+    expect(r.sorte === 'page' && r.page.telephone).toBe('699412708')
+  })
+})

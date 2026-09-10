@@ -1,7 +1,7 @@
 import type {
   CalculDemande, ErreurValidation, FormulaireDemande, PageDemande, RegistreDemande,
 } from '@a237/engine'
-import { lireReponseModele } from '@a237/engine'
+import { lireReponseModele, numeroDansLaDemande } from '@a237/engine'
 import { couter } from './cout.js'
 import type { Cout } from './cout.js'
 import type { Fournisseur } from './fournisseur.js'
@@ -135,7 +135,7 @@ export async function traiter(
       return { sorte: 'calcule', calcul: lu.calcul, cout: cout(), essais: essai }
     }
     if (lu.sorte === 'page') {
-      return { sorte: 'page', page: lu.page, cout: cout(), essais: essai }
+      return { sorte: 'page', page: sansNumeroInvente(lu.page, demande), cout: cout(), essais: essai }
     }
     if (lu.sorte === 'formulaire') {
       return { sorte: 'formulaire', formulaire: lu.formulaire, cout: cout(), essais: essai }
@@ -165,6 +165,38 @@ export async function traiter(
           sortie: jetons.sortie,
         }
   }
+}
+
+/**
+ * Retire un numéro que la demande ne contenait pas.
+ *
+ * Mesuré en production, deux fois : le modèle remplit le champ « téléphone »
+ * d'une page même quand la demande n'en donne aucun. Il a d'abord recopié
+ * l'exemple du schéma, puis — l'exemple retiré — il en a inventé un, valide et
+ * appartenant donc à quelqu'un. Une interdiction dans l'invite n'a pas suffi,
+ * et ne pouvait pas suffire : un champ vide appelle une valeur plus fort
+ * qu'une phrase ne l'en dissuade.
+ *
+ * On retire plutôt que de reprendre : une reprise coûte un tour entier pour
+ * corriger un seul champ, et le reste de la page est bon. Sans numéro, la page
+ * n'a pas son bouton WhatsApp — c'est une perte, et elle vaut mieux qu'un
+ * bouton qui appelle un inconnu. Le propriétaire l'ajoute dans l'écran de
+ * modification, où il est le seul à savoir quoi mettre.
+ *
+ * L'adresse n'est pas traitée de même, et il faut le dire : elle ne se vérifie
+ * pas mécaniquement. Le pari est qu'un commerçant voit qu'une rue n'est pas la
+ * sienne — il sait où est sa boutique — alors que personne ne relit dix
+ * chiffres. Ce qui distingue vraiment les deux : un numéro inventé fait du tort
+ * à un tiers qui n'a rien demandé.
+ */
+function sansNumeroInvente(page: PageDemande, demande: string): PageDemande {
+  const tel = page.telephone
+  if (tel === undefined || tel === '' || numeroDansLaDemande(tel, demande)) return page
+
+  console.warn(JSON.stringify({ evenement: 'numero_invente_retire' }))
+  const { telephone, ...sansTel } = page
+  void telephone
+  return sansTel
 }
 
 /**

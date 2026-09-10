@@ -607,6 +607,38 @@ lignes de D1 avec eux. Les comptes d'essai ouverts au passage sont restés :
 cinq crédits chacun, jamais dépensés, et rien ne les distingue d'une vraie
 première visite.
 
+### Le numéro que le modèle inventait — trouvé par une vraie génération
+
+Aucun test unitaire ne pouvait le voir, et il n'a coûté que trois générations
+réelles à trouver. « Je veux un site internet pour ma quincaillerie à Bépanda »
+a rendu une page portant `6 99 41 27 08`, `Rue Bépanda-Omnisport, en face du
+marché` et `Lundi à samedi, 7 h – 19 h` — **les exemples du schéma, recopiés au
+caractère près**, alors que l'invite dit déjà « n'invente jamais un numéro ».
+Une valeur concrète posée à côté d'un champ est une démonstration de ce qu'il
+faut y mettre, et elle est plus forte qu'une interdiction écrite ailleurs.
+
+Les exemples retirés, le modèle en a **inventé** un : `699 12 34 56`, qui est un
+numéro camerounais valide, et qui appartient donc à quelqu'un. La page aurait
+été publiée sous le nom d'un commerçant, et ses clients auraient appelé un
+inconnu. Personne ne relit dix chiffres avant de partager un lien.
+
+Une interdiction dans l'invite ne pouvait pas suffire : un champ vide appelle
+une valeur plus fort qu'une phrase ne l'en dissuade. Ce qui suffit est une
+vérification, et elle est possible parce que la demande est là — c'est le seul
+endroit d'où un vrai numéro peut venir. Un numéro absent de la demande est
+**retiré** de la page, sans reprise : une reprise coûterait un tour entier pour
+un seul champ, et le reste de la page est bon.
+
+Vérifié en production après correction, trois fois de suite : le numéro inventé
+disparaît, et celui que la demande donne reste.
+
+**L'adresse, elle, n'est pas traitée de même, et il faut le dire.** Elle ne se
+vérifie pas mécaniquement, et le modèle continue de rendre « Rue de la Liberté,
+Bepanda ». Le pari est qu'un commerçant voit qu'une rue n'est pas la sienne — il
+sait où est sa boutique — alors que personne ne relit dix chiffres. Ce qui
+distingue vraiment les deux : un numéro inventé fait du tort à **un tiers qui
+n'a rien demandé**.
+
 ### Ce qu'il reste à voir sur un vrai téléphone
 
 Un formulaire rempli **depuis WhatsApp**, dans son navigateur intégré, sur une

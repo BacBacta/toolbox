@@ -726,19 +726,19 @@ var schemaPage = {
 			type: "string",
 			maxLength: 20,
 			title: "WhatsApp",
-			description: "Le numéro qu’on peut écrire. Ex. « 6 99 41 27 08 »."
+			description: "Le numéro sur lequel on peut écrire, uniquement s’il est dans la demande. Ne l’invente sous aucun prétexte : un numéro inventé appartient à quelqu’un, et c’est lui qu’on appellera."
 		},
 		adresse: {
 			type: "string",
 			maxLength: 90,
 			title: "Où",
-			description: "Le quartier et la rue. Ex. « Rue Bépanda-Omnisport, en face du marché »."
+			description: "Le quartier et la rue, uniquement s’ils sont dans la demande. N’invente pas un lieu : des gens s’y déplaceraient."
 		},
 		horaires: {
 			type: "string",
 			maxLength: 60,
 			title: "Quand",
-			description: "Ex. « Lundi à samedi, 7 h – 19 h »."
+			description: "Les jours et les heures d’ouverture, uniquement s’ils sont dans la demande."
 		},
 		date: {
 			type: "string",

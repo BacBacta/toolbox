@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_LIGNES_SECTION, MAX_SECTIONS, avecSommaire, carteDePage, direLeJour, partageDePage,
-  sectionsAncrees,
-  verifierPage,
+  schemaPage, sectionsAncrees, verifierPage,
 } from '../src/page.js'
 import type { PageDemande } from '../src/page.js'
 
@@ -391,5 +390,47 @@ describe('la carte d’un événement', () => {
   it('met le jour en tête de ce qui part dans une discussion', () => {
     const lignes = partageDePage(FETE, CTX).txt.split('\n')
     expect(lignes[2]).toBe('Samedi 12 septembre 2026 à 15 h — dans 3 jours')
+  })
+})
+
+/**
+ * Ce que le schéma donne au modèle, il le rend.
+ *
+ * Mesuré sur une génération réelle en production : « je veux un site internet
+ * pour ma quincaillerie à Bépanda » a rendu le numéro, la rue et les horaires
+ * de l'exemple, recopiés au caractère près — alors que l'invite dit déjà
+ * « n'invente jamais un numéro ». Une valeur concrète posée à côté d'un champ
+ * est une démonstration de ce qu'il faut y mettre, et elle est plus forte
+ * qu'une interdiction écrite ailleurs.
+ *
+ * Le numéro est le pire des trois, parce qu'il appartient à quelqu'un : la page
+ * aurait été publiée sous le nom d'un commerçant, et ses clients auraient
+ * appelé un inconnu. Personne ne relit dix chiffres avant de partager un lien.
+ */
+describe('les champs qui désignent une personne ou un lieu', () => {
+  const proprietes = (schemaPage as { properties: Record<string, { description?: string }> })
+    .properties
+
+  it.each(['telephone', 'adresse', 'horaires'])(
+    '« %s » ne donne aucune valeur à recopier',
+    (clef) => {
+      const description = proprietes[clef]?.description ?? ''
+      expect(description).not.toMatch(/\d/)
+      expect(description).not.toContain('Ex.')
+    },
+  )
+
+  it('et disent chacun de ne rien inventer', () => {
+    expect(proprietes.telephone?.description).toContain('appartient à quelqu’un')
+    expect(proprietes.adresse?.description).toContain('déplaceraient')
+  })
+
+  it('mais les prix gardent le leur : c’est la matière de la page', () => {
+    // Un commerçant voit tout de suite qu'un prix n'est pas le sien, et une
+    // vitrine sans rien dessus ne sert à rien.
+    const sections = proprietes.sections as unknown as {
+      items: { properties: { lignes: { items: { properties: { valeur: { description: string } } } } } }
+    }
+    expect(sections.items.properties.lignes.items.properties.valeur.description).toContain('Ex.')
   })
 })
