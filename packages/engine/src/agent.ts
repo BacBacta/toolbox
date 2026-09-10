@@ -105,11 +105,18 @@ export function lireTour(valeur: unknown): LectureTour | null {
   const outil = tour.outil ?? (familleDe(valeur) === null ? undefined : valeur)
   if (outil === undefined || outil === null) return mot === '' ? null : { sorte: 'mot', mot }
 
-  return {
-    sorte: 'outil',
-    mot: mot === '' ? MOT_PAR_DEFAUT : mot,
-    outil: lireReponseModele(outil),
-  }
+  const lu = lireReponseModele(outil)
+
+  /*
+   * Une coquille vide n'ouvre pas d'écran, et le mot qui l'accompagne est une
+   * question. On rend donc le tour tel qu'il est réellement : la question. Le
+   * modèle pose volontiers son ébauche à côté de sa demande de précision —
+   * deux passes d'invite n'ont pas réussi à l'en dissuader — et la refuser
+   * gâchait un tour qui, sans elle, fait exactement ce qu'il faut.
+   */
+  if (lu.sorte === 'vide') return mot === '' ? null : { sorte: 'mot', mot }
+
+  return { sorte: 'outil', mot: mot === '' ? MOT_PAR_DEFAUT : mot, outil: lu }
 }
 
 /**

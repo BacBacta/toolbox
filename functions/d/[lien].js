@@ -2970,7 +2970,7 @@ var schemaFormulaire = {
 			minLength: 2,
 			maxLength: 30,
 			title: "Sur-titre",
-			description: "En capitales, au-dessus du nom. Ex. « TRAITEUR MAMA NGO »."
+			description: "En capitales, au-dessus du nom. Le métier suffit si la personne n’a pas donné le nom de son commerce — ex. « TRAITEUR »."
 		},
 		accroche: {
 			type: "string",
@@ -3190,7 +3190,7 @@ var schemaPage = {
 			minLength: 2,
 			maxLength: 40,
 			title: "Nom",
-			description: "Le nom de l’activité, tel qu’il est sur l’enseigne. Ex. « Quincaillerie Bépanda »."
+			description: "Le nom de l’activité, tel qu’il est sur l’enseigne, si la personne le donne. Sinon, mets simplement le métier — ex. « Quincaillerie » — et demande-le dans ton mot."
 		},
 		kicker: {
 			type: "string",

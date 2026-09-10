@@ -30,6 +30,16 @@ export type ReponseModele =
   | { readonly sorte: 'page'; readonly page: PageDemande }
   | { readonly sorte: 'formulaire'; readonly formulaire: FormulaireDemande }
   | { readonly sorte: 'refus'; readonly pourquoi: string }
+  /**
+   * Le modèle a rendu une coquille : le bon nom de famille, et rien dedans.
+   *
+   * Ce n'est pas un échec, c'est une question — il demande de quoi remplir, et
+   * il pose son ébauche à côté. Une coquille ne porte aucune information : la
+   * jeter ne perd rien, et le mot qui l'accompagne est ce dont la personne a
+   * besoin pour que le tour suivant fabrique quelque chose. Distinct
+   * d'« invalide », qui se dit de ce qui porte quelque chose de faux.
+   */
+  | { readonly sorte: 'vide' }
   | { readonly sorte: 'invalide'; readonly erreurs: readonly ErreurValidation[] }
 
 /**
@@ -92,6 +102,23 @@ function sansLEtiquette(valeur: object): object {
   return Object.keys(reste).length === Object.keys(valeur).length ? valeur : reste
 }
 
+/**
+ * Ce qui fait la matière d'un outil, famille par famille.
+ *
+ * Tout le reste — titres, sur-titres, accroches, libellés — habille. Un outil
+ * qui n'a que son habillage n'a rien à montrer.
+ */
+const MATIERE = ['sections', 'colonnes', 'entrees', 'champs'] as const
+
+/** Vrai quand l'outil ne porte aucune matière : ni section, ni colonne, ni champ. */
+function coquilleVide(valeur: object): boolean {
+  const o = valeur as Record<string, unknown>
+  return MATIERE.every((clef) => {
+    const liste = o[clef]
+    return liste === undefined || (Array.isArray(liste) && liste.length === 0)
+  })
+}
+
 export function lireReponseModele(valeur: unknown): ReponseModele {
   if (typeof valeur !== 'object' || valeur === null) {
     return { sorte: 'invalide', erreurs: [{ chemin: '$', message: 'la réponse n’est pas un objet' }] }
@@ -146,6 +173,7 @@ export function lireReponseModele(valeur: unknown): ReponseModele {
 
   if ('champs' in outil) {
     const redresse = redresserFormulaire(outil)
+    if (coquilleVide(redresse as object)) return { sorte: 'vide' }
     const erreurs = verifierFormulaire(redresse)
     return erreurs.length > 0
       ? { sorte: 'invalide', erreurs }
@@ -162,6 +190,7 @@ export function lireReponseModele(valeur: unknown): ReponseModele {
      * devant le schéma, champs interdits compris.
      */
     const redressee = redresserPage(outil)
+    if (coquilleVide(redressee as object)) return { sorte: 'vide' }
     const erreurs = verifierPage(redressee)
     return erreurs.length > 0
       ? { sorte: 'invalide', erreurs }
@@ -170,6 +199,7 @@ export function lireReponseModele(valeur: unknown): ReponseModele {
 
   if ('entrees' in outil) {
     const redresse = redresserCalcul(outil)
+    if (coquilleVide(redresse as object)) return { sorte: 'vide' }
     const erreurs = verifierCalcul(redresse)
     return erreurs.length > 0
       ? { sorte: 'invalide', erreurs }
@@ -177,6 +207,7 @@ export function lireReponseModele(valeur: unknown): ReponseModele {
   }
 
   const redresse = redresserRegistre(outil)
+  if (coquilleVide(redresse as object)) return { sorte: 'vide' }
   const erreurs = verifierRegistre(redresse)
   return erreurs.length > 0
     ? { sorte: 'invalide', erreurs }

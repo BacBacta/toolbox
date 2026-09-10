@@ -1,4 +1,4 @@
-import type { Comprehension, Extrait, FicheSquelette } from '@a237/engine'
+import type { Comprehension, Etage, Extrait, FicheSquelette } from '@a237/engine'
 import { CE_QUE_COUTE, comprendre, etageDe, montantF } from '@a237/engine'
 import type { JSX } from 'preact'
 import { useState } from 'preact/hooks'
@@ -105,7 +105,10 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
       )}
 
       {reponse?.sorte === 'sur' && (
-        <Proposition fiche={reponse.fiche} extrait={reponse.extrait} onOuvrir={ouvrir} />
+        <>
+          <Proposition fiche={reponse.fiche} extrait={reponse.extrait} onOuvrir={ouvrir} />
+          <EnParler demande={demande} fiches={props.fiches} onDiscuter={props.onDiscuter} />
+        </>
       )}
 
       {reponse?.sorte === 'ambigu' && (
@@ -124,6 +127,7 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
               </button>
             ))}
           </div>
+          <EnParler demande={demande} fiches={props.fiches} onDiscuter={props.onDiscuter} />
         </div>
       )}
 
@@ -144,29 +148,75 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
             ramasse les réponses.
           </p>
 
-          <button
-            type="button"
-            class="atelier-option principale"
-            onClick={() => props.onDiscuter(demande)}
-          >
-            <span class="marque" aria-hidden="true">✳</span>
-            <span class="texte">
-              <b>En parler à l’atelier</b>
-              {/*
-                * Le prix se dit avant le clic, pas après.
-                *
-                * L'étage se calcule ici, gratuitement et sans réseau : c'est ce
-                * qui permet d'annoncer un prix plutôt qu'une facture. Le
-                * serveur le recalcule et tranche — un prix qu'on peut
-                * contourner depuis le navigateur n'est pas un prix.
-                */}
-              <span>{CE_QUE_COUTE[etageDe(demande, props.fiches)]}</span>
-            </span>
-          </button>
+          <EnParler
+            demande={demande}
+            fiches={props.fiches}
+            onDiscuter={props.onDiscuter}
+            principale
+          />
         </div>
       )}
 
     </section>
+  )
+}
+
+/**
+ * La porte de l'atelier, et elle reste ouverte partout.
+ *
+ * Elle n'apparaissait que quand aucun outil ne correspondait. « Un menu pour
+ * mon restaurant » tombe sur « liste de prix » — un bon rapprochement, gratuit
+ * et immédiat, qui garde donc la première place. Mais quelqu'un qui voulait
+ * une vraie page de menu, avec ses rubriques, n'avait aucun moyen de le dire :
+ * il n'y avait qu'un bouton, et il menait ailleurs.
+ *
+ * L'outil qui correspond reste en tête, parce qu'il ne coûte rien et qu'il
+ * s'ouvre tout de suite. La conversation est en dessous, et se paie — d'où le
+ * prix, dit avant le clic.
+ */
+/**
+ * Ce que coûte la conversation, et jamais moins que ce qu'elle coûte.
+ *
+ * `etageDe` rend l'étage 1 — « gratuit, et ça marche hors ligne » — dès qu'un
+ * squelette se détache de la demande, et c'est exact : ce squelette-là est
+ * gratuit. Ça ne l'est pas de ce bouton-ci, qui appelle le modèle et prend un
+ * crédit. Tant que la conversation n'apparaissait qu'à défaut d'outil, la
+ * question ne se posait pas ; elle apparaît maintenant à côté d'eux.
+ */
+function prixDeLaConversation(
+  demande: string,
+  fiches: readonly FicheSquelette[],
+): Exclude<Etage, 1> {
+  const etage = etageDe(demande, fiches)
+  return etage === 1 ? 2 : etage
+}
+
+function EnParler(props: {
+  readonly demande: string
+  readonly fiches: readonly FicheSquelette[]
+  readonly onDiscuter: (demande: string) => void
+  readonly principale?: boolean
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      class={props.principale === true ? 'atelier-option principale' : 'atelier-option'}
+      onClick={() => props.onDiscuter(props.demande)}
+    >
+      <span class="marque" aria-hidden="true">✳</span>
+      <span class="texte">
+        <b>En parler à l’atelier</b>
+        {/*
+          * Le prix se dit avant le clic, pas après.
+          *
+          * L'étage se calcule ici, gratuitement et sans réseau : c'est ce qui
+          * permet d'annoncer un prix plutôt qu'une facture. Le serveur le
+          * recalcule et tranche — un prix qu'on peut contourner depuis le
+          * navigateur n'est pas un prix.
+          */}
+        <span>{CE_QUE_COUTE[prixDeLaConversation(props.demande, props.fiches)]}</span>
+      </span>
+    </button>
   )
 }
 

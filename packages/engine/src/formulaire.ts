@@ -117,7 +117,10 @@ export const schemaFormulaire: JsonSchema = {
     },
     kicker: {
       type: 'string', minLength: 2, maxLength: 30, title: 'Sur-titre',
-      description: 'En capitales, au-dessus du nom. Ex. « TRAITEUR MAMA NGO ».',
+      // Le nom du commerce ne s'invente pas non plus : voir « titre » de la page.
+      description:
+        'En capitales, au-dessus du nom. Le métier suffit si la personne n’a pas donné ' +
+        'le nom de son commerce — ex. « TRAITEUR ».',
     },
     accroche: {
       type: 'string', minLength: 4, maxLength: 160, title: 'Accroche',

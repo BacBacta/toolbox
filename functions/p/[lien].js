@@ -622,7 +622,7 @@ var schemaPage = {
 			minLength: 2,
 			maxLength: 40,
 			title: "Nom",
-			description: "Le nom de l’activité, tel qu’il est sur l’enseigne. Ex. « Quincaillerie Bépanda »."
+			description: "Le nom de l’activité, tel qu’il est sur l’enseigne, si la personne le donne. Sinon, mets simplement le métier — ex. « Quincaillerie » — et demande-le dans ton mot."
 		},
 		kicker: {
 			type: "string",

@@ -161,7 +161,18 @@ export const schemaPage: JsonSchema = {
   properties: {
     titre: {
       type: 'string', minLength: 2, maxLength: 40, title: 'Nom',
-      description: 'Le nom de l’activité, tel qu’il est sur l’enseigne. Ex. « Quincaillerie Bépanda ».',
+      /*
+       * L'exemple ne nomme plus de lieu.
+       *
+       * « Quincaillerie Bépanda » y était, et une demande sans quartier ni nom
+       * l'a rendu tel quel : Bépanda est un vrai quartier de Douala. Un nom
+       * faux se publie et devient l'enseigne de quelqu'un d'autre sur le lien
+       * qu'il envoie à ses clients. La forme attendue se montre encore — une
+       * activité, pas une phrase — sans donner de lieu à recopier.
+       */
+      description:
+        'Le nom de l’activité, tel qu’il est sur l’enseigne, si la personne le donne. ' +
+        'Sinon, mets simplement le métier — ex. « Quincaillerie » — et demande-le dans ton mot.',
     },
     kicker: {
       type: 'string', minLength: 2, maxLength: 30, title: 'Sur-titre',

@@ -426,6 +426,23 @@ describe('les champs qui désignent une personne ou un lieu', () => {
     expect(proprietes.adresse?.description).toContain('déplaceraient')
   })
 
+  /*
+   * Le nom de l'enseigne est du même bois, et il a fallu une deuxième capture
+   * d'écran pour le voir : « je veux un site internet pour ma quincaillerie »
+   * — sans quartier, sans nom — a rendu « Quincaillerie Bépanda ». Bépanda est
+   * un vrai quartier de Douala, et c'est l'exemple qui était posé là.
+   *
+   * Un numéro faux se remarque à l'appel ; un nom faux se publie, se partage,
+   * et devient l'enseigne de quelqu'un d'autre sur le lien qu'il envoie à ses
+   * clients. L'exemple reste, parce qu'il montre la forme attendue — une
+   * activité et non une phrase — mais il ne nomme plus de lieu.
+   */
+  it('le nom de l’activité ne donne pas de quartier à recopier', () => {
+    const description = proprietes.titre?.description ?? ''
+    expect(description).not.toMatch(/Bépanda|Douala|Yaoundé|Bonamoussadi|Akwa/)
+    expect(description).toMatch(/demande-le|elle le donne/)
+  })
+
   it('mais les prix gardent le leur : c’est la matière de la page', () => {
     // Un commerçant voit tout de suite qu'un prix n'est pas le sien, et une
     // vitrine sans rien dessus ne sert à rien.

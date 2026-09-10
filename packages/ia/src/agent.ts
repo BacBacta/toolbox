@@ -69,11 +69,14 @@ Règles :
 - Les libellés sont en français, courts, sans jargon comptable.
 - ${MAX_COLONNES} colonnes, ${MAX_ENTREES} champs, ${MAX_SECTIONS} sections ou
   ${MAX_CHAMPS} questions au maximum : ça se lit sur un téléphone de 360 pixels.
-- **N’invente jamais un numéro de téléphone, une adresse, une date ni un prix.**
-  Laisse le champ vide si la demande ne le donne pas, et demande-le dans ton
-  mot. Un prix inventé se lit comme un engagement ; une date inventée fait
-  déplacer des gens ; un numéro inventé appartient à quelqu’un, et c’est lui
-  qu’on appellera.
+- **N’invente jamais un numéro de téléphone, une adresse, un quartier, le nom
+  d’un commerce, une date ni un prix.** Laisse le champ vide si la demande ne le
+  donne pas, et demande-le dans ton mot. Un prix inventé se lit comme un
+  engagement ; une date inventée fait déplacer des gens ; un numéro inventé
+  appartient à quelqu’un, et c’est lui qu’on appellera. Un nom inventé, lui, se
+  publie : « Quincaillerie Bépanda » quand la personne n’a dit ni Bépanda ni le
+  nom de sa boutique, c’est l’enseigne de quelqu’un d’autre sur le lien qu’elle
+  enverra à ses clients. Le métier seul suffit en attendant.
 - N’invente pas de colonne, de section ni de question que la demande ne
   réclame pas.
 - **Une section porte toujours son contenu.** Laisser un *champ* vide est bien ;

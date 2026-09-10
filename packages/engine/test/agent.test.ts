@@ -69,7 +69,10 @@ describe('un tour de conversation', () => {
   })
 
   it('rapporte une configuration invalide au lieu de la laisser passer', () => {
-    const lu = lireTour({ mot: 'Voilà.', outil: { ...REGISTRE, colonnes: [] } })
+    const lu = lireTour({
+      mot: 'Voilà.',
+      outil: { ...REGISTRE, colonnes: [{ clef: 'quoi', titre: 'Quoi', type: 'vidéo' }] },
+    })
     expect(lu?.sorte === 'outil' && lu.outil.sorte).toBe('invalide')
   })
 
@@ -205,5 +208,29 @@ describe('la fenêtre, une fois l’outil fini', () => {
     expect(ebaucheFinie('Non.', { sorte: 'refus', pourquoi: 'non' } as never)).toEqual({
       mot: 'Non.', famille: 'refus', titre: '', pieces: [],
     })
+  })
+})
+
+/**
+ * Ce que l'écran fait d'un outil vide : la question, et rien d'autre.
+ *
+ * Le mot est ce qui sert ; la coquille n'ouvre aucun écran, donc aucun bouton
+ * ne la propose — un bouton mort est pire qu'un bouton absent.
+ */
+describe('un tour dont l’outil ne porte rien', () => {
+  const VIDE = {
+    mot: 'Ah, un menu ! Comment s’appelle ton établissement ?',
+    outil: { titre: 'Menu', kicker: 'MENU', accroche: 'Nos plats.', sections: [] },
+  }
+
+  it('se lit comme un mot : la question passe, la coquille non', () => {
+    const lu = lireTour(VIDE)
+    expect(lu?.sorte).toBe('mot')
+    if (lu?.sorte !== 'mot') return
+    expect(lu.mot).toBe(VIDE.mot)
+  })
+
+  it('mais une coquille sans un mot ne laisse rien à montrer', () => {
+    expect(lireTour({ outil: { titre: 'Menu', kicker: 'MENU', accroche: 'A.', sections: [] } })).toBe(null)
   })
 })

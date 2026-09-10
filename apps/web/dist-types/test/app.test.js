@@ -109,6 +109,45 @@ describe('l’atelier comprend la demande, sans appeler personne', () => {
         // La conversation part sur un geste, jamais en tapant : chaque tour coûte.
         expect(hote.textContent).toContain('En parler à l’atelier');
     });
+    /*
+     * L'agent n'était atteignable que quand rien ne correspondait.
+     *
+     * « Un menu pour mon restaurant » tombe sur « liste de prix » — un bon
+     * rapprochement, et un outil gratuit et immédiat, qui reste donc en tête.
+     * Mais quelqu'un qui voulait une vraie page de menu, avec ses rubriques,
+     * n'avait aucun moyen de le dire : il n'y avait qu'un bouton, et il menait
+     * ailleurs. La porte de l'atelier reste ouverte partout.
+     */
+    it('laisse parler à l’atelier même quand un outil correspond', () => {
+        demander('noter la tontine du quartier');
+        expect(hote.textContent).toContain('Ouvrir carnet de njangi');
+        expect(hote.textContent).toContain('En parler à l’atelier');
+    });
+    it('et même quand deux outils se disputent la demande', () => {
+        demander('je veux un devis puis une facture');
+        expect(hote.textContent).toContain('Lequel veux-tu ?');
+        expect(hote.textContent).toContain('En parler à l’atelier');
+    });
+    it('mais l’outil qui correspond garde la première place : il est gratuit', () => {
+        demander('noter la tontine du quartier');
+        const principale = hote.querySelector('.atelier-option.principale');
+        expect(principale?.textContent).toContain('Ouvrir carnet de njangi');
+    });
+    /*
+     * Le bouton dit ce qu'il coûte, et là il coûte.
+     *
+     * `etageDe` rend l'étage 1 — « gratuit, et ça marche hors ligne » — dès qu'un
+     * squelette se détache, et c'est vrai du squelette. Ce n'est pas vrai de la
+     * conversation posée juste en dessous : elle appelle le modèle et prend un
+     * crédit. Annoncer « gratuit » sur un bouton qui débite est le genre de
+     * détail qui fait désinstaller une application au Cameroun.
+     */
+    it('et la conversation annonce son prix, même quand un outil gratuit correspond', () => {
+        demander('noter la tontine du quartier');
+        const parler = [...hote.querySelectorAll('.atelier-option')].find((b) => b.textContent?.includes('En parler à l’atelier'));
+        expect(parler?.textContent).not.toContain('gratuit');
+        expect(parler?.textContent).toContain('centimes');
+    });
     it('garde la grille complète sous la main', () => {
         // La demande ne cache pas les autres outils : on peut toujours parcourir.
         demander('devis');

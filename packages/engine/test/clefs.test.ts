@@ -264,7 +264,9 @@ describe('les libellés d’ambiance d’un registre', () => {
    * tableau sans rien dedans : lui inventer des colonnes serait inventer le
    * travail de quelqu'un.
    */
-  it('et un registre sans colonnes reste refusé', () => {
-    expect(lireReponseModele({ ...SANS, colonnes: [] }).sorte).toBe('invalide')
+  it('et un registre sans colonnes ne devient pas un registre pour autant', () => {
+    // Il ne porte rien : le tour se lit comme une question, et jamais comme un
+    // tableau vide qu'on inviterait à ouvrir.
+    expect(lireReponseModele({ ...SANS, colonnes: [] }).sorte).toBe('vide')
   })
 })

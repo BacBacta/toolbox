@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_CHAMPS, MAX_PARAGRAPHE, MAX_TEXTE, depouiller, verifierFormulaire } from '../src/formulaire.js'
+import {
+  MAX_CHAMPS, MAX_PARAGRAPHE, MAX_TEXTE, depouiller, schemaFormulaire, verifierFormulaire,
+} from '../src/formulaire.js'
 import type { FormulaireDemande } from '../src/formulaire.js'
 
 /**
@@ -165,5 +167,22 @@ describe('ce qu’un visiteur renvoie', () => {
   it('jette un nombre qui n’en est pas un plutôt que de ranger « NaN »', () => {
     expect(depouiller(BON, { nom: 'A', telephone: '6', parts: 'beaucoup' }).contenu.parts)
       .toBeUndefined()
+  })
+})
+
+/**
+ * Le sur-titre d'un formulaire nomme un traiteur, et l'exemple en nommait un.
+ *
+ * Même leçon que « Quincaillerie Bépanda » sur la page : une valeur concrète
+ * posée à côté d'un champ est une démonstration de ce qu'il faut y mettre, plus
+ * forte qu'une interdiction écrite ailleurs. Un formulaire se publie et reçoit
+ * des commandes ; le nom qui le coiffe est celui sous lequel les gens
+ * répondent.
+ */
+describe('le sur-titre d’un formulaire', () => {
+  it('ne donne pas de nom de commerce à recopier', () => {
+    const proprietes = (schemaFormulaire as { properties: Record<string, { description?: string }> })
+      .properties
+    expect(proprietes.kicker?.description ?? '').not.toMatch(/MAMA NGO/)
   })
 })

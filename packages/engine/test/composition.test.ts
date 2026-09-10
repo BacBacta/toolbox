@@ -63,7 +63,13 @@ describe('la forme dit la famille', () => {
   })
 
   it('rapporte les reproches quand la forme est bonne et le contenu faux', () => {
-    const lu = lireReponseModele({ ...REGISTRE, colonnes: [] })
+    // Une colonne qui porte un type inconnu : le modèle a écrit quelque chose,
+    // et ce quelque chose est faux. À distinguer de la coquille vide, qui ne
+    // porte rien et se lit comme une question.
+    const lu = lireReponseModele({
+      ...REGISTRE,
+      colonnes: [{ clef: 'quoi', titre: 'Quoi', type: 'vidéo' }],
+    })
     expect(lu.sorte).toBe('invalide')
     expect(lu.sorte === 'invalide' && lu.erreurs.length).toBeGreaterThan(0)
   })
@@ -151,8 +157,10 @@ describe('une page dont une étiquette contredisait son contenu', () => {
   })
 
   it('mais une section qui ne porte rien du tout ne s’invente pas', () => {
+    // Elle s'en va au redressement, et il ne reste alors plus de page : le tour
+    // se lit comme une question, jamais comme une vitrine à trous.
     expect(lireReponseModele({ ...RENDU, sections: [{ titre: 'Ce que je vends', sorte: 'liste' }] }).sorte)
-      .toBe('invalide')
+      .toBe('vide')
   })
 })
 
@@ -209,5 +217,60 @@ describe('un outil qui se nomme lui-même', () => {
     expect(lu.sorte).toBe('invalide')
     if (lu.sorte !== 'invalide') return
     expect(lu.erreurs[0]?.message).toMatch(/tu as renvoyé le schéma/)
+  })
+})
+
+/**
+ * Un outil sans rien dedans n'est pas un outil raté : c'est une question.
+ *
+ * « Un menu pour mon restaurant » : six fois sur six, le modèle demandait le
+ * nom de l'établissement — la bonne question — et joignait une page à zéro
+ * section. Deux passes d'invite n'y ont rien changé ; il veut poser son
+ * ébauche à côté de sa question, et chaque tentative de l'en empêcher déplaçait
+ * le problème ailleurs.
+ *
+ * Alors on le lit pour ce qu'il est. Une coquille vide ne porte aucune
+ * information : la jeter ne perd rien, et ce qui reste — la question — est
+ * exactement ce dont la personne a besoin pour que le tour suivant fabrique
+ * quelque chose. Le tour est réussi ; c'est le refuser qui le gâchait.
+ *
+ * La frontière n'a pas bougé d'un pouce : « vide » ne se dit que d'un outil qui
+ * ne porte rien. Tout ce qui porte quelque chose de faux reste « invalide », et
+ * le dit.
+ */
+describe('un outil qui ne porte rien', () => {
+  it('une page sans section se lit comme une question, pas comme une erreur', () => {
+    const lu = lireReponseModele({ titre: 'Menu', kicker: 'MENU', accroche: 'Nos plats.', sections: [] })
+    expect(lu.sorte).toBe('vide')
+  })
+
+  it('un registre sans colonne, une calculatrice sans entrée, un formulaire sans champ', () => {
+    expect(lireReponseModele({ titre: 'A', kicker: 'A', titreNom: 'A', colonnes: [] }).sorte).toBe('vide')
+    expect(lireReponseModele({ titre: 'A', kicker: 'A', titreNom: 'A', entrees: [] }).sorte).toBe('vide')
+    expect(lireReponseModele({ titre: 'A', kicker: 'A', accroche: 'A', champs: [] }).sorte).toBe('vide')
+    expect(lireReponseModele({}).sorte).toBe('vide')
+  })
+
+  it('une page dont toutes les sections étaient des coquilles aussi', () => {
+    const lu = lireReponseModele({
+      titre: 'Menu', kicker: 'MENU', accroche: 'Nos plats.',
+      sections: [
+        { titre: 'Nos entrées', sorte: 'prix', lignes: [] },
+        { titre: 'Nos plats', sorte: 'prix', lignes: [] },
+      ],
+    })
+    expect(lu.sorte).toBe('vide')
+  })
+
+  it('mais un outil qui porte quelque chose de faux reste invalide, et le dit', () => {
+    const lu = lireReponseModele({
+      titre: 'Menu', kicker: 'MENU', accroche: 'Nos plats.',
+      sections: [{ titre: 'Nos plats', sorte: 'prix', lignes: [{ valeur: '2000 F' }] }],
+    })
+    expect(lu.sorte).toBe('invalide')
+  })
+
+  it('et un refus reste un refus : il porte sa phrase', () => {
+    expect(lireReponseModele({ impossible: 'Un logo se dessine.' }).sorte).toBe('refus')
   })
 })

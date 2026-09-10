@@ -60,11 +60,17 @@ describe('ce que l’invite dit', () => {
   })
 
   /*
-   * « Un menu pour mon restaurant » : trois fois sur trois, le modèle
-   * annonçait « je te prépare ça tout de suite » et rendait une page à zéro
-   * section. Le mot s'affiche, l'outil ne s'ouvre pas, et la personne attend.
-   * Une question aurait coûté le même tour et aurait servi.
+   * Deuxième fois que l'exemple d'un schéma ressort comme donnée : après le
+   * numéro et l'adresse, le nom de l'enseigne. L'exemple est parti du schéma,
+   * et l'interdiction le nomme ici — les deux, parce que la première fois
+   * l'interdiction seule n'avait pas suffi.
    */
+  it('interdit d’inventer le nom d’un commerce, pas seulement un numéro', () => {
+    const invite = batirInviteAgent().replace(/\s+/g, ' ')
+    expect(invite).toContain('le nom d’un commerce')
+    expect(invite).toContain('c’est l’enseigne de quelqu’un d’autre')
+  })
+
   /*
    * Quatre schémas devant lui et aucun endroit où dire lequel il a pris : le
    * modèle se le disait à lui-même, en tête de l'outil. La frontière jette
@@ -116,7 +122,8 @@ describe('ce que l’invite dit', () => {
 
   it('interdit d’inventer ce qui engage ou déplace quelqu’un', () => {
     const invite = batirInviteAgent().replace(/\s+/g, ' ')
-    expect(invite).toContain('N’invente jamais un numéro de téléphone, une adresse, une date ni un prix')
+    expect(invite).toContain('N’invente jamais un numéro de téléphone, une adresse')
+    expect(invite).toContain('une date ni un prix')
     expect(invite).toContain('un numéro inventé appartient à quelqu’un')
   })
 

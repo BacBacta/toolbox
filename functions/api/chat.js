@@ -817,7 +817,7 @@ var schemaFormulaire = {
 			minLength: 2,
 			maxLength: 30,
 			title: "Sur-titre",
-			description: "En capitales, au-dessus du nom. Ex. « TRAITEUR MAMA NGO »."
+			description: "En capitales, au-dessus du nom. Le métier suffit si la personne n’a pas donné le nom de son commerce — ex. « TRAITEUR »."
 		},
 		accroche: {
 			type: "string",
@@ -1017,7 +1017,7 @@ var schemaPage = {
 			minLength: 2,
 			maxLength: 40,
 			title: "Nom",
-			description: "Le nom de l’activité, tel qu’il est sur l’enseigne. Ex. « Quincaillerie Bépanda »."
+			description: "Le nom de l’activité, tel qu’il est sur l’enseigne, si la personne le donne. Sinon, mets simplement le métier — ex. « Quincaillerie » — et demande-le dans ton mot."
 		},
 		kicker: {
 			type: "string",
@@ -1539,6 +1539,26 @@ function sansLEtiquette(valeur) {
 	const reste = Object.fromEntries(Object.entries(valeur).filter(([clef, v]) => !((clef === "type" || clef === "sorte") && typeof v === "string")));
 	return Object.keys(reste).length === Object.keys(valeur).length ? valeur : reste;
 }
+/**
+* Ce qui fait la matière d'un outil, famille par famille.
+*
+* Tout le reste — titres, sur-titres, accroches, libellés — habille. Un outil
+* qui n'a que son habillage n'a rien à montrer.
+*/
+var MATIERE = [
+	"sections",
+	"colonnes",
+	"entrees",
+	"champs"
+];
+/** Vrai quand l'outil ne porte aucune matière : ni section, ni colonne, ni champ. */
+function coquilleVide(valeur) {
+	const o = valeur;
+	return MATIERE.every((clef) => {
+		const liste = o[clef];
+		return liste === void 0 || Array.isArray(liste) && liste.length === 0;
+	});
+}
 function lireReponseModele(valeur) {
 	if (typeof valeur !== "object" || valeur === null) return {
 		sorte: "invalide",
@@ -1569,6 +1589,7 @@ function lireReponseModele(valeur) {
 	}
 	if ("champs" in outil) {
 		const redresse = redresserFormulaire(outil);
+		if (coquilleVide(redresse)) return { sorte: "vide" };
 		const erreurs = verifierFormulaire(redresse);
 		return erreurs.length > 0 ? {
 			sorte: "invalide",
@@ -1580,6 +1601,7 @@ function lireReponseModele(valeur) {
 	}
 	if ("sections" in outil) {
 		const redressee = redresserPage(outil);
+		if (coquilleVide(redressee)) return { sorte: "vide" };
 		const erreurs = verifierPage(redressee);
 		return erreurs.length > 0 ? {
 			sorte: "invalide",
@@ -1591,6 +1613,7 @@ function lireReponseModele(valeur) {
 	}
 	if ("entrees" in outil) {
 		const redresse = redresserCalcul(outil);
+		if (coquilleVide(redresse)) return { sorte: "vide" };
 		const erreurs = verifierCalcul(redresse);
 		return erreurs.length > 0 ? {
 			sorte: "invalide",
@@ -1601,6 +1624,7 @@ function lireReponseModele(valeur) {
 		};
 	}
 	const redresse = redresserRegistre(outil);
+	if (coquilleVide(redresse)) return { sorte: "vide" };
 	const erreurs = verifierRegistre(redresse);
 	return erreurs.length > 0 ? {
 		sorte: "invalide",
@@ -1776,10 +1800,15 @@ function lireTour(valeur) {
 		sorte: "mot",
 		mot
 	};
+	const lu = lireReponseModele(outil);
+	if (lu.sorte === "vide") return mot === "" ? null : {
+		sorte: "mot",
+		mot
+	};
 	return {
 		sorte: "outil",
 		mot: mot === "" ? MOT_PAR_DEFAUT : mot,
-		outil: lireReponseModele(outil)
+		outil: lu
 	};
 }
 /** La famille se lit sur la forme, comme partout ailleurs. */
@@ -2197,11 +2226,14 @@ Règles :
 - Les libellés sont en français, courts, sans jargon comptable.
 - 6 colonnes, 5 champs, 8 sections ou
   8 questions au maximum : ça se lit sur un téléphone de 360 pixels.
-- **N’invente jamais un numéro de téléphone, une adresse, une date ni un prix.**
-  Laisse le champ vide si la demande ne le donne pas, et demande-le dans ton
-  mot. Un prix inventé se lit comme un engagement ; une date inventée fait
-  déplacer des gens ; un numéro inventé appartient à quelqu’un, et c’est lui
-  qu’on appellera.
+- **N’invente jamais un numéro de téléphone, une adresse, un quartier, le nom
+  d’un commerce, une date ni un prix.** Laisse le champ vide si la demande ne le
+  donne pas, et demande-le dans ton mot. Un prix inventé se lit comme un
+  engagement ; une date inventée fait déplacer des gens ; un numéro inventé
+  appartient à quelqu’un, et c’est lui qu’on appellera. Un nom inventé, lui, se
+  publie : « Quincaillerie Bépanda » quand la personne n’a dit ni Bépanda ni le
+  nom de sa boutique, c’est l’enseigne de quelqu’un d’autre sur le lien qu’elle
+  enverra à ses clients. Le métier seul suffit en attendant.
 - N’invente pas de colonne, de section ni de question que la demande ne
   réclame pas.
 - **Une section porte toujours son contenu.** Laisser un *champ* vide est bien ;
