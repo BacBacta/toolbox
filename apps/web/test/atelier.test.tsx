@@ -183,7 +183,48 @@ describe('la troisième forme : une page', () => {
   })
 })
 
-describe('quand la demande n’est aucune des trois', () => {
+describe('la quatrième forme : un formulaire', () => {
+  const FORM = {
+    titre: 'Commandes du week-end',
+    kicker: 'TRAITEUR MAMA NGO',
+    accroche: 'Commande avant vendredi 18 h.',
+    champs: [{ clef: 'nom', titre: 'Ton nom', sorte: 'texte', obligatoire: true }],
+    bouton: 'Envoyer ma commande',
+    merci: 'C’est noté.',
+  }
+
+  it('crée le formulaire composé', async () => {
+    // La seule des quatre formes qui reçoit. Ce qui se fait aujourd'hui par
+    // vingt messages WhatsApp recopiés à la main dans un cahier.
+    repond(200, { formulaire: FORM, fcfa: 0.17 })
+    demander('savoir qui vient a la fete et ce qu il apporte')
+    cliquer('Compose-le pour moi')
+    await attendre()
+    expect(creations[0]?.skeleton).toBe('compose-formulaire')
+    expect(creations[0]?.registre).toMatchObject({
+      formulaire: { titre: 'Commandes du week-end' },
+    })
+  })
+
+  it('refuse un choix dont aucune réponse n’est possible', async () => {
+    repond(200, {
+      formulaire: { ...FORM, champs: [{ clef: 'plat', titre: 'Quel plat ?', sorte: 'choix' }] },
+      fcfa: 0.17,
+    })
+    demander('savoir qui vient a la fete et ce qu il apporte')
+    cliquer('Compose-le pour moi')
+    await attendre()
+    expect(creations).toHaveLength(0)
+    expect(hote.textContent).toContain('ne décrit pas un outil valide')
+  })
+
+  it('annonce les quatre formes avant qu’on clique', () => {
+    demander('savoir qui vient a la fete et ce qu il apporte')
+    expect(hote.textContent).toContain('un formulaire qui ramasse les réponses')
+  })
+})
+
+describe('quand la demande n’est aucune des quatre', () => {
   it('rapporte le refus du modèle, sans créer d’outil', async () => {
     // Un outil qui ne sait pas dire non finit par mentir : il inventait un
     // registre « Ventes » de bout en bout, et le facturait.

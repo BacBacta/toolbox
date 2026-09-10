@@ -168,7 +168,11 @@ export async function repondre(
       jetonsEntree: resultat.cout.entree,
       jetonsSortie: resultat.cout.sortie,
       coutXaf: resultat.cout.fcfa,
-      ok: resultat.sorte === 'reussi' || resultat.sorte === 'calcule' || resultat.sorte === 'page',
+      ok:
+        resultat.sorte === 'reussi' ||
+        resultat.sorte === 'calcule' ||
+        resultat.sorte === 'page' ||
+        resultat.sorte === 'formulaire',
     })
 
     // Le coût part dans le journal du serveur en attendant `ai_calls` : la
@@ -199,6 +203,10 @@ export async function repondre(
 
     if (resultat.sorte === 'page') {
       return { statut: 200, corps: { page: resultat.page, fcfa: resultat.cout.fcfa } }
+    }
+
+    if (resultat.sorte === 'formulaire') {
+      return { statut: 200, corps: { formulaire: resultat.formulaire, fcfa: resultat.cout.fcfa } }
     }
 
     if (resultat.sorte !== 'reussi') {

@@ -1,7 +1,7 @@
 import type { Comprehension, Extrait, FicheSquelette } from '@a237/engine'
 import {
-  CE_QUE_COUTE, EXTRAIT_VIDE, ID_COMPOSE, ID_COMPOSE_CALCUL, ID_COMPOSE_PAGE, comprendre, etageDe,
-  montantF,
+  CE_QUE_COUTE, EXTRAIT_VIDE, ID_COMPOSE, ID_COMPOSE_CALCUL, ID_COMPOSE_FORMULAIRE,
+  ID_COMPOSE_PAGE, comprendre, etageDe, montantF,
 } from '@a237/engine'
 import type { JSX } from 'preact'
 import { useState } from 'preact/hooks'
@@ -104,6 +104,9 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
       } else if (r.sorte === 'page') {
         reussi()
         props.onCreer(ID_COMPOSE_PAGE, EXTRAIT_VIDE, { page: r.page }, r.fcfa)
+      } else if (r.sorte === 'formulaire') {
+        reussi()
+        props.onCreer(ID_COMPOSE_FORMULAIRE, EXTRAIT_VIDE, { formulaire: r.formulaire }, r.fcfa)
       } else if (r.sorte === 'pas-ouvert') {
         setComposition('pas-ouvert')
       } else if (r.sorte === 'sans-credit') {
@@ -196,8 +199,8 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
         <div class="atelier-reponse">
           <p class="atelier-dit">
             Aucun de mes outils ne correspond. Je peux en composer un — un registre avec
-            tes colonnes, une calculatrice avec tes champs, ou une page à envoyer sur
-            WhatsApp.
+            tes colonnes, une calculatrice avec tes champs, une page à envoyer sur
+            WhatsApp, ou un formulaire qui ramasse les réponses.
           </p>
 
           {composition === 'repos' && (

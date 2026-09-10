@@ -17,6 +17,9 @@ export const CHARGEURS = {
      * et non un formulaire qui remplirait un gabarit.
      */
     'compose-page': () => import('./outils/page.js'),
+    // La seule des quatre formes qui reçoit : son écran a un onglet de plus, où
+    // arrivent les réponses.
+    'compose-formulaire': () => import('./outils/formulaire.js'),
     devis: () => import('./outils/devis.js'),
     facture: () => import('./outils/facture.js'),
     // Un seul fragment pour les quatre actes : même cadre, même formulaire, seul

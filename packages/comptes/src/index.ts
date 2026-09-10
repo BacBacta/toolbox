@@ -28,5 +28,11 @@ export {
 } from './base.js'
 export type { AppelIa, BaseD1, Requete } from './base.js'
 
+export {
+  DELAI_ENTRE_ENVOIS_MS, REPONSES_PAR_PAGE, combienDeReponses, empreinteSource, lireReponses,
+  noterPublication, proprietaireDe, rangerReponse, tropTot,
+} from './reponses.js'
+export type { LigneReponse } from './reponses.js'
+
 export { SCHEMA_AUTORISATION, jetonDeLEntete, ouvrirSeance } from './seance.js'
 export type { Seance } from './seance.js'

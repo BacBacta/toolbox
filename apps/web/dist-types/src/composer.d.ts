@@ -1,4 +1,4 @@
-import type { CalculDemande, PageDemande, RegistreDemande } from '@a237/engine';
+import type { CalculDemande, FormulaireDemande, PageDemande, RegistreDemande } from '@a237/engine';
 /**
  * L'étage 2 : ce que l'étage 1 n'a pas su faire, on le fait composer.
  *
@@ -29,6 +29,15 @@ export type Composition = {
  | {
     readonly sorte: 'page';
     readonly page: PageDemande;
+    readonly fcfa: number;
+}
+/**
+ * Un formulaire : la seule des quatre formes qui reçoit. Ce qui se fait
+ * aujourd'hui par vingt messages WhatsApp recopiés à la main dans un cahier.
+ */
+ | {
+    readonly sorte: 'formulaire';
+    readonly formulaire: FormulaireDemande;
     readonly fcfa: number;
 }
 /**

@@ -1,4 +1,6 @@
-import type { CalculDemande, ErreurValidation, PageDemande, RegistreDemande } from '@a237/engine'
+import type {
+  CalculDemande, ErreurValidation, FormulaireDemande, PageDemande, RegistreDemande,
+} from '@a237/engine'
 import { lireReponseModele } from '@a237/engine'
 import { couter } from './cout.js'
 import type { Cout } from './cout.js'
@@ -47,6 +49,17 @@ export type Resultat =
   | {
       readonly sorte: 'page'
       readonly page: PageDemande
+      readonly cout: Cout
+      readonly essais: number
+    }
+  /**
+   * Un formulaire : la seule des quatre formes qui **reçoit**. Ce qui se fait
+   * aujourd'hui par vingt messages WhatsApp qu'il faut recopier à la main
+   * dans un cahier.
+   */
+  | {
+      readonly sorte: 'formulaire'
+      readonly formulaire: FormulaireDemande
       readonly cout: Cout
       readonly essais: number
     }
@@ -123,6 +136,9 @@ export async function traiter(
     }
     if (lu.sorte === 'page') {
       return { sorte: 'page', page: lu.page, cout: cout(), essais: essai }
+    }
+    if (lu.sorte === 'formulaire') {
+      return { sorte: 'formulaire', formulaire: lu.formulaire, cout: cout(), essais: essai }
     }
     if (lu.sorte === 'refus') {
       // On ne reprend pas un refus : ce serait payer un tour pour lui faire

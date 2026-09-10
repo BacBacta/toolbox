@@ -1,5 +1,6 @@
 import type {
-  BatirPartage, CalculDemande, Extrait, PageDemande, RegistreDemande, RenderContext,
+  BatirPartage, CalculDemande, Extrait, FormulaireDemande, PageDemande, RegistreDemande,
+  RenderContext,
 } from '@a237/engine'
 import type { JSX } from 'preact'
 import type { OutilEnregistre } from './stockage.js'
@@ -7,15 +8,16 @@ import type { OutilEnregistre } from './stockage.js'
 /**
  * Ce que le modèle a composé, quand il a composé quelque chose.
  *
- * Trois formes, jamais deux à la fois : un registre tient une liste, une
- * calculatrice répond à une question, une page se montre. La coquille les
- * transporte sans les comprendre — c'est le fragment de l'outil qui sait les
- * dessiner.
+ * Quatre formes, jamais deux à la fois : un registre tient une liste, une
+ * calculatrice répond à une question, une page se montre, un formulaire reçoit.
+ * La coquille les transporte sans les comprendre — c'est le fragment de l'outil
+ * qui sait les dessiner.
  */
 export interface Compose {
   readonly registre?: RegistreDemande
   readonly calcul?: CalculDemande
   readonly page?: PageDemande
+  readonly formulaire?: FormulaireDemande
 }
 
 export interface ProprietesOutil {
@@ -80,6 +82,9 @@ export const CHARGEURS: Readonly<Record<string, () => Promise<ModuleOutil>>> = {
    * et non un formulaire qui remplirait un gabarit.
    */
   'compose-page': () => import('./outils/page.js'),
+  // La seule des quatre formes qui reçoit : son écran a un onglet de plus, où
+  // arrivent les réponses.
+  'compose-formulaire': () => import('./outils/formulaire.js'),
   devis: () => import('./outils/devis.js'),
   facture: () => import('./outils/facture.js'),
   // Un seul fragment pour les quatre actes : même cadre, même formulaire, seul

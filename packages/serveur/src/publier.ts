@@ -1,7 +1,7 @@
 import type { Instantane } from '@a237/engine'
 import {
-  ID_COMPOSE, ID_COMPOSE_CALCUL, ID_COMPOSE_PAGE, accepteLaVersion, lienValide, publiable,
-  pourquoiNonPubliable,
+  ID_COMPOSE, ID_COMPOSE_CALCUL, ID_COMPOSE_FORMULAIRE, ID_COMPOSE_PAGE, accepteLaVersion,
+  lienValide, publiable, pourquoiNonPubliable,
 } from '@a237/engine'
 import { rendable, squeletteConnu } from './html.js'
 
@@ -23,7 +23,9 @@ export const TAILLE_MAX = 256 * 1024
  * finiraient par ne plus être les mêmes, et c'est la publication qui
  * refuserait — après coup, chez le destinataire.
  */
-const COMPOSES: ReadonlySet<string> = new Set([ID_COMPOSE, ID_COMPOSE_CALCUL, ID_COMPOSE_PAGE])
+const COMPOSES: ReadonlySet<string> = new Set([
+  ID_COMPOSE, ID_COMPOSE_CALCUL, ID_COMPOSE_PAGE, ID_COMPOSE_FORMULAIRE,
+])
 
 export interface Depot {
   readonly lien: string

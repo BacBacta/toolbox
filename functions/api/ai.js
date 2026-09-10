@@ -708,6 +708,169 @@ function verifierCalcul(valeur) {
 	erreurs.push(...verifierExpression(c.sortie.formule, clefs, "$.sortie.formule"));
 	return erreurs;
 }
+var schemaFormulaire = {
+	type: "object",
+	additionalProperties: false,
+	required: [
+		"titre",
+		"kicker",
+		"accroche",
+		"champs",
+		"bouton",
+		"merci"
+	],
+	properties: {
+		titre: {
+			type: "string",
+			minLength: 2,
+			maxLength: 40,
+			title: "Nom",
+			description: "Ce que le formulaire demande. Ex. « Commandes du week-end »."
+		},
+		kicker: {
+			type: "string",
+			minLength: 2,
+			maxLength: 30,
+			title: "Sur-titre",
+			description: "En capitales, au-dessus du nom. Ex. « TRAITEUR MAMA NGO »."
+		},
+		accroche: {
+			type: "string",
+			minLength: 4,
+			maxLength: 160,
+			title: "Accroche",
+			description: "Une ou deux phrases : à quoi ça sert, et jusqu’à quand on peut répondre."
+		},
+		champs: {
+			type: "array",
+			minItems: 1,
+			maxItems: 8,
+			items: {
+				type: "object",
+				additionalProperties: false,
+				required: [
+					"clef",
+					"titre",
+					"sorte"
+				],
+				properties: {
+					clef: {
+						type: "string",
+						minLength: 1,
+						maxLength: 24,
+						title: "Identifiant",
+						description: "Lettres non accentuées, chiffres, soulignés. Commence par une minuscule. Ex. « nomDuClient »."
+					},
+					titre: {
+						type: "string",
+						minLength: 1,
+						maxLength: 60,
+						title: "La question",
+						description: "Ce qu’on demande, tel qu’on le demanderait de vive voix. Ex. « Ton nom »."
+					},
+					sorte: {
+						type: "string",
+						enum: [
+							"texte",
+							"paragraphe",
+							"nombre",
+							"telephone",
+							"choix",
+							"oui-non"
+						],
+						title: "Sorte de réponse",
+						description: "texte : une ligne. paragraphe : plusieurs. nombre : une quantité. telephone : un numéro. choix : une liste d’options. oui-non : une case à cocher."
+					},
+					obligatoire: {
+						type: "boolean",
+						title: "Obligatoire",
+						description: "Vrai seulement si la réponse ne sert à rien sans. N’en mets pas partout."
+					},
+					aide: {
+						type: "string",
+						maxLength: 90,
+						title: "Précision",
+						description: "Une phrase sous la question, si elle évite un malentendu."
+					},
+					options: {
+						type: "array",
+						maxItems: 6,
+						title: "Options",
+						items: {
+							type: "string",
+							minLength: 1,
+							maxLength: 40,
+							title: "Option"
+						},
+						description: "Pour un champ « choix », et pour lui seul.",
+						ecran: {
+							montrerSi: {
+								champ: "sorte",
+								vaut: ["choix"]
+							},
+							ajout: "Ajouter une option",
+							retrait: "Retirer l’option"
+						}
+					}
+				}
+			},
+			title: "Questions",
+			description: "Le moins possible : chaque question de plus est une réponse de moins.",
+			ecran: {
+				ajout: "Ajouter une question",
+				retrait: "Retirer la question"
+			}
+		},
+		bouton: {
+			type: "string",
+			minLength: 2,
+			maxLength: 30,
+			title: "Bouton",
+			description: "Ex. « Envoyer ma commande »."
+		},
+		merci: {
+			type: "string",
+			minLength: 4,
+			maxLength: 160,
+			title: "Après l’envoi",
+			description: "Ce qu’on lit une fois la réponse partie. Dis ce qui va se passer ensuite."
+		}
+	}
+};
+/**
+* Vérifie ce que le modèle a rendu, au-delà de ce que le schéma sait dire.
+*
+* Deux incohérences que le schéma ne peut pas exprimer, et qui font toutes deux
+* un formulaire qu'on ne peut pas remplir : une clef en double — la seconde
+* réponse écraserait la première sans que rien ne le montre — et un champ
+* « choix » sans options, qui est une question dont aucune réponse n'est
+* possible.
+*/
+function verifierFormulaire(valeur) {
+	const erreurs = [...valider(schemaFormulaire, valeur)];
+	if (erreurs.length > 0) return erreurs;
+	const f = valeur;
+	const clefs = f.champs.map((c) => c.clef);
+	for (const [i, champ] of f.champs.entries()) {
+		if (!/^[a-z][a-zA-Z0-9_]*$/.test(champ.clef)) erreurs.push({
+			chemin: `$.champs[${i}].clef`,
+			message: `« ${champ.clef} » ne prend que des lettres non accentuées, des chiffres et des soulignés, et commence par une minuscule`
+		});
+		if (champ.sorte === "choix" && (champ.options ?? []).length < 2) erreurs.push({
+			chemin: `$.champs[${i}].options`,
+			message: "un champ « choix » a besoin d’au moins deux options : sinon il n’y a rien à choisir"
+		});
+		if (champ.sorte !== "choix" && champ.options !== void 0) erreurs.push({
+			chemin: `$.champs[${i}].options`,
+			message: `des options sur un champ « ${champ.sorte} » ne s’afficheraient nulle part`
+		});
+	}
+	for (const d of new Set(clefs.filter((c, i) => clefs.indexOf(c) !== i))) erreurs.push({
+		chemin: "$.champs",
+		message: `la clef « ${d} » apparaît deux fois : la seconde réponse écraserait la première`
+	});
+	return erreurs;
+}
 //#endregion
 //#region ../engine/src/schema-modele.ts
 /**
@@ -1171,6 +1334,16 @@ function lireReponseModele(valeur) {
 			pourquoi: coupe
 		};
 	}
+	if ("champs" in valeur) {
+		const erreurs = verifierFormulaire(valeur);
+		return erreurs.length > 0 ? {
+			sorte: "invalide",
+			erreurs
+		} : {
+			sorte: "formulaire",
+			formulaire: valeur
+		};
+	}
 	if ("sections" in valeur) {
 		const erreurs = verifierPage(valeur);
 		return erreurs.length > 0 ? {
@@ -1477,7 +1650,7 @@ function couter(jetons, prix, tauxFcfaParDollar) {
 * (Cameroun, francs CFA, téléphone), l'interdiction de sortir du cadre, et le
 * fait que la réponse doit être du JSON nu.
 *
-* Les trois schémas pèsent ensemble à peu près deux mille jetons d'entrée,
+* Les quatre schémas pèsent ensemble à peu près deux mille jetons d'entrée,
 * soit environ un quart de franc par génération — mesuré, pas estimé. Le
 * plafond du § 8 est d'un franc : tant qu'on est là, envoyer tous les schémas
 * vaut mieux que deviner lequel envoyer. Se tromper de famille ferait payer un
@@ -1487,7 +1660,7 @@ function couter(jetons, prix, tauxFcfaParDollar) {
 */
 var CONSIGNES = `Tu fabriques un outil pour un petit commerçant camerounais.
 
-Tu sais fabriquer trois sortes de choses, et choisir entre elles.
+Tu sais fabriquer quatre sortes de choses, et choisir entre elles.
 
 Un **registre** est un tableau de lignes qu'on tient à la main : des ventes,
 des dettes, un stock, des présences, des cotisations. Il répond à « qu'est-ce
@@ -1513,15 +1686,22 @@ N'invente jamais un numéro de téléphone, une adresse, une date ni un prix :
 laisse le champ vide si la demande ne le donne pas — un prix inventé se lit
 comme un engagement, et une date inventée fait déplacer des gens.
 
+Un **formulaire** se publie derrière un lien et **reçoit** des réponses. Il
+répond à « comment je ramasse ce que les gens me disent ? » — les commandes du
+week-end, les inscriptions à une réunion, qui vient à la fête, ce que chacun
+apporte. C'est la seule des quatre qui reçoit ; les trois autres se lisent.
+Mets le moins de questions possible : chacune de plus est une réponse de moins.
+
 Réponds par un objet JSON seul, sans texte autour, sans bloc de code.
 
 Les schémas plus bas **décrivent** la forme de ta réponse. Ils ne sont pas la
 réponse : renvoie un objet dont les champs sont remplis pour cette demande-là,
 jamais la description elle-même.
 
-**Si la demande n'est aucune des trois, refuse.** Une application à installer,
+**Si la demande n'est aucune des quatre, refuse.** Une application à installer,
 un logo, une photo, une traduction, un conseil : rien de cela ne se range dans
-un tableau, dans une formule ni dans une page. Réponds alors par un objet qui
+un tableau, dans une formule, dans une page ni dans un formulaire. Réponds
+alors par un objet qui
 n'a qu'un champ « impossible », en disant en une phrase ce que tu ne peux pas
 faire, et ce que tu sais faire. Ne fabrique jamais un outil plausible pour une
 demande qui n'en réclame pas : un outil inventé se remplit une fois, puis se
@@ -1530,8 +1710,8 @@ referme pour toujours.
 Règles :
 - Les montants sont en francs CFA, entiers, sans décimale.
 - Les libellés sont en français, courts, tutoiement, sans jargon comptable.
-- 6 colonnes, 5 champs ou 8 sections au
-  maximum : ça se lit sur un téléphone de 360 pixels.
+- 6 colonnes, 5 champs, 8 sections ou
+  8 questions au maximum : ça se lit sur un téléphone de 360 pixels.
 - La première colonne nomme la ligne : mets devant celle qui l'identifie.
 - Au plus une colonne de type bascule.
 - N'invente pas de colonne que la demande ne réclame pas.
@@ -1541,6 +1721,7 @@ Règles :
 var REGISTRE = JSON.stringify(pourLeModele(schemaRegistre));
 var CALCUL = JSON.stringify(pourLeModele(schemaCalcul));
 var PAGE = JSON.stringify(pourLeModele(schemaPage));
+var FORMULAIRE = JSON.stringify(pourLeModele(schemaFormulaire));
 var REFUS = JSON.stringify(pourLeModele(schemaRefus));
 function batirInvite(demande) {
 	return `${CONSIGNES}
@@ -1553,6 +1734,9 @@ ${CALCUL}
 
 Une page, celui-ci :
 ${PAGE}
+
+Un formulaire, celui-ci :
+${FORMULAIRE}
 
 Un refus, celui-ci :
 ${REFUS}
@@ -1623,6 +1807,12 @@ async function traiter(demande, fournisseur, tauxFcfaParDollar) {
 		if (lu.sorte === "page") return {
 			sorte: "page",
 			page: lu.page,
+			cout: cout(),
+			essais: essai
+		};
+		if (lu.sorte === "formulaire") return {
+			sorte: "formulaire",
+			formulaire: lu.formulaire,
 			cout: cout(),
 			essais: essai
 		};
@@ -1776,7 +1966,7 @@ async function repondre(corpsRecu, r, seance) {
 			jetonsEntree: resultat.cout.entree,
 			jetonsSortie: resultat.cout.sortie,
 			coutXaf: resultat.cout.fcfa,
-			ok: resultat.sorte === "reussi" || resultat.sorte === "calcule" || resultat.sorte === "page"
+			ok: resultat.sorte === "reussi" || resultat.sorte === "calcule" || resultat.sorte === "page" || resultat.sorte === "formulaire"
 		});
 		console.log(JSON.stringify({
 			evenement: "appel_ia",
@@ -1803,6 +1993,13 @@ async function repondre(corpsRecu, r, seance) {
 			statut: 200,
 			corps: {
 				page: resultat.page,
+				fcfa: resultat.cout.fcfa
+			}
+		};
+		if (resultat.sorte === "formulaire") return {
+			statut: 200,
+			corps: {
+				formulaire: resultat.formulaire,
 				fcfa: resultat.cout.fcfa
 			}
 		};

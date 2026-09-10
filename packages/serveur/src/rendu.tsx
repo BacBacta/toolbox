@@ -1,7 +1,9 @@
-import type { CardSpec, Instantane, PageDemande, RenderContext } from '@a237/engine'
+import type {
+  CardSpec, FormulaireDemande, Instantane, PageDemande, RenderContext,
+} from '@a237/engine'
 import {
-  ID_COMPOSE_PAGE, carteDePage, limiterItems, squeletteDeCalcul, squeletteDeRegistre,
-  squeletteParId, texteReste, verifierPage,
+  ID_COMPOSE_FORMULAIRE, ID_COMPOSE_PAGE, carteDePage, limiterItems, squeletteDeCalcul,
+  squeletteDeRegistre, squeletteParId, texteReste, verifierFormulaire, verifierPage,
 } from '@a237/engine'
 import { PageVitrine } from '@a237/render/page'
 import {
@@ -50,6 +52,21 @@ export function pageDe(instantane: Instantane): PageDemande | null {
   return verifierPage(instantane.etat).length > 0 ? null : (instantane.etat as PageDemande)
 }
 
+/**
+ * Le formulaire que porte l'instantané, si c'en est un et qu'il tient debout.
+ *
+ * Même raison que pour la page : ce qui est déjà dans KV a pu être déposé par
+ * une version plus ancienne du contrôle. Et ici l'enjeu est plus lourd — une
+ * configuration à trous ne fait pas seulement une page bancale, elle fait un
+ * formulaire dont les réponses ne se rangent nulle part.
+ */
+export function formulaireDe(instantane: Instantane): FormulaireDemande | null {
+  if (instantane.skeleton !== ID_COMPOSE_FORMULAIRE) return null
+  return verifierFormulaire(instantane.etat).length > 0
+    ? null
+    : (instantane.etat as FormulaireDemande)
+}
+
 /** La facture a besoin de l'instant pour dire son retard ; les autres non. */
 function estFacture(skeleton: string): boolean {
   return skeleton === 'facture'
@@ -83,6 +100,14 @@ export function documentDe(instantane: Instantane, ctx: RenderContext): JSX.Elem
 export function carteDe(instantane: Instantane, ctx: RenderContext): CardSpec | null {
   const page = pageDe(instantane)
   if (page !== null) return carteDePage(page, ctx)
+
+  /*
+   * Un formulaire n'a pas de carte, et c'est délibéré : une carte partagée
+   * résume ce qu'un outil contient, et ce qu'un formulaire contient est ce que
+   * des gens y ont écrit. Le lien s'annonce par son titre et son accroche,
+   * jamais par ses réponses.
+   */
+  if (formulaireDe(instantane) !== null) return null
 
   const squelette = squeletteCompose(instantane) ?? squeletteParId(instantane.skeleton)
   if (squelette === null) return null

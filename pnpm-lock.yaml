@@ -113,6 +113,9 @@ importers:
 
   packages/serveur:
     dependencies:
+      '@a237/comptes':
+        specifier: workspace:*
+        version: link:../comptes
       '@a237/engine':
         specifier: workspace:*
         version: link:../engine

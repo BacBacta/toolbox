@@ -1,6 +1,6 @@
 # Vérification de bout en bout
 
-Six scripts, six choses qu'aucun test unitaire ne peut voir.
+Sept scripts, sept choses qu'aucun test unitaire ne peut voir.
 
 `fumee.mjs` ouvre l'application **construite** dans un vrai Chromium, sur un
 écran de 360 × 740 avec le tactile, et vérifie la chaîne complète : recherche
@@ -13,6 +13,16 @@ jusqu'au lien reçu : la configuration vient du réseau, traverse le stockage,
 devenir une page. La réponse est une vraie sortie de production capturée telle
 quelle, pas une réponse inventée : sa première colonne est de type `nombre`, ce
 qui a longtemps été interdit. Il lui faut le Worker et son KV.
+
+`formulaire.mjs` suit le seul parcours du produit où **deux personnes**
+interviennent : celle qui fabrique le formulaire et le partage, et celle qui le
+remplit sans avoir jamais ouvert l'application, sans compte, et — c'est le
+point — **avec le JavaScript coupé**. Le navigateur poste un `<form>` tout
+seul ; c'est la seule façon que ça marche dans le navigateur intégré de
+WhatsApp, sur un téléphone d'entrée de gamme. Il vérifie aussi ce qui n'arrive
+pas : le robot qui remplit le champ piège, le doublon envoyé coup sur coup, et
+l'appareil qui essaie de lire les réponses d'un autre. Il lui faut le Worker,
+son KV et sa base D1 — migrations comprises.
 
 `hors-ligne.mjs` joue la boucle du § 2.7 en entier : on coupe le réseau, on
 crée un outil, on demande à le diffuser, et on regarde la file partir **toute

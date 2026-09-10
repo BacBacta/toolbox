@@ -1,6 +1,6 @@
 import {
-  MAX_COLONNES, MAX_ENTREES, MAX_SECTIONS, pourLeModele, schemaCalcul, schemaPage, schemaRefus,
-  schemaRegistre,
+  MAX_CHAMPS, MAX_COLONNES, MAX_ENTREES, MAX_SECTIONS, pourLeModele, schemaCalcul,
+  schemaFormulaire, schemaPage, schemaRefus, schemaRegistre,
 } from '@a237/engine'
 
 /**
@@ -15,7 +15,7 @@ import {
  * (Cameroun, francs CFA, téléphone), l'interdiction de sortir du cadre, et le
  * fait que la réponse doit être du JSON nu.
  *
- * Les trois schémas pèsent ensemble à peu près deux mille jetons d'entrée,
+ * Les quatre schémas pèsent ensemble à peu près deux mille jetons d'entrée,
  * soit environ un quart de franc par génération — mesuré, pas estimé. Le
  * plafond du § 8 est d'un franc : tant qu'on est là, envoyer tous les schémas
  * vaut mieux que deviner lequel envoyer. Se tromper de famille ferait payer un
@@ -26,7 +26,7 @@ import {
 
 const CONSIGNES = `Tu fabriques un outil pour un petit commerçant camerounais.
 
-Tu sais fabriquer trois sortes de choses, et choisir entre elles.
+Tu sais fabriquer quatre sortes de choses, et choisir entre elles.
 
 Un **registre** est un tableau de lignes qu'on tient à la main : des ventes,
 des dettes, un stock, des présences, des cotisations. Il répond à « qu'est-ce
@@ -52,15 +52,22 @@ N'invente jamais un numéro de téléphone, une adresse, une date ni un prix :
 laisse le champ vide si la demande ne le donne pas — un prix inventé se lit
 comme un engagement, et une date inventée fait déplacer des gens.
 
+Un **formulaire** se publie derrière un lien et **reçoit** des réponses. Il
+répond à « comment je ramasse ce que les gens me disent ? » — les commandes du
+week-end, les inscriptions à une réunion, qui vient à la fête, ce que chacun
+apporte. C'est la seule des quatre qui reçoit ; les trois autres se lisent.
+Mets le moins de questions possible : chacune de plus est une réponse de moins.
+
 Réponds par un objet JSON seul, sans texte autour, sans bloc de code.
 
 Les schémas plus bas **décrivent** la forme de ta réponse. Ils ne sont pas la
 réponse : renvoie un objet dont les champs sont remplis pour cette demande-là,
 jamais la description elle-même.
 
-**Si la demande n'est aucune des trois, refuse.** Une application à installer,
+**Si la demande n'est aucune des quatre, refuse.** Une application à installer,
 un logo, une photo, une traduction, un conseil : rien de cela ne se range dans
-un tableau, dans une formule ni dans une page. Réponds alors par un objet qui
+un tableau, dans une formule, dans une page ni dans un formulaire. Réponds
+alors par un objet qui
 n'a qu'un champ « impossible », en disant en une phrase ce que tu ne peux pas
 faire, et ce que tu sais faire. Ne fabrique jamais un outil plausible pour une
 demande qui n'en réclame pas : un outil inventé se remplit une fois, puis se
@@ -69,8 +76,8 @@ referme pour toujours.
 Règles :
 - Les montants sont en francs CFA, entiers, sans décimale.
 - Les libellés sont en français, courts, tutoiement, sans jargon comptable.
-- ${MAX_COLONNES} colonnes, ${MAX_ENTREES} champs ou ${MAX_SECTIONS} sections au
-  maximum : ça se lit sur un téléphone de 360 pixels.
+- ${MAX_COLONNES} colonnes, ${MAX_ENTREES} champs, ${MAX_SECTIONS} sections ou
+  ${MAX_CHAMPS} questions au maximum : ça se lit sur un téléphone de 360 pixels.
 - La première colonne nomme la ligne : mets devant celle qui l'identifie.
 - Au plus une colonne de type bascule.
 - N'invente pas de colonne que la demande ne réclame pas.
@@ -88,6 +95,7 @@ Règles :
 const REGISTRE = JSON.stringify(pourLeModele(schemaRegistre))
 const CALCUL = JSON.stringify(pourLeModele(schemaCalcul))
 const PAGE = JSON.stringify(pourLeModele(schemaPage))
+const FORMULAIRE = JSON.stringify(pourLeModele(schemaFormulaire))
 const REFUS = JSON.stringify(pourLeModele(schemaRefus))
 
 export function batirInvite(demande: string): string {
@@ -101,6 +109,9 @@ ${CALCUL}
 
 Une page, celui-ci :
 ${PAGE}
+
+Un formulaire, celui-ci :
+${FORMULAIRE}
 
 Un refus, celui-ci :
 ${REFUS}

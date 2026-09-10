@@ -96,6 +96,13 @@ export { cvSchema } from './schema/cv.js'
 export { ID_COMPOSE_CALCUL } from './calcul.js'
 export type { CalculDemande, EntreeDemandee } from './calcul.js'
 export { MAX_ENTREES, schemaCalcul, verifierCalcul } from './calcul.js'
+export {
+  ID_COMPOSE_FORMULAIRE, MAX_CHAMPS, MAX_OPTIONS, MAX_PARAGRAPHE, MAX_REPONSES, MAX_TEXTE,
+  depouiller, schemaFormulaire, verifierFormulaire,
+} from './formulaire.js'
+export type {
+  ChampDemande, Depouille, FormulaireDemande, Reponse, SorteChamp,
+} from './formulaire.js'
 export { pourLeModele } from './schema-modele.js'
 export type { ReponseModele } from './composition.js'
 export { lireReponseModele } from './composition.js'

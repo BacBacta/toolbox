@@ -1,4 +1,4 @@
-import type { CalculDemande, PageDemande, RegistreDemande } from '@a237/engine'
+import type { CalculDemande, FormulaireDemande, PageDemande, RegistreDemande } from '@a237/engine'
 import { lireReponseModele } from '@a237/engine'
 import { entetesDAppareil } from './appareil.js'
 import { noterApresComposition } from './compte.js'
@@ -26,6 +26,15 @@ export type Composition =
    * était jusqu'ici la demande la plus refusée de toutes.
    */
   | { readonly sorte: 'page'; readonly page: PageDemande; readonly fcfa: number }
+  /**
+   * Un formulaire : la seule des quatre formes qui reçoit. Ce qui se fait
+   * aujourd'hui par vingt messages WhatsApp recopiés à la main dans un cahier.
+   */
+  | {
+      readonly sorte: 'formulaire'
+      readonly formulaire: FormulaireDemande
+      readonly fcfa: number
+    }
   /**
    * Le modèle a répondu que la demande n'est pas un registre. C'est une
    * réponse, pas une panne : on la montre telle quelle et on ne réessaie pas.
@@ -85,7 +94,8 @@ export async function composer(demande: string, signal?: AbortSignal): Promise<C
 
   const corps = (await reponse.json().catch(() => null)) as
     | {
-        registre?: unknown; calcul?: unknown; page?: unknown; impossible?: unknown; fcfa?: unknown
+        registre?: unknown; calcul?: unknown; page?: unknown; formulaire?: unknown
+        impossible?: unknown; fcfa?: unknown
         plan?: unknown; credits?: unknown
       }
     | null
@@ -109,9 +119,10 @@ export async function composer(demande: string, signal?: AbortSignal): Promise<C
   }
 
   // Le même lecteur que le serveur, sur la charge utile seule.
-  const lu = lireReponseModele(corps?.registre ?? corps?.calcul ?? corps?.page)
+  const lu = lireReponseModele(corps?.registre ?? corps?.calcul ?? corps?.page ?? corps?.formulaire)
   if (lu.sorte === 'registre') return { sorte: 'compose', registre: lu.registre, fcfa }
   if (lu.sorte === 'calcul') return { sorte: 'calcule', calcul: lu.calcul, fcfa }
   if (lu.sorte === 'page') return { sorte: 'page', page: lu.page, fcfa }
+  if (lu.sorte === 'formulaire') return { sorte: 'formulaire', formulaire: lu.formulaire, fcfa }
   return { sorte: 'echoue', pourquoi: 'la réponse ne décrit pas un outil valide' }
 }

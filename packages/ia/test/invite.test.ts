@@ -27,13 +27,20 @@ import { batirInvite, batirReproches } from '../src/invite.js'
  * reprise — au tarif du modèle par défaut et au taux du jour. Ce garde-fou-là
  * ne se relève pas sans changer la promesse.
  *
- * Où en est-on : **0,75 F** au pire cas, pour une moyenne mesurée à 0,198 F sur
- * dix générations réelles — la plupart aboutissent au premier tour. Il reste
- * donc à peu près trois mille caractères avant le mur, et c'est trop peu pour
- * deux schémas de plus : un formulaire et un événement porteraient le pire cas
- * à 0,93 F. Le jour où on les ajoute, ce n'est pas ce plafond qu'il faut
- * lever, c'est l'invite qu'il faut router — n'envoyer que le schéma de la
- * famille demandée. Ce chiffre-là est la raison de le faire, et le moment.
+ * Où en est-on : **0,860 F** au pire cas, et de l'ordre de 0,36 F au premier
+ * tour, qui est le cas courant — à comparer aux 0,198 F mesurés sur dix
+ * générations réelles quand l'invite ne portait que trois schémas.
+ *
+ * Ce chiffre a bougé deux fois pour la même raison, et il faut le dire
+ * franchement : chaque forme que le modèle sait composer ajoute son schéma à
+ * chaque appel, y compris aux appels qui n'en ont pas besoin. Il reste à peu
+ * près deux mille caractères avant le mur. **Une cinquième forme ne passera
+ * pas**, et la réponse ne sera pas de lever ce plafond : ce sera de router
+ * l'invite — reconnaître la famille demandée avant d'appeler, et n'envoyer que
+ * son schéma. On ne l'a pas fait plus tôt parce que se tromper de famille
+ * ferait payer un refus à quelqu'un dont la demande était faisable, et c'est le
+ * plus cher des deux échecs ; le jour où il faudra choisir, c'est ce
+ * compromis-là qu'il faudra trancher, pas ce nombre.
  */
 const FRANC_PAR_GENERATION = 1
 
@@ -93,11 +100,12 @@ describe('l’invite n’emporte pas ce qui ne sert qu’à l’écran', () => {
 })
 
 describe('l’invite dit ce qu’elle doit dire', () => {
-  it('offre les quatre issues', () => {
+  it('offre les cinq issues', () => {
     const invite = batirInvite('un registre')
     expect(invite).toContain('registre')
     expect(invite).toContain('calculatrice')
     expect(invite).toContain('page')
+    expect(invite).toContain('formulaire')
     expect(invite).toContain('impossible')
   })
 

@@ -16,7 +16,14 @@ import type { BaseD1, Requete } from '../src/base.js'
  * que D1 la joue à distance. La sémantique — tout ou rien — est la même.
  */
 
-const MIGRATION = new URL('../migrations/0001-comptes.sql', import.meta.url)
+/*
+ * Toutes les migrations, dans l'ordre. Une base d'essai qui n'en jouerait
+ * qu'une reproduirait un schéma qui n'existe nulle part.
+ */
+const MIGRATIONS = [
+  new URL('../migrations/0001-comptes.sql', import.meta.url),
+  new URL('../migrations/0002-reponses.sql', import.meta.url),
+]
 
 class RequeteSqlite implements Requete {
   constructor(
@@ -52,7 +59,7 @@ class RequeteSqlite implements Requete {
 export function baseDEssai(): BaseD1 {
   const db = new DatabaseSync(':memory:')
   db.exec('PRAGMA foreign_keys = ON')
-  db.exec(readFileSync(MIGRATION, 'utf8'))
+  for (const m of MIGRATIONS) db.exec(readFileSync(m, 'utf8'))
   return {
     prepare: (sql: string) => new RequeteSqlite(db, sql),
     batch: (requetes: readonly Requete[]) => {

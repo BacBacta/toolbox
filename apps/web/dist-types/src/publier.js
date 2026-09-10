@@ -1,4 +1,5 @@
 import { ALPHABET_LIEN, LONGUEUR_LIEN, publiable, pourquoiNonPubliable } from '@a237/engine';
+import { entetesSiPossible } from './appareil.js';
 /**
  * Publier depuis le téléphone.
  *
@@ -84,7 +85,16 @@ export async function publier(outil, quand, lienExistant) {
     try {
         reponse = await fetch('/api/publier', {
             method: 'POST',
-            headers: { 'content-type': 'application/json' },
+            /*
+             * L'appareil se présente, comme pour composer.
+             *
+             * Il ne sert qu'à une chose : un formulaire ouvre une adresse où des
+             * inconnus écrivent, et ce qu'ils écrivent doit revenir à quelqu'un. Le
+             * serveur note le propriétaire pour ces dépôts-là et pour eux seuls.
+             * Publier une page ne demande toujours aucun compte — et si le jeton
+             * n'est pas lisible, la requête part sans lui plutôt que d'échouer.
+             */
+            headers: { 'content-type': 'application/json', ...(await entetesSiPossible()) },
             body: JSON.stringify({ lien, instantane: instantaneDe(outil, quand) }),
         });
     }

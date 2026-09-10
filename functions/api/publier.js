@@ -1,3 +1,13 @@
+/** Un compte neuf, tel qu'il naît au premier appareil qui se présente. */
+function compteNeuf(id) {
+	return {
+		id,
+		plan: "essai",
+		planExpire: null,
+		credits: 5
+	};
+}
+//#endregion
 //#region ../legal-cm/src/identifiants.ts
 /**
 * Identifiants fiscaux et commerciaux camerounais.
@@ -2976,6 +2986,194 @@ function valider(schema, valeur, chemin = "$") {
 */
 /** Celui d'une calculatrice composée. Voir `ID_COMPOSE` : même raison. */
 var ID_COMPOSE_CALCUL = "compose-calcul";
+//#endregion
+//#region ../engine/src/formulaire.ts
+/**
+* La quatrième chose que le modèle a le droit de composer : un formulaire.
+*
+* Les trois autres se lisent. Celui-ci **reçoit** — et c'est la seule chose du
+* produit qui écrive depuis l'extérieur. Un traiteur qui prend les commandes du
+* week-end, un bureau de tontine qui ramasse les inscriptions, un lycée qui
+* recense les présences à une réunion : aujourd'hui, ça se fait par vingt
+* messages WhatsApp qu'il faut recopier à la main dans un cahier.
+*
+* La page publiée est un vrai `<form method="post">`, **sans une ligne de
+* script**. Ce n'est pas une prouesse, c'est la seule façon que ça marche : sur
+* un téléphone d'entrée de gamme, dans le navigateur intégré de WhatsApp, sur
+* une connexion qui hoquette, un formulaire qui dépend de JavaScript est un
+* formulaire qui perd des réponses sans que personne ne le sache. Le navigateur
+* sait faire ça depuis 1995.
+*
+* L'invariant § 2.1 tient comme ailleurs : le modèle ne rend pas de HTML, il
+* remplit cette configuration, et c'est du code écrit à la main qui la dessine.
+* Ce qu'un visiteur renvoie est revalidé contre cette même configuration —
+* personne ne fait confiance à un corps de requête.
+*/
+/** L'identifiant d'un formulaire composé par le modèle. */
+var ID_COMPOSE_FORMULAIRE = "compose-formulaire";
+var schemaFormulaire = {
+	type: "object",
+	additionalProperties: false,
+	required: [
+		"titre",
+		"kicker",
+		"accroche",
+		"champs",
+		"bouton",
+		"merci"
+	],
+	properties: {
+		titre: {
+			type: "string",
+			minLength: 2,
+			maxLength: 40,
+			title: "Nom",
+			description: "Ce que le formulaire demande. Ex. « Commandes du week-end »."
+		},
+		kicker: {
+			type: "string",
+			minLength: 2,
+			maxLength: 30,
+			title: "Sur-titre",
+			description: "En capitales, au-dessus du nom. Ex. « TRAITEUR MAMA NGO »."
+		},
+		accroche: {
+			type: "string",
+			minLength: 4,
+			maxLength: 160,
+			title: "Accroche",
+			description: "Une ou deux phrases : à quoi ça sert, et jusqu’à quand on peut répondre."
+		},
+		champs: {
+			type: "array",
+			minItems: 1,
+			maxItems: 8,
+			items: {
+				type: "object",
+				additionalProperties: false,
+				required: [
+					"clef",
+					"titre",
+					"sorte"
+				],
+				properties: {
+					clef: {
+						type: "string",
+						minLength: 1,
+						maxLength: 24,
+						title: "Identifiant",
+						description: "Lettres non accentuées, chiffres, soulignés. Commence par une minuscule. Ex. « nomDuClient »."
+					},
+					titre: {
+						type: "string",
+						minLength: 1,
+						maxLength: 60,
+						title: "La question",
+						description: "Ce qu’on demande, tel qu’on le demanderait de vive voix. Ex. « Ton nom »."
+					},
+					sorte: {
+						type: "string",
+						enum: [
+							"texte",
+							"paragraphe",
+							"nombre",
+							"telephone",
+							"choix",
+							"oui-non"
+						],
+						title: "Sorte de réponse",
+						description: "texte : une ligne. paragraphe : plusieurs. nombre : une quantité. telephone : un numéro. choix : une liste d’options. oui-non : une case à cocher."
+					},
+					obligatoire: {
+						type: "boolean",
+						title: "Obligatoire",
+						description: "Vrai seulement si la réponse ne sert à rien sans. N’en mets pas partout."
+					},
+					aide: {
+						type: "string",
+						maxLength: 90,
+						title: "Précision",
+						description: "Une phrase sous la question, si elle évite un malentendu."
+					},
+					options: {
+						type: "array",
+						maxItems: 6,
+						title: "Options",
+						items: {
+							type: "string",
+							minLength: 1,
+							maxLength: 40,
+							title: "Option"
+						},
+						description: "Pour un champ « choix », et pour lui seul.",
+						ecran: {
+							montrerSi: {
+								champ: "sorte",
+								vaut: ["choix"]
+							},
+							ajout: "Ajouter une option",
+							retrait: "Retirer l’option"
+						}
+					}
+				}
+			},
+			title: "Questions",
+			description: "Le moins possible : chaque question de plus est une réponse de moins.",
+			ecran: {
+				ajout: "Ajouter une question",
+				retrait: "Retirer la question"
+			}
+		},
+		bouton: {
+			type: "string",
+			minLength: 2,
+			maxLength: 30,
+			title: "Bouton",
+			description: "Ex. « Envoyer ma commande »."
+		},
+		merci: {
+			type: "string",
+			minLength: 4,
+			maxLength: 160,
+			title: "Après l’envoi",
+			description: "Ce qu’on lit une fois la réponse partie. Dis ce qui va se passer ensuite."
+		}
+	}
+};
+/**
+* Vérifie ce que le modèle a rendu, au-delà de ce que le schéma sait dire.
+*
+* Deux incohérences que le schéma ne peut pas exprimer, et qui font toutes deux
+* un formulaire qu'on ne peut pas remplir : une clef en double — la seconde
+* réponse écraserait la première sans que rien ne le montre — et un champ
+* « choix » sans options, qui est une question dont aucune réponse n'est
+* possible.
+*/
+function verifierFormulaire(valeur) {
+	const erreurs = [...valider(schemaFormulaire, valeur)];
+	if (erreurs.length > 0) return erreurs;
+	const f = valeur;
+	const clefs = f.champs.map((c) => c.clef);
+	for (const [i, champ] of f.champs.entries()) {
+		if (!/^[a-z][a-zA-Z0-9_]*$/.test(champ.clef)) erreurs.push({
+			chemin: `$.champs[${i}].clef`,
+			message: `« ${champ.clef} » ne prend que des lettres non accentuées, des chiffres et des soulignés, et commence par une minuscule`
+		});
+		if (champ.sorte === "choix" && (champ.options ?? []).length < 2) erreurs.push({
+			chemin: `$.champs[${i}].options`,
+			message: "un champ « choix » a besoin d’au moins deux options : sinon il n’y a rien à choisir"
+		});
+		if (champ.sorte !== "choix" && champ.options !== void 0) erreurs.push({
+			chemin: `$.champs[${i}].options`,
+			message: `des options sur un champ « ${champ.sorte} » ne s’afficheraient nulle part`
+		});
+	}
+	for (const d of new Set(clefs.filter((c, i) => clefs.indexOf(c) !== i))) erreurs.push({
+		chemin: "$.champs",
+		message: `la clef « ${d} » apparaît deux fois : la seconde réponse écraserait la première`
+	});
+	return erreurs;
+}
 /**
 * Met un numéro au format international attendu par `wa.me`.
 *
@@ -4784,6 +4982,76 @@ function squeletteParId(id) {
 	return SQUELETTES.find((s) => s.id === id) ?? null;
 }
 //#endregion
+//#region ../comptes/src/identite.ts
+function hex(octets) {
+	return Array.from(octets, (o) => o.toString(16).padStart(2, "0")).join("");
+}
+/** Ce que le serveur range à la place du jeton. */
+async function empreinte(secret) {
+	const condense = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret));
+	return hex(new Uint8Array(condense));
+}
+//#endregion
+//#region ../comptes/src/base.ts
+function versCompte(ligne) {
+	return {
+		id: ligne.id,
+		plan: ligne.plan === "atelier" ? "atelier" : "essai",
+		planExpire: ligne.plan_expire,
+		credits: ligne.credits
+	};
+}
+/**
+* Le compte que porte cet appareil, ouvert s'il n'existait pas.
+*
+* L'ouverture est paresseuse et sans un mot : personne ne s'inscrit pour se
+* servir de l'atelier (§ 2), et le serveur ne voit un appareil qu'au premier
+* appel qui coûte quelque chose.
+*
+* L'ordre des écritures n'est pas indifférent, et la clé étrangère le décide :
+* un appareil ne peut pas désigner un compte qui n'existe pas. On ouvre donc un
+* compte candidat, puis on tente le lien. Deux requêtes simultanées d'un même
+* appareil neuf se disputent la clé primaire de `appareils`, `INSERT OR IGNORE`
+* en laisse passer une, et la relecture dit laquelle a gagné — la perdante
+* remballe son candidat, qui n'a jamais porté personne.
+*
+* `INSERT OR IGNORE` sur les comptes compte autant : sans lui, revenir
+* remettrait les crédits à cinq et l'essai n'aurait pas de fin.
+*/
+async function compteDeLAppareil(db, empreinte, maintenant) {
+	const t = maintenant.getTime();
+	const candidat = compteNeuf(crypto.randomUUID());
+	await db.prepare("INSERT OR IGNORE INTO comptes (id, plan, plan_expire, credits, cree_le) VALUES (?, ?, ?, ?, ?)").bind(candidat.id, candidat.plan, candidat.planExpire, candidat.credits, t).run();
+	await db.prepare("INSERT OR IGNORE INTO appareils (empreinte, compte_id, vu_le) VALUES (?, ?, ?)").bind(empreinte, candidat.id, t).run();
+	const compteId = (await db.prepare("SELECT compte_id FROM appareils WHERE empreinte = ?").bind(empreinte).first())?.compte_id ?? candidat.id;
+	if (compteId !== candidat.id) await db.prepare("DELETE FROM comptes WHERE id = ? AND NOT EXISTS (SELECT 1 FROM appareils WHERE compte_id = ?)").bind(candidat.id, candidat.id).run();
+	const ligne = await db.prepare("SELECT id, plan, plan_expire, credits FROM comptes WHERE id = ?").bind(compteId).first();
+	if (ligne === null) throw new Error(`compte introuvable après ouverture : ${compteId}`);
+	await db.prepare("UPDATE appareils SET vu_le = ? WHERE empreinte = ?").bind(t, empreinte).run();
+	return versCompte(ligne);
+}
+//#endregion
+//#region ../comptes/src/reponses.ts
+/**
+* Note qui a publié quoi.
+*
+* Sans ça, une adresse publique qui reçoit n'aurait pas de destinataire : le
+* propriétaire ne pourrait pas relire ses réponses, et n'importe qui le
+* pourrait. Écrit à chaque dépôt d'un formulaire, et mis à jour quand il est
+* republié — le lien ne change pas, la configuration si.
+*/
+async function noterPublication(db, publication, maintenant) {
+	const t = maintenant.getTime();
+	await db.prepare("INSERT INTO publications (lien, compte_id, skeleton, cree_le, maj_le) VALUES (?, ?, ?, ?, ?) ON CONFLICT(lien) DO UPDATE SET skeleton = excluded.skeleton, maj_le = excluded.maj_le WHERE publications.compte_id = excluded.compte_id").bind(publication.lien, publication.compteId, publication.skeleton, t, t).run();
+}
+function jetonDeLEntete(entetes) {
+	const brut = entetes.get("authorization");
+	if (brut === null) return null;
+	const [schema, jeton] = brut.split(" ");
+	if (schema !== "Appareil" || jeton === void 0) return null;
+	return jeton;
+}
+//#endregion
 //#region ../../node_modules/.pnpm/preact@10.29.8_preact-render-to-string@6.7.0/node_modules/preact/dist/preact.module.js
 var n;
 var l$1;
@@ -5371,7 +5639,7 @@ function J(e) {
 var a4_default$1 = "/*\n * Feuille A4 réelle, en millimètres.\n *\n * Le prototype dessinait un aperçu à l'échelle, en pixels minuscules (7,4 px\n * pour le corps de texte). Ça se voit à l'écran et ça s'imprime n'importe\n * comment. Ici la page fait ses 210 × 297 mm et le texte ses points : on rend à\n * la taille vraie, et c'est l'aperçu qui est mis à l'échelle par --echelle.\n *\n * **Cette feuille ignore le thème sombre, et c'est voulu** : un devis part à\n * l'impression et chez un client. Il est blanc chez tout le monde. Elle ne lit\n * donc aucun jeton de l'interface et se suffit à elle-même.\n *\n * Aucune police web : on prend ce que le téléphone a déjà (invariant § 2.6).\n */\n\n.a4-cadre {\n  --echelle: 1;\n  width: calc(210mm * var(--echelle));\n  overflow: hidden;\n}\n\n.a4-cadre > .a4 {\n  transform: scale(var(--echelle));\n  transform-origin: top left;\n  margin-bottom: calc((297mm * var(--echelle)) - 297mm);\n  box-shadow: 0 2px 18px rgb(18 23 16 / 12%);\n}\n\n.a4 {\n  --pa: #1f2a44;\n  --trait: #d7dce1;\n  --trait-fort: #aeb6bd;\n  --gris: #4e575e;\n  --gris-clair: #7b848b;\n\n  box-sizing: border-box;\n  position: relative;\n  width: 210mm;\n  min-height: 297mm;\n  padding: 15mm 16mm 20mm;\n  background: #fff;\n  color: #16191c;\n  font: 9.5pt/1.5 system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n  font-variant-numeric: tabular-nums lining-nums;\n  /* Les aplats d'accent doivent sortir de l'imprimante, pas être « économisés ». */\n  print-color-adjust: exact;\n  -webkit-print-color-adjust: exact;\n}\n\n.a4 * {\n  box-sizing: border-box;\n}\n\n/* ─────────────────────────────── entête ─────────────────────────────── */\n\n.a4-entete {\n  display: flex;\n  justify-content: space-between;\n  align-items: flex-start;\n  gap: 10mm;\n  padding-bottom: 3.5mm;\n  border-bottom: 0.7mm solid var(--pa);\n}\n\n.a4-entete .raison {\n  font-size: 14pt;\n  font-weight: 700;\n  line-height: 1.15;\n  letter-spacing: -0.01em;\n  color: var(--pa);\n}\n\n.a4-entete .coordonnees,\n.a4-entete .immat {\n  margin-top: 1.5mm;\n  font-size: 8pt;\n  line-height: 1.55;\n  color: var(--gris);\n}\n\n.a4-entete .immat {\n  text-align: right;\n  white-space: nowrap;\n}\n\n/* ─────────────────────────────── titre ─────────────────────────────── */\n\n.a4-titre {\n  margin: 9mm 0 0;\n  font-size: 22pt;\n  font-weight: 700;\n  line-height: 1;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  color: var(--pa);\n}\n\n.a4-sous-titre {\n  margin-top: 2mm;\n  font-size: 9pt;\n  color: var(--gris);\n}\n\n.a4-bloc-client {\n  margin-top: 7mm;\n  padding: 3.5mm 4mm;\n  border: 0.25mm solid var(--trait);\n  border-left: 1.2mm solid var(--pa);\n  border-radius: 0 1mm 1mm 0;\n  background: #fbfcfd;\n  font-size: 9pt;\n  line-height: 1.55;\n}\n\n.a4-bloc-client .etiquette {\n  margin-bottom: 0.8mm;\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.14em;\n  text-transform: uppercase;\n  color: var(--gris-clair);\n}\n\n/* ─────────────────────────────── tableau ─────────────────────────────── */\n\n.a4-tableau {\n  width: 100%;\n  margin-top: 7mm;\n  border-collapse: collapse;\n  font-size: 8.5pt;\n}\n\n.a4-tableau th {\n  padding: 2.4mm 2mm;\n  border-bottom: 0.6mm solid var(--pa);\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  text-align: left;\n  color: var(--pa);\n  white-space: nowrap;\n}\n\n.a4-tableau td {\n  padding: 2.4mm 2mm;\n  border-bottom: 0.2mm solid var(--trait);\n  vertical-align: top;\n}\n\n/* Une ligne de facture ne se coupe pas au milieu par un saut de page. */\n.a4-tableau tr {\n  break-inside: avoid;\n}\n\n.a4-tableau .nombre {\n  text-align: right;\n  white-space: nowrap;\n}\n\n.a4-tableau tbody tr:last-child td {\n  border-bottom: 0.4mm solid var(--trait-fort);\n}\n\n.a4-vide {\n  padding: 8mm 0;\n  color: var(--gris-clair);\n  font-style: italic;\n  text-align: center;\n}\n\n/* ─────────────────────────────── totaux ─────────────────────────────── */\n\n.a4-totaux {\n  margin-top: 5mm;\n  margin-left: auto;\n  width: 88mm;\n  font-size: 9pt;\n  break-inside: avoid;\n}\n\n.a4-totaux .ligne {\n  display: flex;\n  justify-content: space-between;\n  gap: 6mm;\n  padding: 1.6mm 1mm;\n}\n\n.a4-totaux .ligne + .ligne {\n  border-top: 0.2mm solid var(--trait);\n}\n\n.a4-totaux .fort {\n  margin-top: 1.5mm;\n  padding: 2.6mm 3mm;\n  border: 0;\n  border-radius: 1mm;\n  background: var(--pa);\n  color: #fff;\n  font-size: 11.5pt;\n  font-weight: 700;\n  letter-spacing: 0.01em;\n}\n\n.a4-en-lettres {\n  margin-top: 4mm;\n  font-size: 8.5pt;\n  font-style: italic;\n  line-height: 1.55;\n  color: var(--gris);\n  break-inside: avoid;\n}\n\n/* ─────────────────────── mentions, signatures, pied ─────────────────────── */\n\n.a4-mentions {\n  margin-top: 7mm;\n  font-size: 8pt;\n  line-height: 1.6;\n  color: var(--gris);\n  orphans: 2;\n  widows: 2;\n}\n\n.a4-mentions p {\n  margin: 0 0 2mm;\n}\n\n.a4-signatures {\n  display: flex;\n  gap: 10mm;\n  margin-top: 12mm;\n  break-inside: avoid;\n}\n\n.a4-signatures .zone {\n  flex: 1;\n}\n\n.a4-signatures .libelle {\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  color: var(--pa);\n}\n\n.a4-signatures .mention {\n  margin-top: 0.8mm;\n  font-size: 7.5pt;\n  color: var(--gris-clair);\n}\n\n.a4-signatures .cadre {\n  margin-top: 2.5mm;\n  height: 24mm;\n  border: 0.25mm dashed var(--trait-fort);\n  border-radius: 1mm;\n}\n\n.a4-pied {\n  position: absolute;\n  left: 16mm;\n  right: 16mm;\n  bottom: 11mm;\n  padding-top: 2.5mm;\n  border-top: 0.2mm solid var(--trait);\n  font-size: 7pt;\n  line-height: 1.6;\n  color: var(--gris-clair);\n}\n\n.a4-numero-page {\n  position: absolute;\n  right: 16mm;\n  bottom: 6mm;\n  font-size: 7pt;\n  color: var(--gris-clair);\n}\n\n/* ─────────────────────────────── impression ─────────────────────────── */\n\n@page {\n  size: A4;\n  margin: 0;\n}\n\n@media print {\n  .a4-cadre {\n    --echelle: 1;\n    width: auto;\n    overflow: visible;\n  }\n\n  .a4-cadre > .a4 {\n    transform: none;\n    margin-bottom: 0;\n    box-shadow: none;\n  }\n}\n\n/* ────────────────────── actes et lettres ────────────────────── */\n/*\n * Ces quatre documents ne portent pas de tableau taxé. Ce qui les distingue,\n * c'est la disposition : un acte pose ses parties avant son corps, une lettre\n * française met l'expéditeur à gauche et le destinataire à droite. Le reste —\n * papier, titre, signatures, pied — vient des mêmes pièces que le devis.\n */\n\n/* Un corps de texte long : la mesure compte plus que la taille. */\n.a4-corps {\n  margin-top: 6mm;\n  font-size: 9.5pt;\n  line-height: 1.7;\n  color: var(--encre);\n  text-align: justify;\n}\n\n.a4-corps p {\n  margin: 0 0 3.5mm;\n}\n\n/* Les deux parties d'un acte, nommées avant le corps. */\n.a4-parties {\n  margin-top: 6mm;\n  font-size: 9.5pt;\n  line-height: 1.9;\n}\n\n.a4-parties .qui {\n  font-weight: 700;\n  color: var(--pa);\n}\n\n/* Le montant encadré : ce que l'œil doit trouver en premier sur l'acte. */\n.a4-encadre {\n  margin-top: 6mm;\n  padding: 4mm 5mm;\n  border: 0.5mm solid var(--pa);\n  border-radius: 1mm;\n  break-inside: avoid;\n}\n\n.a4-encadre .etiquette {\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.12em;\n  text-transform: uppercase;\n  color: var(--pa);\n}\n\n.a4-encadre .chiffre {\n  margin-top: 1mm;\n  font-size: 16pt;\n  font-weight: 800;\n  letter-spacing: -0.01em;\n}\n\n.a4-encadre .lettres {\n  margin-top: 0.8mm;\n  font-size: 9pt;\n  font-style: italic;\n  color: var(--gris);\n}\n\n.a4-encadre .echeance {\n  margin-top: 2.5mm;\n  font-size: 9pt;\n}\n\n/* La disposition d'une lettre française. */\n.a4-lettre-tete {\n  display: flex;\n  justify-content: space-between;\n  gap: 10mm;\n  font-size: 9pt;\n  line-height: 1.5;\n}\n\n.a4-lettre-tete .expediteur {\n  max-width: 70mm;\n}\n\n.a4-lettre-tete .destinataire {\n  max-width: 80mm;\n  text-align: right;\n  color: var(--gris);\n}\n\n.a4-lettre-date {\n  margin-top: 8mm;\n  font-size: 9pt;\n  text-align: right;\n  color: var(--gris);\n}\n\n.a4-lettre-objet {\n  display: inline-block;\n  margin-top: 6mm;\n  padding-bottom: 1mm;\n  border-bottom: 0.3mm solid var(--pa);\n  font-size: 10pt;\n  font-weight: 600;\n}\n\n.a4-lettre-signature {\n  margin-top: 10mm;\n  font-size: 10pt;\n  text-align: right;\n}\n\n/* ───────────────────────────── curriculum vitæ ─────────────────────────────\n *\n * Quatre gabarits pour une même feuille. Ils ne diffèrent que par la police,\n * la façon d'annoncer une section et la présence d'une colonne : la structure\n * du contenu est la même pour les quatre, et c'est ce qui permet de changer de\n * gabarit sans rien ressaisir.\n *\n * Aucune police web ici non plus (invariant § 2.6). « Serif » et « grotesque »\n * se jouent avec les familles génériques que tout téléphone possède.\n */\n\n.a4-cv {\n  --cv-inter: 1.5;\n  --cv-saut: 5mm;\n}\n\n.a4-cv.dense {\n  --cv-inter: 1.28;\n  --cv-saut: 3mm;\n  font-size: 9pt;\n}\n\n.a4-cv .cv-nom {\n  font-size: 20pt;\n  font-weight: 700;\n  letter-spacing: 0.02em;\n  line-height: 1.15;\n}\n\n.a4-cv .cv-titre {\n  margin-top: 1mm;\n  color: var(--pa);\n  font-size: 11pt;\n  font-weight: 600;\n}\n\n.a4-cv .cv-contact {\n  margin-top: 2mm;\n  color: var(--gris);\n  font-size: 9pt;\n}\n\n.a4-cv .cv-section {\n  margin: var(--cv-saut) 0 2mm;\n  color: var(--pa);\n  font-size: 9pt;\n  font-weight: 700;\n  letter-spacing: 0.08em;\n  text-transform: uppercase;\n}\n\n.a4-cv .cv-profil {\n  line-height: var(--cv-inter);\n  text-align: justify;\n}\n\n.a4-cv .cv-profil p {\n  margin: 0 0 2mm;\n}\n\n.a4-cv .cv-item {\n  margin-bottom: 3mm;\n  line-height: var(--cv-inter);\n}\n\n.a4-cv .cv-quoi {\n  font-size: 10pt;\n  font-weight: 600;\n}\n\n.a4-cv .cv-ou {\n  color: var(--gris);\n  font-size: 9pt;\n}\n\n/* La puce est dessinée, pas listée : un <ul> imprime des marges que le\n * gabarit ne contrôle pas d'un navigateur à l'autre. */\n.a4-cv .cv-fait {\n  position: relative;\n  margin-top: 1mm;\n  padding-left: 4mm;\n  font-size: 9.5pt;\n}\n\n.a4-cv .cv-fait::before {\n  content: \"\";\n  position: absolute;\n  top: 1.7mm;\n  left: 0.8mm;\n  width: 1.2mm;\n  height: 1.2mm;\n  background: var(--pa);\n}\n\n.a4-cv .cv-serie {\n  font-size: 9.5pt;\n  line-height: var(--cv-inter);\n}\n\n/* — Notaire : sérif, tout centré, pour une administration. — */\n.a4-cv.notaire {\n  font-family: Georgia, \"Times New Roman\", serif;\n}\n\n.a4-cv.notaire .cv-tete {\n  padding-bottom: 3mm;\n  border-bottom: 0.4mm solid var(--pa);\n  text-align: center;\n}\n\n.a4-cv.notaire .cv-section {\n  border-bottom: 0.2mm solid var(--trait);\n  padding-bottom: 1mm;\n  text-align: center;\n  letter-spacing: 0.14em;\n}\n\n.a4-cv.notaire .cv-serie {\n  text-align: center;\n}\n\n/* — Exécutif : grotesque, un filet de couleur, pour le privé. — */\n\n/*\n * Le filet sort dans la marge : posé dans la colonne de texte, il décalait le\n * nom de quatre millimètres vers la droite et l'entête ne s'alignait plus sur\n * les titres de section en dessous.\n */\n.a4-cv.executif .cv-tete {\n  /* 5 mm de retrait plus l'épaisseur du filet : sans elle, le nom reste décalé\n   * du filet lui-même et rate l'alignement d'un millimètre et demi. */\n  margin-left: -6.5mm;\n  border-left: 1.5mm solid var(--pa);\n  padding-left: 5mm;\n}\n\n.a4-cv.executif .cv-section {\n  border-bottom: 0.2mm solid var(--trait);\n  padding-bottom: 1mm;\n}\n\n/* — Éditorial : le nom en display, la date en marge, pour un métier créatif. — */\n.a4-cv.editorial .cv-nom {\n  font-size: 28pt;\n  font-weight: 300;\n  letter-spacing: -0.01em;\n}\n\n.a4-cv.editorial .cv-tete {\n  padding-bottom: 4mm;\n  border-bottom: 0.8mm solid var(--pa);\n}\n\n.a4-cv.editorial .cv-section {\n  color: var(--gris-clair);\n  letter-spacing: 0.18em;\n}\n\n/*\n * `column-gap`, pas `gap` : chaque fait occupe sa propre rangée de la grille,\n * et un `gap` de quatre millimètres les écartait tous les uns des autres —\n * trois puces séparées comme trois paragraphes.\n */\n.a4-cv.editorial .cv-item {\n  display: grid;\n  grid-template-columns: 28mm 1fr;\n  column-gap: 4mm;\n}\n\n.a4-cv.editorial .cv-marge {\n  grid-column: 1;\n  grid-row: 1;\n  color: var(--gris);\n  font-size: 9pt;\n  text-align: right;\n}\n\n.a4-cv.editorial .cv-quoi,\n.a4-cv.editorial .cv-ou,\n.a4-cv.editorial .cv-fait {\n  grid-column: 2;\n}\n\n/* — Bloc : une bande latérale porte le contact et les listes. — */\n\n/*\n * La hauteur est celle de la zone de texte de la feuille : 297 mm moins les\n * marges haute et basse. Sans elle, le filet de la bande s'arrête où le\n * contenu s'arrête, et un CV court montre un trait qui meurt au milieu de la\n * page — ce qui se lit comme un défaut de rendu, pas comme un parti pris.\n */\n.a4-cv.bloc {\n  display: grid;\n  grid-template-columns: 58mm 1fr;\n  gap: 8mm;\n  min-height: calc(297mm - 15mm - 20mm);\n}\n\n/* Justifier une colonne de cent millimètres ouvre des rivières entre les mots. */\n.a4-cv.bloc .cv-profil {\n  text-align: left;\n}\n\n.a4-cv.bloc .cv-bande {\n  padding-right: 6mm;\n  border-right: 0.3mm solid var(--trait);\n}\n\n.a4-cv.bloc .cv-bande .cv-nom {\n  font-size: 16pt;\n}\n\n.a4-cv.bloc .cv-bande .cv-titre {\n  font-size: 10pt;\n}\n\n.a4-cv.bloc .cv-ligne {\n  margin-top: 1mm;\n  font-size: 9pt;\n  line-height: 1.35;\n  overflow-wrap: anywhere;\n}\n\n.a4-cv.bloc .cv-principal .cv-section:first-child {\n  margin-top: 0;\n}\n";
 //#endregion
 //#region ../render/src/styles/vitrine.css?raw
-var vitrine_default = "/*\n * La page composée par le modèle.\n *\n * Elle vit à deux endroits : en aperçu dans l'application, et publiée sur le\n * serveur pour qui reçoit le lien. Une seule feuille, pour que les deux\n * montrent la même chose — celle que le client voit ne doit pas être la\n * surprise.\n *\n * Elle se lit d'un pouce, sur un téléphone d'entrée de gamme, souvent dans le\n * navigateur intégré de WhatsApp. Aucune animation, aucune police à charger :\n * ce qui arrive est fini quand il arrive.\n */\n\n.vitrine {\n  max-width: 560px;\n  margin: 0 auto;\n  padding: 4px 0 8px;\n}\n\n.vitrine-tete {\n  padding-bottom: 18px;\n  border-bottom: 2px solid var(--accent);\n}\n\n.vitrine-tete .kicker {\n  margin: 0 0 6px;\n  color: var(--accent);\n  font-size: 12px;\n  font-weight: 700;\n  letter-spacing: 0.14em;\n  text-transform: uppercase;\n}\n\n.vitrine-tete h1 {\n  margin: 0;\n  font-size: 27px;\n  line-height: 1.15;\n  letter-spacing: -0.02em;\n}\n\n.vitrine-tete .accroche {\n  margin: 8px 0 0;\n  color: var(--encre-2);\n  font-size: 15px;\n  line-height: 1.45;\n}\n\n.vitrine-section {\n  margin-top: 24px;\n}\n\n.vitrine-section h2 {\n  margin: 0 0 10px;\n  font-size: 12px;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  color: var(--encre-3);\n}\n\n.vitrine-section p {\n  margin: 0 0 8px;\n  font-size: 15px;\n  line-height: 1.55;\n  color: var(--encre-2);\n}\n\n.vitrine-liste,\n.vitrine-prix {\n  margin: 0;\n  padding: 0;\n  list-style: none;\n}\n\n.vitrine-liste li,\n.vitrine-prix li {\n  display: flex;\n  align-items: baseline;\n  justify-content: space-between;\n  gap: 14px;\n  padding: 9px 0;\n  border-top: 1px solid var(--trait);\n  font-size: 15px;\n}\n\n.vitrine-liste li:first-child,\n.vitrine-prix li:first-child {\n  border-top: 0;\n}\n\n.vitrine-liste .quoi,\n.vitrine-prix .quoi {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  min-width: 0;\n}\n\n.vitrine-liste .detail,\n.vitrine-prix .detail {\n  color: var(--encre-3);\n  font-size: 13px;\n}\n\n/* Le prix ne se coupe jamais : c'est le chiffre qu'on cherche du regard. */\n.vitrine-prix .combien {\n  flex: none;\n  color: var(--accent);\n  font-weight: 700;\n  white-space: nowrap;\n}\n\n.vitrine-liste .combien {\n  flex: none;\n  color: var(--encre-3);\n  white-space: nowrap;\n}\n\n.vitrine-pied {\n  margin-top: 26px;\n  padding-top: 18px;\n  border-top: 1px solid var(--trait);\n}\n\n/*\n * Le bouton qui rapporte.\n *\n * Quelqu'un qui lit la page et veut acheter ne doit pas avoir à recopier dix\n * chiffres : `wa.me` ouvre WhatsApp avec le message déjà écrit, gratuitement\n * et sans compte (§ 6).\n */\n.vitrine-appel {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  padding: 13px 16px;\n  border-radius: 12px;\n  background: var(--accent);\n  color: #fff;\n  font-weight: 700;\n  text-decoration: none;\n}\n\n.vitrine-appel span {\n  font-weight: 400;\n  font-size: 13px;\n  opacity: 0.85;\n}\n\n.vitrine-ou {\n  display: flex;\n  gap: 10px;\n  margin: 12px 0 0;\n  color: var(--encre-2);\n  font-size: 14px;\n}\n\n.vitrine-ou .etiquette {\n  /*\n   * Assez large pour « QUAND », le plus long des libellés. À 46 px il touchait\n   * le texte alors que « OÙ » gardait sa gouttière : la colonne était taillée\n   * pour le mot le plus court.\n   */\n  flex: none;\n  width: 58px;\n  color: var(--encre-3);\n  font-size: 11px;\n  font-weight: 700;\n  letter-spacing: 0.08em;\n  text-transform: uppercase;\n  line-height: 1.6;\n}\n\n/*\n * Le sommaire d'un « site ».\n *\n * Des ancres et non des adresses : sur une connexion qui hoquette, un menu qui\n * recharge est un menu qu'on n'ose plus toucher. Il défile horizontalement\n * plutôt que de passer à la ligne — six titres empilés repousseraient la\n * première section sous le pli, et on cacherait le contenu pour montrer son\n * plan.\n */\n.vitrine-sommaire {\n  display: flex;\n  gap: 8px;\n  margin-top: 14px;\n  overflow-x: auto;\n  scrollbar-width: none;\n}\n\n.vitrine-sommaire a {\n  flex: none;\n  padding: 7px 12px;\n  border: 1px solid var(--trait);\n  border-radius: 999px;\n  color: var(--encre-2);\n  font-size: 13px;\n  text-decoration: none;\n  white-space: nowrap;\n}\n\n/* Une section visée par le sommaire ne doit pas coller au bord de l'écran. */\n.vitrine-section {\n  scroll-margin-top: 12px;\n}\n\n/*\n * Le jour d'un événement.\n *\n * Le délai est le gros caractère, pas la date : on ne lit pas une affiche pour\n * sa date, on la lit pour savoir si on a le temps. Quand le jour est passé, le\n * bloc s'éteint — une affiche qui garde son air d'urgence après coup fait\n * traverser la ville pour rien.\n */\n.vitrine-jour {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  margin: 14px 0 0;\n  padding: 12px 14px;\n  border-radius: 12px;\n  background: var(--accent);\n  color: #fff;\n}\n\n.vitrine-jour b {\n  font-size: 19px;\n  line-height: 1.2;\n}\n\n.vitrine-jour span {\n  font-size: 14px;\n  opacity: 0.9;\n}\n\n.vitrine-jour.passe {\n  background: var(--surface);\n  border: 1px solid var(--trait);\n  color: var(--encre-3);\n}\n";
+var vitrine_default = "/*\n * La page composée par le modèle.\n *\n * Elle vit à deux endroits : en aperçu dans l'application, et publiée sur le\n * serveur pour qui reçoit le lien. Une seule feuille, pour que les deux\n * montrent la même chose — celle que le client voit ne doit pas être la\n * surprise.\n *\n * Elle se lit d'un pouce, sur un téléphone d'entrée de gamme, souvent dans le\n * navigateur intégré de WhatsApp. Aucune animation, aucune police à charger :\n * ce qui arrive est fini quand il arrive.\n */\n\n.vitrine {\n  max-width: 560px;\n  margin: 0 auto;\n  padding: 4px 0 8px;\n}\n\n.vitrine-tete {\n  padding-bottom: 18px;\n  border-bottom: 2px solid var(--accent);\n}\n\n.vitrine-tete .kicker {\n  margin: 0 0 6px;\n  color: var(--accent);\n  font-size: 12px;\n  font-weight: 700;\n  letter-spacing: 0.14em;\n  text-transform: uppercase;\n}\n\n.vitrine-tete h1 {\n  margin: 0;\n  font-size: 27px;\n  line-height: 1.15;\n  letter-spacing: -0.02em;\n}\n\n.vitrine-tete .accroche {\n  margin: 8px 0 0;\n  color: var(--encre-2);\n  font-size: 15px;\n  line-height: 1.45;\n}\n\n.vitrine-section {\n  margin-top: 24px;\n}\n\n.vitrine-section h2 {\n  margin: 0 0 10px;\n  font-size: 12px;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  color: var(--encre-3);\n}\n\n.vitrine-section p {\n  margin: 0 0 8px;\n  font-size: 15px;\n  line-height: 1.55;\n  color: var(--encre-2);\n}\n\n.vitrine-liste,\n.vitrine-prix {\n  margin: 0;\n  padding: 0;\n  list-style: none;\n}\n\n.vitrine-liste li,\n.vitrine-prix li {\n  display: flex;\n  align-items: baseline;\n  justify-content: space-between;\n  gap: 14px;\n  padding: 9px 0;\n  border-top: 1px solid var(--trait);\n  font-size: 15px;\n}\n\n.vitrine-liste li:first-child,\n.vitrine-prix li:first-child {\n  border-top: 0;\n}\n\n.vitrine-liste .quoi,\n.vitrine-prix .quoi {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  min-width: 0;\n}\n\n.vitrine-liste .detail,\n.vitrine-prix .detail {\n  color: var(--encre-3);\n  font-size: 13px;\n}\n\n/* Le prix ne se coupe jamais : c'est le chiffre qu'on cherche du regard. */\n.vitrine-prix .combien {\n  flex: none;\n  color: var(--accent);\n  font-weight: 700;\n  white-space: nowrap;\n}\n\n.vitrine-liste .combien {\n  flex: none;\n  color: var(--encre-3);\n  white-space: nowrap;\n}\n\n.vitrine-pied {\n  margin-top: 26px;\n  padding-top: 18px;\n  border-top: 1px solid var(--trait);\n}\n\n/*\n * Le bouton qui rapporte.\n *\n * Quelqu'un qui lit la page et veut acheter ne doit pas avoir à recopier dix\n * chiffres : `wa.me` ouvre WhatsApp avec le message déjà écrit, gratuitement\n * et sans compte (§ 6).\n */\n.vitrine-appel {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  padding: 13px 16px;\n  border-radius: 12px;\n  background: var(--accent);\n  color: #fff;\n  font-weight: 700;\n  text-decoration: none;\n}\n\n.vitrine-appel span {\n  font-weight: 400;\n  font-size: 13px;\n  opacity: 0.85;\n}\n\n.vitrine-ou {\n  display: flex;\n  gap: 10px;\n  margin: 12px 0 0;\n  color: var(--encre-2);\n  font-size: 14px;\n}\n\n.vitrine-ou .etiquette {\n  /*\n   * Assez large pour « QUAND », le plus long des libellés. À 46 px il touchait\n   * le texte alors que « OÙ » gardait sa gouttière : la colonne était taillée\n   * pour le mot le plus court.\n   */\n  flex: none;\n  width: 58px;\n  color: var(--encre-3);\n  font-size: 11px;\n  font-weight: 700;\n  letter-spacing: 0.08em;\n  text-transform: uppercase;\n  line-height: 1.6;\n}\n\n/*\n * Le sommaire d'un « site ».\n *\n * Des ancres et non des adresses : sur une connexion qui hoquette, un menu qui\n * recharge est un menu qu'on n'ose plus toucher. Il défile horizontalement\n * plutôt que de passer à la ligne — six titres empilés repousseraient la\n * première section sous le pli, et on cacherait le contenu pour montrer son\n * plan.\n */\n.vitrine-sommaire {\n  display: flex;\n  gap: 8px;\n  margin-top: 14px;\n  overflow-x: auto;\n  scrollbar-width: none;\n}\n\n.vitrine-sommaire a {\n  flex: none;\n  padding: 7px 12px;\n  border: 1px solid var(--trait);\n  border-radius: 999px;\n  color: var(--encre-2);\n  font-size: 13px;\n  text-decoration: none;\n  white-space: nowrap;\n}\n\n/* Une section visée par le sommaire ne doit pas coller au bord de l'écran. */\n.vitrine-section {\n  scroll-margin-top: 12px;\n}\n\n/*\n * Le jour d'un événement.\n *\n * Le délai est le gros caractère, pas la date : on ne lit pas une affiche pour\n * sa date, on la lit pour savoir si on a le temps. Quand le jour est passé, le\n * bloc s'éteint — une affiche qui garde son air d'urgence après coup fait\n * traverser la ville pour rien.\n */\n.vitrine-jour {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  margin: 14px 0 0;\n  padding: 12px 14px;\n  border-radius: 12px;\n  background: var(--accent);\n  color: #fff;\n}\n\n.vitrine-jour b {\n  font-size: 19px;\n  line-height: 1.2;\n}\n\n.vitrine-jour span {\n  font-size: 14px;\n  opacity: 0.9;\n}\n\n.vitrine-jour.passe {\n  background: var(--surface);\n  border: 1px solid var(--trait);\n  color: var(--encre-3);\n}\n\n/*\n * Le formulaire.\n *\n * Il partage l'entête de la vitrine — même titre, même accroche, même trait —\n * parce que c'est la même page : ce qui change est qu'elle reçoit au lieu de\n * se lire. Les cibles font 48 px comme partout : on remplit ça au pouce, dans\n * un taxi.\n *\n * Plus étroit qu'une vitrine, et pas par goût : un champ de saisie large de\n * 560 px se remplit sans qu'on voie où il commence, et une question dont\n * l'étiquette est loin de sa réponse se relit deux fois.\n */\n.vitrine.form {\n  max-width: 480px;\n}\n\n.form-corps {\n  display: flex;\n  flex-direction: column;\n  gap: 18px;\n  margin-top: 22px;\n}\n\n.form-champ {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n}\n\n.form-question {\n  font-size: 14px;\n  font-weight: 700;\n}\n\n.form-question i {\n  color: var(--accent);\n  font-style: normal;\n}\n\n.form-aide {\n  color: var(--encre-3);\n  font-size: 13px;\n}\n\n.form-champ input[type=\"text\"],\n.form-champ input[type=\"tel\"],\n.form-champ select,\n.form-champ textarea {\n  width: 100%;\n  min-height: 48px;\n  padding: 12px 14px;\n  border: 1px solid var(--trait);\n  border-radius: 12px;\n  background: var(--surface);\n  color: var(--encre);\n  font: inherit;\n}\n\n.form-champ textarea {\n  min-height: 92px;\n  resize: vertical;\n}\n\n/* La case est petite, mais son étiquette fait la cible. */\n.form-champ input[type=\"checkbox\"] {\n  width: 24px;\n  height: 24px;\n  accent-color: var(--accent);\n}\n\n.form-envoyer {\n  min-height: 52px;\n  padding: 14px 18px;\n  border: 0;\n  border-radius: 12px;\n  background: var(--accent);\n  color: #fff;\n  font: inherit;\n  font-weight: 700;\n  cursor: pointer;\n}\n\n.form-envoyer:disabled {\n  opacity: 0.55;\n}\n\n/*\n * Le champ que personne ne doit remplir : hors écran plutôt que `display:\n * none`, qu'un robot un peu sérieux sait reconnaître. Il sort aussi de l'ordre\n * de tabulation, pour qu'un doigt ou un clavier ne tombe jamais dessus.\n */\n.form-piege {\n  position: absolute;\n  left: -9999px;\n  width: 1px;\n  height: 1px;\n  overflow: hidden;\n}\n\n.form-manque,\n.form-clos {\n  margin: 0;\n  padding: 12px 14px;\n  border-radius: 12px;\n  background: var(--surface);\n  border: 1px solid var(--alerte);\n  color: var(--alerte);\n  font-size: 14px;\n}\n\n.form-clos {\n  margin-top: 22px;\n}\n\n.form-merci {\n  margin: 24px 0 0;\n  font-size: 17px;\n  line-height: 1.5;\n}\n";
 //#endregion
 //#region src/a4.css?raw
 var a4_default = "/*\n * Ce que seuls les écrits A4 emportent : la mise à l'échelle de la feuille et\n * le lien d'impression. Une vitrine ne se met pas dans une chemise, et une\n * carte ne s'imprime pas — leur donner ces règles serait du poids sans dessin.\n */\n/*\n * La feuille A4 occupe exactement la largeur disponible.\n *\n * Par paliers — 0,44 puis 0,66 puis 0,86 — elle ne la remplissait presque\n * jamais : sur un écran de 500 px elle restait dessinée pour 390, et son texte\n * finissait plus petit que celui du pied de page. Or c'est le document qu'on\n * vient lire. Le calcul le met à la largeur juste à chaque taille d'écran, et\n * s'arrête à 1 : un devis agrandi au-delà de sa taille réelle n'apprend rien de\n * plus et se met à baver.\n *\n * 210 mm valent 793,7 px à 96 ppp ; les 32 px sont les marges du corps. Le\n * diviseur porte son unité : diviser une longueur par un nombre rend une\n * longueur, et `min(1, 0.41px)` mélange un nombre et une longueur — déclaration\n * invalide, silencieusement ignorée. L'échelle retombait alors à 1 et le\n * document sortait à sa taille réelle, coupé par le cadre sur un téléphone.\n */\n.a4-cadre {\n  --echelle: min(1, calc((100vw - 32px) / 793.7px));\n  margin: 0 auto;\n}\n@media print {\n  body { padding: 0; background: #fff; }\n  .lecture-pied { display: none; }\n}\n\n/*\n * « Enregistrer en PDF » : un lien, pas un bouton.\n *\n * La page n'a aucun script, et c'est ce qui la rend fiable dans le navigateur\n * intégré de WhatsApp, sur un téléphone d'entrée de gamme. Un lien de\n * téléchargement n'en demande pas.\n */\n.lecture-pdf { margin: 10px 0 0; }\n.lecture-pdf a {\n  color: var(--accent);\n  font-weight: 600;\n  text-decoration: none;\n  border-bottom: 1px solid currentColor;\n}\n";
@@ -5464,6 +5732,161 @@ function u(e, t, n, o, i, u) {
 	};
 	if ("function" == typeof e && (a = e.defaultProps)) for (c in a) void 0 === p[c] && (p[c] = a[c]);
 	return l$1.vnode && l$1.vnode(l), l;
+}
+//#endregion
+//#region ../render/src/page/formulaire.tsx
+/**
+* Un formulaire composé, dessiné à la main.
+*
+* **Aucun script.** Ce n'est pas une prouesse, c'est la seule façon que ça
+* marche : sur un téléphone d'entrée de gamme, dans le navigateur intégré de
+* WhatsApp, sur une connexion qui hoquette, un formulaire qui dépend de
+* JavaScript est un formulaire qui perd des réponses sans que personne ne le
+* sache. Le navigateur sait poster un `<form>` depuis 1995, et il le fait même
+* quand la page n'a pas fini de charger.
+*
+* Le même composant sert l'aperçu dans l'application et la page publiée. Dans
+* l'aperçu il ne poste nulle part — `action` est vide et les champs sont
+* inertes — mais il montre exactement ce qu'un visiteur verra. Un aperçu qui
+* ressemble n'est pas un aperçu.
+*/
+/**
+* Le champ que personne ne doit remplir.
+*
+* Un robot qui remplit tout ce qu'il trouve remplit aussi celui-là, et sa
+* réponse part à la poubelle. C'est la seule défense qui ne demande rien à
+* l'utilisateur : pas d'image à déchiffrer, pas de case « je ne suis pas un
+* robot » qui charge trois cents kilo-octets de script.
+*
+* Il est caché par le style et non par `type="hidden"` : un champ caché de
+* type `hidden` se repère, un champ de texte hors écran se remplit.
+*/
+var CHAMP_PIEGE = "ne_rien_ecrire_ici";
+function Champ(props) {
+	const c = props.champ;
+	const id = `f-${c.clef}`;
+	const commun = {
+		id,
+		name: c.clef,
+		required: c.obligatoire === true,
+		...props.inerte ? { disabled: true } : {}
+	};
+	return /* @__PURE__ */ u("label", {
+		class: "form-champ",
+		for: id,
+		children: [
+			/* @__PURE__ */ u("span", {
+				class: "form-question",
+				children: [c.titre, c.obligatoire === true && /* @__PURE__ */ u("i", {
+					"aria-hidden": "true",
+					children: " *"
+				})]
+			}),
+			c.sorte === "paragraphe" && /* @__PURE__ */ u("textarea", {
+				...commun,
+				rows: 3,
+				maxLength: 1e3
+			}),
+			c.sorte === "choix" && /* @__PURE__ */ u("select", {
+				...commun,
+				children: [/* @__PURE__ */ u("option", {
+					value: "",
+					children: "—"
+				}), (c.options ?? []).map((o) => /* @__PURE__ */ u("option", {
+					value: o,
+					children: o
+				}, o))]
+			}),
+			c.sorte === "oui-non" && /* @__PURE__ */ u("input", {
+				...commun,
+				type: "checkbox",
+				value: "oui"
+			}),
+			c.sorte === "nombre" && /* @__PURE__ */ u("input", {
+				...commun,
+				type: "text",
+				inputMode: "decimal"
+			}),
+			c.sorte === "telephone" && /* @__PURE__ */ u("input", {
+				...commun,
+				type: "tel",
+				inputMode: "tel",
+				autocomplete: "tel",
+				maxLength: 200
+			}),
+			c.sorte === "texte" && /* @__PURE__ */ u("input", {
+				...commun,
+				type: "text",
+				maxLength: 200
+			}),
+			c.aide !== void 0 && c.aide !== "" && /* @__PURE__ */ u("span", {
+				class: "form-aide",
+				children: c.aide
+			})
+		]
+	});
+}
+function PageFormulaire(props) {
+	const f = props.formulaire;
+	const inerte = props.action === void 0 || props.action === "";
+	const manques = props.manques ?? [];
+	return /* @__PURE__ */ u("article", {
+		class: "vitrine form",
+		children: [/* @__PURE__ */ u("header", {
+			class: "vitrine-tete",
+			children: [
+				/* @__PURE__ */ u("p", {
+					class: "kicker",
+					children: f.kicker
+				}),
+				/* @__PURE__ */ u("h1", { children: f.titre }),
+				/* @__PURE__ */ u("p", {
+					class: "accroche",
+					children: f.accroche
+				})
+			]
+		}), props.ferme === true ? /* @__PURE__ */ u("p", {
+			class: "form-clos",
+			children: "Ce formulaire ne prend plus de réponses. Écris directement à la personne qui te l’a envoyé."
+		}) : /* @__PURE__ */ u("form", {
+			class: "form-corps",
+			method: "post",
+			action: props.action ?? "",
+			children: [
+				manques.length > 0 && /* @__PURE__ */ u("p", {
+					class: "form-manque",
+					role: "alert",
+					children: [
+						"Il manque ",
+						manques.join(", "),
+						"."
+					]
+				}),
+				f.champs.map((c) => /* @__PURE__ */ u(Champ, {
+					champ: c,
+					inerte
+				}, c.clef)),
+				/* @__PURE__ */ u("label", {
+					class: "form-piege",
+					for: `f-${CHAMP_PIEGE}`,
+					"aria-hidden": "true",
+					children: ["Laisse ce champ vide", /* @__PURE__ */ u("input", {
+						id: `f-${CHAMP_PIEGE}`,
+						type: "text",
+						name: CHAMP_PIEGE,
+						tabIndex: -1,
+						autocomplete: "off"
+					})]
+				}),
+				/* @__PURE__ */ u("button", {
+					type: "submit",
+					class: "form-envoyer",
+					disabled: inerte,
+					children: f.bouton
+				})
+			]
+		})]
+	});
 }
 //#endregion
 //#region ../render/src/page/vitrine.tsx
@@ -6551,6 +6974,18 @@ function pageDe(instantane) {
 	if (instantane.skeleton !== "compose-page") return null;
 	return verifierPage(instantane.etat).length > 0 ? null : instantane.etat;
 }
+/**
+* Le formulaire que porte l'instantané, si c'en est un et qu'il tient debout.
+*
+* Même raison que pour la page : ce qui est déjà dans KV a pu être déposé par
+* une version plus ancienne du contrôle. Et ici l'enjeu est plus lourd — une
+* configuration à trous ne fait pas seulement une page bancale, elle fait un
+* formulaire dont les réponses ne se rangent nulle part.
+*/
+function formulaireDe(instantane) {
+	if (instantane.skeleton !== "compose-formulaire") return null;
+	return verifierFormulaire(instantane.etat).length > 0 ? null : instantane.etat;
+}
 /** La facture a besoin de l'instant pour dire son retard ; les autres non. */
 function estFacture(skeleton) {
 	return skeleton === "facture";
@@ -6583,6 +7018,7 @@ function documentDe(instantane, ctx) {
 function carteDe(instantane, ctx) {
 	const page = pageDe(instantane);
 	if (page !== null) return carteDePage(page, ctx);
+	if (formulaireDe(instantane) !== null) return null;
 	const squelette = squeletteCompose(instantane) ?? squeletteParId(instantane.skeleton);
 	if (squelette === null) return null;
 	try {
@@ -6616,6 +7052,11 @@ function rendable(instantane) {
 			lien: "",
 			maintenant: new Date(instantane.publieLe)
 		};
+		const formulaire = formulaireDe(instantane);
+		if (formulaire !== null) {
+			K(/* @__PURE__ */ u(PageFormulaire, { formulaire }));
+			return true;
+		}
 		const document = documentDe(instantane, ctx);
 		if (document !== null) {
 			K(document);
@@ -6639,7 +7080,8 @@ function squeletteConnu(skeleton) {
 var COMPOSES = /* @__PURE__ */ new Set([
 	ID_COMPOSE,
 	ID_COMPOSE_CALCUL,
-	ID_COMPOSE_PAGE
+	ID_COMPOSE_PAGE,
+	ID_COMPOSE_FORMULAIRE
 ]);
 function refus(statut, erreur, extra = {}) {
 	return {
@@ -6695,6 +7137,17 @@ async function onRequest(contexte) {
 	if (verdict !== null) return json(verdict.statut, verdict.corps);
 	const corps = JSON.stringify(depot.instantane);
 	if (corps.length > 262144) return json(413, { erreur: "instantane-trop-gros" });
+	if (depot.instantane.skeleton === "compose-formulaire") {
+		const jeton = jetonDeLEntete(contexte.request.headers);
+		if (jeton === null) return json(401, { erreur: "appareil-absent" });
+		const maintenant = /* @__PURE__ */ new Date();
+		const compte = await compteDeLAppareil(contexte.env.COMPTES, await empreinte(jeton), maintenant);
+		await noterPublication(contexte.env.COMPTES, {
+			lien: depot.lien,
+			compteId: compte.id,
+			skeleton: depot.instantane.skeleton
+		}, maintenant);
+	}
 	await contexte.env.INSTANTANES.put(depot.lien, corps);
 	return json(200, {
 		lien: depot.lien,

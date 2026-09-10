@@ -34,13 +34,21 @@ export function PiedLecture(props: {
   readonly instantane: Instantane
   /** L'adresse du PDF, quand ce document en a un. */
   readonly pdf?: string
+  /**
+   * Vrai sur une page qui reçoit. Le pied dit alors autre chose, et c'est
+   * important : « Document en lecture seule » sous un formulaire qu'on invite
+   * à remplir se contredit, et ce qu'une personne veut savoir avant de taper
+   * son numéro n'est pas la date de dépôt — c'est où va ce qu'elle écrit.
+   */
+  readonly recoit?: boolean
 }): JSX.Element {
   const quand = new Date(props.instantane.publieLe)
   return (
     <footer class="lecture-pied">
       <p>
-        Arrêté le {Number.isNaN(quand.getTime()) ? '—' : dateLongue(quand)}.
-        Document en lecture seule.
+        {props.recoit === true
+          ? 'Ta réponse va à la personne qui t’a envoyé ce lien, et à personne d’autre.'
+          : `Arrêté le ${Number.isNaN(quand.getTime()) ? '—' : dateLongue(quand)}. Document en lecture seule.`}
       </p>
       {/*
         Un lien, pas un bouton : la page n'a pas de script, et un client qui

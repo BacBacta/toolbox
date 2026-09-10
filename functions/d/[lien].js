@@ -2945,6 +2945,196 @@ function valider(schema, valeur, chemin = "$") {
 */
 /** Celui d'une calculatrice composée. Voir `ID_COMPOSE` : même raison. */
 var ID_COMPOSE_CALCUL = "compose-calcul";
+var MAX_PARAGRAPHE = 1e3;
+var schemaFormulaire = {
+	type: "object",
+	additionalProperties: false,
+	required: [
+		"titre",
+		"kicker",
+		"accroche",
+		"champs",
+		"bouton",
+		"merci"
+	],
+	properties: {
+		titre: {
+			type: "string",
+			minLength: 2,
+			maxLength: 40,
+			title: "Nom",
+			description: "Ce que le formulaire demande. Ex. « Commandes du week-end »."
+		},
+		kicker: {
+			type: "string",
+			minLength: 2,
+			maxLength: 30,
+			title: "Sur-titre",
+			description: "En capitales, au-dessus du nom. Ex. « TRAITEUR MAMA NGO »."
+		},
+		accroche: {
+			type: "string",
+			minLength: 4,
+			maxLength: 160,
+			title: "Accroche",
+			description: "Une ou deux phrases : à quoi ça sert, et jusqu’à quand on peut répondre."
+		},
+		champs: {
+			type: "array",
+			minItems: 1,
+			maxItems: 8,
+			items: {
+				type: "object",
+				additionalProperties: false,
+				required: [
+					"clef",
+					"titre",
+					"sorte"
+				],
+				properties: {
+					clef: {
+						type: "string",
+						minLength: 1,
+						maxLength: 24,
+						title: "Identifiant",
+						description: "Lettres non accentuées, chiffres, soulignés. Commence par une minuscule. Ex. « nomDuClient »."
+					},
+					titre: {
+						type: "string",
+						minLength: 1,
+						maxLength: 60,
+						title: "La question",
+						description: "Ce qu’on demande, tel qu’on le demanderait de vive voix. Ex. « Ton nom »."
+					},
+					sorte: {
+						type: "string",
+						enum: [
+							"texte",
+							"paragraphe",
+							"nombre",
+							"telephone",
+							"choix",
+							"oui-non"
+						],
+						title: "Sorte de réponse",
+						description: "texte : une ligne. paragraphe : plusieurs. nombre : une quantité. telephone : un numéro. choix : une liste d’options. oui-non : une case à cocher."
+					},
+					obligatoire: {
+						type: "boolean",
+						title: "Obligatoire",
+						description: "Vrai seulement si la réponse ne sert à rien sans. N’en mets pas partout."
+					},
+					aide: {
+						type: "string",
+						maxLength: 90,
+						title: "Précision",
+						description: "Une phrase sous la question, si elle évite un malentendu."
+					},
+					options: {
+						type: "array",
+						maxItems: 6,
+						title: "Options",
+						items: {
+							type: "string",
+							minLength: 1,
+							maxLength: 40,
+							title: "Option"
+						},
+						description: "Pour un champ « choix », et pour lui seul.",
+						ecran: {
+							montrerSi: {
+								champ: "sorte",
+								vaut: ["choix"]
+							},
+							ajout: "Ajouter une option",
+							retrait: "Retirer l’option"
+						}
+					}
+				}
+			},
+			title: "Questions",
+			description: "Le moins possible : chaque question de plus est une réponse de moins.",
+			ecran: {
+				ajout: "Ajouter une question",
+				retrait: "Retirer la question"
+			}
+		},
+		bouton: {
+			type: "string",
+			minLength: 2,
+			maxLength: 30,
+			title: "Bouton",
+			description: "Ex. « Envoyer ma commande »."
+		},
+		merci: {
+			type: "string",
+			minLength: 4,
+			maxLength: 160,
+			title: "Après l’envoi",
+			description: "Ce qu’on lit une fois la réponse partie. Dis ce qui va se passer ensuite."
+		}
+	}
+};
+/**
+* Vérifie ce que le modèle a rendu, au-delà de ce que le schéma sait dire.
+*
+* Deux incohérences que le schéma ne peut pas exprimer, et qui font toutes deux
+* un formulaire qu'on ne peut pas remplir : une clef en double — la seconde
+* réponse écraserait la première sans que rien ne le montre — et un champ
+* « choix » sans options, qui est une question dont aucune réponse n'est
+* possible.
+*/
+function verifierFormulaire(valeur) {
+	const erreurs = [...valider(schemaFormulaire, valeur)];
+	if (erreurs.length > 0) return erreurs;
+	const f = valeur;
+	const clefs = f.champs.map((c) => c.clef);
+	for (const [i, champ] of f.champs.entries()) {
+		if (!/^[a-z][a-zA-Z0-9_]*$/.test(champ.clef)) erreurs.push({
+			chemin: `$.champs[${i}].clef`,
+			message: `« ${champ.clef} » ne prend que des lettres non accentuées, des chiffres et des soulignés, et commence par une minuscule`
+		});
+		if (champ.sorte === "choix" && (champ.options ?? []).length < 2) erreurs.push({
+			chemin: `$.champs[${i}].options`,
+			message: "un champ « choix » a besoin d’au moins deux options : sinon il n’y a rien à choisir"
+		});
+		if (champ.sorte !== "choix" && champ.options !== void 0) erreurs.push({
+			chemin: `$.champs[${i}].options`,
+			message: `des options sur un champ « ${champ.sorte} » ne s’afficheraient nulle part`
+		});
+	}
+	for (const d of new Set(clefs.filter((c, i) => clefs.indexOf(c) !== i))) erreurs.push({
+		chemin: "$.champs",
+		message: `la clef « ${d} » apparaît deux fois : la seconde réponse écraserait la première`
+	});
+	return erreurs;
+}
+function depouiller(formulaire, recu) {
+	const contenu = {};
+	const manques = [];
+	for (const champ of formulaire.champs) {
+		const brut = (recu[champ.clef] ?? "").trim();
+		const valeur = brut === "" ? "" : ramener(champ, brut);
+		if (valeur === "") {
+			if (champ.obligatoire === true) manques.push(champ.titre);
+			continue;
+		}
+		contenu[champ.clef] = valeur;
+	}
+	return {
+		contenu,
+		manques
+	};
+}
+function ramener(champ, brut) {
+	if (champ.sorte === "oui-non") return "oui";
+	if (champ.sorte === "choix") return (champ.options ?? []).includes(brut) ? brut : "";
+	if (champ.sorte === "nombre") {
+		const nombre = Number(brut.replace(/\s/g, "").replace(",", "."));
+		return Number.isFinite(nombre) ? String(nombre) : "";
+	}
+	return brut.slice(0, champ.sorte === "paragraphe" ? MAX_PARAGRAPHE : 200);
+}
 /**
 * Met un numéro au format international attendu par `wa.me`.
 *
@@ -4728,6 +4918,40 @@ function squeletteParId(id) {
 	return SQUELETTES.find((s) => s.id === id) ?? null;
 }
 //#endregion
+//#region ../comptes/src/identite.ts
+function hex(octets) {
+	return Array.from(octets, (o) => o.toString(16).padStart(2, "0")).join("");
+}
+/** Ce que le serveur range à la place du jeton. */
+async function empreinte(secret) {
+	const condense = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret));
+	return hex(new Uint8Array(condense));
+}
+//#endregion
+//#region ../comptes/src/reponses.ts
+/** Combien de réponses ce formulaire a déjà reçues. */
+async function combienDeReponses(db, lien) {
+	return (await db.prepare("SELECT COUNT(*) AS n FROM reponses WHERE lien = ?").bind(lien).first())?.n ?? 0;
+}
+async function tropTot(db, lien, source, maintenant) {
+	const ligne = await db.prepare("SELECT recu_le FROM reponses WHERE lien = ? AND source = ? ORDER BY recu_le DESC LIMIT 1").bind(lien, source).first();
+	return ligne !== null && maintenant.getTime() - ligne.recu_le < 3e4;
+}
+async function rangerReponse(db, reponse, maintenant) {
+	await db.prepare("INSERT INTO reponses (id, lien, contenu, source, recu_le) VALUES (?, ?, ?, ?, ?)").bind(crypto.randomUUID(), reponse.lien, JSON.stringify(reponse.contenu), reponse.source, maintenant.getTime()).run();
+}
+/**
+* L'empreinte d'une adresse, salée par le lien.
+*
+* Salée, parce que sans sel la même adresse donne la même empreinte sur tous
+* les formulaires : on saurait alors qu'une même personne a répondu à celui de
+* la tontine et à celui du lycée. Le lien lui-même fait le sel — il est déjà
+* secret, et il change d'un formulaire à l'autre.
+*/
+async function empreinteSource(lien, adresse) {
+	return adresse === null || adresse === "" ? null : empreinte(`${lien}:${adresse}`);
+}
+//#endregion
 //#region ../../node_modules/.pnpm/preact@10.29.8_preact-render-to-string@6.7.0/node_modules/preact/dist/preact.module.js
 var n;
 var l$1;
@@ -4990,27 +5214,332 @@ n = w$1.slice, l$1 = { __e: function(n, l, u, t) {
 	return n.__v.__b - l.__v.__b;
 }, H$1.__r = 0, f$2 = Math.random().toString(8), c$1 = "__d" + f$2, a$1 = "__a" + f$2, s$1 = /(PointerCapture)$|Capture$/i, h$1 = 0, p$1 = V$1(!1), v$1 = V$1(!0);
 //#endregion
+//#region ../../node_modules/.pnpm/preact@10.29.8_preact-render-to-string@6.7.0/node_modules/preact/jsx-runtime/dist/jsxRuntime.module.js
+var f$1 = 0;
+Array.isArray;
+function u$1(e, t, n, o, i, u) {
+	t || (t = {});
+	var a, c, p = t;
+	if ("ref" in p) for (c in p = {}, t) "ref" == c ? a = t[c] : p[c] = t[c];
+	var l = {
+		type: e,
+		props: p,
+		key: n,
+		ref: a,
+		__k: null,
+		__: null,
+		__b: 0,
+		__e: null,
+		__c: null,
+		constructor: void 0,
+		__v: --f$1,
+		__i: -1,
+		__u: 0,
+		__source: i,
+		__self: u
+	};
+	if ("function" == typeof e && (a = e.defaultProps)) for (c in a) void 0 === p[c] && (p[c] = a[c]);
+	return l$1.vnode && l$1.vnode(l), l;
+}
+//#endregion
+//#region ../render/src/page/formulaire.tsx
+/**
+* Un formulaire composé, dessiné à la main.
+*
+* **Aucun script.** Ce n'est pas une prouesse, c'est la seule façon que ça
+* marche : sur un téléphone d'entrée de gamme, dans le navigateur intégré de
+* WhatsApp, sur une connexion qui hoquette, un formulaire qui dépend de
+* JavaScript est un formulaire qui perd des réponses sans que personne ne le
+* sache. Le navigateur sait poster un `<form>` depuis 1995, et il le fait même
+* quand la page n'a pas fini de charger.
+*
+* Le même composant sert l'aperçu dans l'application et la page publiée. Dans
+* l'aperçu il ne poste nulle part — `action` est vide et les champs sont
+* inertes — mais il montre exactement ce qu'un visiteur verra. Un aperçu qui
+* ressemble n'est pas un aperçu.
+*/
+/**
+* Le champ que personne ne doit remplir.
+*
+* Un robot qui remplit tout ce qu'il trouve remplit aussi celui-là, et sa
+* réponse part à la poubelle. C'est la seule défense qui ne demande rien à
+* l'utilisateur : pas d'image à déchiffrer, pas de case « je ne suis pas un
+* robot » qui charge trois cents kilo-octets de script.
+*
+* Il est caché par le style et non par `type="hidden"` : un champ caché de
+* type `hidden` se repère, un champ de texte hors écran se remplit.
+*/
+var CHAMP_PIEGE = "ne_rien_ecrire_ici";
+function Champ(props) {
+	const c = props.champ;
+	const id = `f-${c.clef}`;
+	const commun = {
+		id,
+		name: c.clef,
+		required: c.obligatoire === true,
+		...props.inerte ? { disabled: true } : {}
+	};
+	return /* @__PURE__ */ u$1("label", {
+		class: "form-champ",
+		for: id,
+		children: [
+			/* @__PURE__ */ u$1("span", {
+				class: "form-question",
+				children: [c.titre, c.obligatoire === true && /* @__PURE__ */ u$1("i", {
+					"aria-hidden": "true",
+					children: " *"
+				})]
+			}),
+			c.sorte === "paragraphe" && /* @__PURE__ */ u$1("textarea", {
+				...commun,
+				rows: 3,
+				maxLength: 1e3
+			}),
+			c.sorte === "choix" && /* @__PURE__ */ u$1("select", {
+				...commun,
+				children: [/* @__PURE__ */ u$1("option", {
+					value: "",
+					children: "—"
+				}), (c.options ?? []).map((o) => /* @__PURE__ */ u$1("option", {
+					value: o,
+					children: o
+				}, o))]
+			}),
+			c.sorte === "oui-non" && /* @__PURE__ */ u$1("input", {
+				...commun,
+				type: "checkbox",
+				value: "oui"
+			}),
+			c.sorte === "nombre" && /* @__PURE__ */ u$1("input", {
+				...commun,
+				type: "text",
+				inputMode: "decimal"
+			}),
+			c.sorte === "telephone" && /* @__PURE__ */ u$1("input", {
+				...commun,
+				type: "tel",
+				inputMode: "tel",
+				autocomplete: "tel",
+				maxLength: 200
+			}),
+			c.sorte === "texte" && /* @__PURE__ */ u$1("input", {
+				...commun,
+				type: "text",
+				maxLength: 200
+			}),
+			c.aide !== void 0 && c.aide !== "" && /* @__PURE__ */ u$1("span", {
+				class: "form-aide",
+				children: c.aide
+			})
+		]
+	});
+}
+function PageFormulaire(props) {
+	const f = props.formulaire;
+	const inerte = props.action === void 0 || props.action === "";
+	const manques = props.manques ?? [];
+	return /* @__PURE__ */ u$1("article", {
+		class: "vitrine form",
+		children: [/* @__PURE__ */ u$1("header", {
+			class: "vitrine-tete",
+			children: [
+				/* @__PURE__ */ u$1("p", {
+					class: "kicker",
+					children: f.kicker
+				}),
+				/* @__PURE__ */ u$1("h1", { children: f.titre }),
+				/* @__PURE__ */ u$1("p", {
+					class: "accroche",
+					children: f.accroche
+				})
+			]
+		}), props.ferme === true ? /* @__PURE__ */ u$1("p", {
+			class: "form-clos",
+			children: "Ce formulaire ne prend plus de réponses. Écris directement à la personne qui te l’a envoyé."
+		}) : /* @__PURE__ */ u$1("form", {
+			class: "form-corps",
+			method: "post",
+			action: props.action ?? "",
+			children: [
+				manques.length > 0 && /* @__PURE__ */ u$1("p", {
+					class: "form-manque",
+					role: "alert",
+					children: [
+						"Il manque ",
+						manques.join(", "),
+						"."
+					]
+				}),
+				f.champs.map((c) => /* @__PURE__ */ u$1(Champ, {
+					champ: c,
+					inerte
+				}, c.clef)),
+				/* @__PURE__ */ u$1("label", {
+					class: "form-piege",
+					for: `f-${CHAMP_PIEGE}`,
+					"aria-hidden": "true",
+					children: ["Laisse ce champ vide", /* @__PURE__ */ u$1("input", {
+						id: `f-${CHAMP_PIEGE}`,
+						type: "text",
+						name: CHAMP_PIEGE,
+						tabIndex: -1,
+						autocomplete: "off"
+					})]
+				}),
+				/* @__PURE__ */ u$1("button", {
+					type: "submit",
+					class: "form-envoyer",
+					disabled: inerte,
+					children: f.bouton
+				})
+			]
+		})]
+	});
+}
+/**
+* Ce qu'on lit une fois la réponse partie.
+*
+* Une page à part, servie après une redirection, et non le même document avec
+* un message en haut : rafraîchir après un `POST` renvoie la même réponse une
+* deuxième fois, et personne ne le sait avant de compter les commandes.
+*/
+function PageMerci(props) {
+	return /* @__PURE__ */ u$1("article", {
+		class: "vitrine form",
+		children: [/* @__PURE__ */ u$1("header", {
+			class: "vitrine-tete",
+			children: [/* @__PURE__ */ u$1("p", {
+				class: "kicker",
+				children: props.formulaire.kicker
+			}), /* @__PURE__ */ u$1("h1", { children: props.formulaire.titre })]
+		}), /* @__PURE__ */ u$1("p", {
+			class: "form-merci",
+			children: props.formulaire.merci
+		})]
+	});
+}
+//#endregion
+//#region ../render/src/page/vitrine.tsx
+/**
+* Une page composée, dessinée à la main.
+*
+* C'est le même composant qui sert l'aperçu dans l'application et la page
+* publiée sur le serveur. Deux dessins pour une même configuration finiraient
+* par ne plus montrer la même chose, et c'est celui que le client voit qui
+* aurait tort.
+*
+* Il n'y a **aucun script** : ni ici, ni dans ce que le modèle a le droit
+* d'écrire. Une page composée ne peut pas en contenir, parce qu'aucun champ du
+* contrat n'en accepte — l'invariant § 2.1 tient par la forme du contrat, pas
+* par un filtre qu'on pourrait oublier.
+*/
+function Lignes$1(props) {
+	const lignes = props.section.lignes ?? [];
+	return /* @__PURE__ */ u$1("ul", {
+		class: props.section.sorte === "prix" ? "vitrine-prix" : "vitrine-liste",
+		children: lignes.map((l) => /* @__PURE__ */ u$1("li", { children: [/* @__PURE__ */ u$1("span", {
+			class: "quoi",
+			children: [/* @__PURE__ */ u$1("b", { children: l.nom }), l.detail !== void 0 && l.detail !== "" && /* @__PURE__ */ u$1("span", {
+				class: "detail",
+				children: l.detail
+			})]
+		}), l.valeur !== void 0 && l.valeur !== "" && /* @__PURE__ */ u$1("span", {
+			class: "combien",
+			children: l.valeur
+		})] }, l.nom))
+	});
+}
+function PageVitrine(props) {
+	const p = props.page;
+	const jour = p.date === void 0 ? null : direLeJour(p.date, props.maintenant);
+	const sections = sectionsAncrees(p.sections);
+	const sommaire = avecSommaire(p);
+	const message = `Bonjour ${p.titre}, j’ai vu votre page.`;
+	const whatsapp = p.telephone === void 0 || p.telephone === "" ? null : lienWhatsApp(p.telephone, message);
+	return /* @__PURE__ */ u$1("article", {
+		class: "vitrine",
+		children: [
+			/* @__PURE__ */ u$1("header", {
+				class: "vitrine-tete",
+				children: [
+					/* @__PURE__ */ u$1("p", {
+						class: "kicker",
+						children: p.kicker
+					}),
+					/* @__PURE__ */ u$1("h1", { children: p.titre }),
+					/* @__PURE__ */ u$1("p", {
+						class: "accroche",
+						children: p.accroche
+					})
+				]
+			}),
+			jour !== null && /* @__PURE__ */ u$1("p", {
+				class: jour.passe ? "vitrine-jour passe" : "vitrine-jour",
+				children: [/* @__PURE__ */ u$1("b", { children: jour.delai }), /* @__PURE__ */ u$1("span", { children: [jour.quand, jour.heure === "" ? "" : ` ${jour.heure}`] })]
+			}),
+			sommaire && /* @__PURE__ */ u$1("nav", {
+				class: "vitrine-sommaire",
+				"aria-label": "Sections",
+				children: sections.map(({ section, ancre }) => /* @__PURE__ */ u$1("a", {
+					href: `#${ancre}`,
+					children: section.titre
+				}, ancre))
+			}),
+			sections.map(({ section, ancre }) => /* @__PURE__ */ u$1("section", {
+				class: "vitrine-section",
+				id: sommaire ? ancre : void 0,
+				children: [/* @__PURE__ */ u$1("h2", { children: section.titre }), section.sorte === "texte" ? (section.texte ?? "").split("\n").filter((bout) => bout.trim() !== "").map((bout) => /* @__PURE__ */ u$1("p", { children: bout }, bout)) : /* @__PURE__ */ u$1(Lignes$1, { section })]
+			}, ancre)),
+			(whatsapp !== null || p.adresse !== void 0 && p.adresse !== "" || p.horaires !== void 0 && p.horaires !== "") && /* @__PURE__ */ u$1("footer", {
+				class: "vitrine-pied",
+				children: [
+					whatsapp !== null && /* @__PURE__ */ u$1("a", {
+						class: "vitrine-appel",
+						href: whatsapp,
+						rel: "noreferrer",
+						children: ["Écrire sur WhatsApp", /* @__PURE__ */ u$1("span", { children: numeroLisible(p.telephone ?? "") })]
+					}),
+					p.adresse !== void 0 && p.adresse !== "" && /* @__PURE__ */ u$1("p", {
+						class: "vitrine-ou",
+						children: [/* @__PURE__ */ u$1("span", {
+							class: "etiquette",
+							children: "Où"
+						}), p.adresse]
+					}),
+					p.horaires !== void 0 && p.horaires !== "" && /* @__PURE__ */ u$1("p", {
+						class: "vitrine-ou",
+						children: [/* @__PURE__ */ u$1("span", {
+							class: "etiquette",
+							children: "Quand"
+						}), p.horaires]
+					})
+				]
+			})
+		]
+	});
+}
+//#endregion
 //#region ../../node_modules/.pnpm/preact-render-to-string@6.7.0_preact@10.29.8/node_modules/preact-render-to-string/dist/index.module.js
 var r = "diffed";
 var o = "__c";
-var i$1 = "__s";
+var i = "__s";
 var a = "__c";
 var c = "__k";
-var u$1 = "__d";
+var u = "__d";
 var s = "__s";
 var l = /[\s\n\\/='"\0<>]/;
-var f$1 = /^(xlink|xmlns|xml)([A-Z])/;
+var f = /^(xlink|xmlns|xml)([A-Z])/;
 var p = /^(?:accessK|auto[A-Z]|cell|ch|col|cont|cross|dateT|encT|form[A-Z]|frame|hrefL|inputM|maxL|minL|noV|playsI|popoverT|readO|rowS|src[A-Z]|tabI|useM|item[A-Z])/;
 var h = /^ac|^ali|arabic|basel|cap|clipPath$|clipRule$|color|dominant|enable|fill|flood|font|glyph[^R]|horiz|image|letter|lighting|marker[^WUH]|overline|panose|pointe|paint|rendering|shape|stop|strikethrough|stroke|text[^L]|transform|underline|unicode|units|^v[^i]|^w|^xH/;
 var d = /* @__PURE__ */ new Set(["draggable", "spellcheck"]);
 function v(e) {
-	void 0 !== e.__g ? e.__g |= 8 : e[u$1] = !0;
+	void 0 !== e.__g ? e.__g |= 8 : e[u] = !0;
 }
 function m(e) {
-	void 0 !== e.__g ? e.__g &= -9 : e[u$1] = !1;
+	void 0 !== e.__g ? e.__g &= -9 : e[u] = !1;
 }
 function y(e) {
-	return void 0 !== e.__g ? !!(8 & e.__g) : !0 === e[u$1];
+	return void 0 !== e.__g ? !!(8 & e.__g) : !0 === e[u];
 }
 var _ = /["&<]/;
 function g(e) {
@@ -5110,8 +5639,8 @@ function B(e) {
 	return "string" == typeof e ? N + e + q : W(e) ? (e.unshift(N), e.push(q), e) : e && "function" == typeof e.then ? e.then(B) : N + e + q;
 }
 function I(a, u, s) {
-	var l = l$1[i$1];
-	l$1[i$1] = !0, D = l$1.__b, P = l$1[r], $ = l$1.__r, U = l$1.unmount;
+	var l = l$1[i];
+	l$1[i] = !0, D = l$1.__b, P = l$1[r], $ = l$1.__r, U = l$1.unmount;
 	var f = k$1(S, null);
 	f[c] = [a];
 	try {
@@ -5121,7 +5650,7 @@ function I(a, u, s) {
 		if (e.then) throw new Error("Use \"renderToStringAsync\" for suspenseful rendering.");
 		throw e;
 	} finally {
-		l$1[o] && l$1[o](a, M), l$1[i$1] = l, M.length = 0;
+		l$1[o] && l$1[o](a, M), l$1[i] = l, M.length = 0;
 	}
 }
 function O(e, t) {
@@ -5274,7 +5803,7 @@ function R(t, r, o, i, u, _, b) {
 					break;
 				default:
 					if (l.test(ue)) continue;
-					f$1.test(ue) ? ue = ue.replace(f$1, "$1:$2").toLowerCase() : "-" !== ue[4] && !d.has(ue) || null == se ? o ? h.test(ue) && (ue = "panose1" === ue ? "panose-1" : ue.replace(/([A-Z])/g, "-$1").toLowerCase()) : p.test(ue) && (ue = ue.toLowerCase()) : se += H;
+					f.test(ue) ? ue = ue.replace(f, "$1:$2").toLowerCase() : "-" !== ue[4] && !d.has(ue) || null == se ? o ? h.test(ue) && (ue = "panose1" === ue ? "panose-1" : ue.replace(/([A-Z])/g, "-$1").toLowerCase()) : p.test(ue) && (ue = ue.toLowerCase()) : se += H;
 			}
 			null != se && !1 !== se && (ae = !0 === se || se === H ? ae + " " + ue : ae + " " + ue + "=\"" + ("string" == typeof se ? g(se) : se + H) + "\"");
 		}
@@ -5315,7 +5844,7 @@ function J(e) {
 var a4_default$1 = "/*\n * Feuille A4 réelle, en millimètres.\n *\n * Le prototype dessinait un aperçu à l'échelle, en pixels minuscules (7,4 px\n * pour le corps de texte). Ça se voit à l'écran et ça s'imprime n'importe\n * comment. Ici la page fait ses 210 × 297 mm et le texte ses points : on rend à\n * la taille vraie, et c'est l'aperçu qui est mis à l'échelle par --echelle.\n *\n * **Cette feuille ignore le thème sombre, et c'est voulu** : un devis part à\n * l'impression et chez un client. Il est blanc chez tout le monde. Elle ne lit\n * donc aucun jeton de l'interface et se suffit à elle-même.\n *\n * Aucune police web : on prend ce que le téléphone a déjà (invariant § 2.6).\n */\n\n.a4-cadre {\n  --echelle: 1;\n  width: calc(210mm * var(--echelle));\n  overflow: hidden;\n}\n\n.a4-cadre > .a4 {\n  transform: scale(var(--echelle));\n  transform-origin: top left;\n  margin-bottom: calc((297mm * var(--echelle)) - 297mm);\n  box-shadow: 0 2px 18px rgb(18 23 16 / 12%);\n}\n\n.a4 {\n  --pa: #1f2a44;\n  --trait: #d7dce1;\n  --trait-fort: #aeb6bd;\n  --gris: #4e575e;\n  --gris-clair: #7b848b;\n\n  box-sizing: border-box;\n  position: relative;\n  width: 210mm;\n  min-height: 297mm;\n  padding: 15mm 16mm 20mm;\n  background: #fff;\n  color: #16191c;\n  font: 9.5pt/1.5 system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n  font-variant-numeric: tabular-nums lining-nums;\n  /* Les aplats d'accent doivent sortir de l'imprimante, pas être « économisés ». */\n  print-color-adjust: exact;\n  -webkit-print-color-adjust: exact;\n}\n\n.a4 * {\n  box-sizing: border-box;\n}\n\n/* ─────────────────────────────── entête ─────────────────────────────── */\n\n.a4-entete {\n  display: flex;\n  justify-content: space-between;\n  align-items: flex-start;\n  gap: 10mm;\n  padding-bottom: 3.5mm;\n  border-bottom: 0.7mm solid var(--pa);\n}\n\n.a4-entete .raison {\n  font-size: 14pt;\n  font-weight: 700;\n  line-height: 1.15;\n  letter-spacing: -0.01em;\n  color: var(--pa);\n}\n\n.a4-entete .coordonnees,\n.a4-entete .immat {\n  margin-top: 1.5mm;\n  font-size: 8pt;\n  line-height: 1.55;\n  color: var(--gris);\n}\n\n.a4-entete .immat {\n  text-align: right;\n  white-space: nowrap;\n}\n\n/* ─────────────────────────────── titre ─────────────────────────────── */\n\n.a4-titre {\n  margin: 9mm 0 0;\n  font-size: 22pt;\n  font-weight: 700;\n  line-height: 1;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  color: var(--pa);\n}\n\n.a4-sous-titre {\n  margin-top: 2mm;\n  font-size: 9pt;\n  color: var(--gris);\n}\n\n.a4-bloc-client {\n  margin-top: 7mm;\n  padding: 3.5mm 4mm;\n  border: 0.25mm solid var(--trait);\n  border-left: 1.2mm solid var(--pa);\n  border-radius: 0 1mm 1mm 0;\n  background: #fbfcfd;\n  font-size: 9pt;\n  line-height: 1.55;\n}\n\n.a4-bloc-client .etiquette {\n  margin-bottom: 0.8mm;\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.14em;\n  text-transform: uppercase;\n  color: var(--gris-clair);\n}\n\n/* ─────────────────────────────── tableau ─────────────────────────────── */\n\n.a4-tableau {\n  width: 100%;\n  margin-top: 7mm;\n  border-collapse: collapse;\n  font-size: 8.5pt;\n}\n\n.a4-tableau th {\n  padding: 2.4mm 2mm;\n  border-bottom: 0.6mm solid var(--pa);\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  text-align: left;\n  color: var(--pa);\n  white-space: nowrap;\n}\n\n.a4-tableau td {\n  padding: 2.4mm 2mm;\n  border-bottom: 0.2mm solid var(--trait);\n  vertical-align: top;\n}\n\n/* Une ligne de facture ne se coupe pas au milieu par un saut de page. */\n.a4-tableau tr {\n  break-inside: avoid;\n}\n\n.a4-tableau .nombre {\n  text-align: right;\n  white-space: nowrap;\n}\n\n.a4-tableau tbody tr:last-child td {\n  border-bottom: 0.4mm solid var(--trait-fort);\n}\n\n.a4-vide {\n  padding: 8mm 0;\n  color: var(--gris-clair);\n  font-style: italic;\n  text-align: center;\n}\n\n/* ─────────────────────────────── totaux ─────────────────────────────── */\n\n.a4-totaux {\n  margin-top: 5mm;\n  margin-left: auto;\n  width: 88mm;\n  font-size: 9pt;\n  break-inside: avoid;\n}\n\n.a4-totaux .ligne {\n  display: flex;\n  justify-content: space-between;\n  gap: 6mm;\n  padding: 1.6mm 1mm;\n}\n\n.a4-totaux .ligne + .ligne {\n  border-top: 0.2mm solid var(--trait);\n}\n\n.a4-totaux .fort {\n  margin-top: 1.5mm;\n  padding: 2.6mm 3mm;\n  border: 0;\n  border-radius: 1mm;\n  background: var(--pa);\n  color: #fff;\n  font-size: 11.5pt;\n  font-weight: 700;\n  letter-spacing: 0.01em;\n}\n\n.a4-en-lettres {\n  margin-top: 4mm;\n  font-size: 8.5pt;\n  font-style: italic;\n  line-height: 1.55;\n  color: var(--gris);\n  break-inside: avoid;\n}\n\n/* ─────────────────────── mentions, signatures, pied ─────────────────────── */\n\n.a4-mentions {\n  margin-top: 7mm;\n  font-size: 8pt;\n  line-height: 1.6;\n  color: var(--gris);\n  orphans: 2;\n  widows: 2;\n}\n\n.a4-mentions p {\n  margin: 0 0 2mm;\n}\n\n.a4-signatures {\n  display: flex;\n  gap: 10mm;\n  margin-top: 12mm;\n  break-inside: avoid;\n}\n\n.a4-signatures .zone {\n  flex: 1;\n}\n\n.a4-signatures .libelle {\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  color: var(--pa);\n}\n\n.a4-signatures .mention {\n  margin-top: 0.8mm;\n  font-size: 7.5pt;\n  color: var(--gris-clair);\n}\n\n.a4-signatures .cadre {\n  margin-top: 2.5mm;\n  height: 24mm;\n  border: 0.25mm dashed var(--trait-fort);\n  border-radius: 1mm;\n}\n\n.a4-pied {\n  position: absolute;\n  left: 16mm;\n  right: 16mm;\n  bottom: 11mm;\n  padding-top: 2.5mm;\n  border-top: 0.2mm solid var(--trait);\n  font-size: 7pt;\n  line-height: 1.6;\n  color: var(--gris-clair);\n}\n\n.a4-numero-page {\n  position: absolute;\n  right: 16mm;\n  bottom: 6mm;\n  font-size: 7pt;\n  color: var(--gris-clair);\n}\n\n/* ─────────────────────────────── impression ─────────────────────────── */\n\n@page {\n  size: A4;\n  margin: 0;\n}\n\n@media print {\n  .a4-cadre {\n    --echelle: 1;\n    width: auto;\n    overflow: visible;\n  }\n\n  .a4-cadre > .a4 {\n    transform: none;\n    margin-bottom: 0;\n    box-shadow: none;\n  }\n}\n\n/* ────────────────────── actes et lettres ────────────────────── */\n/*\n * Ces quatre documents ne portent pas de tableau taxé. Ce qui les distingue,\n * c'est la disposition : un acte pose ses parties avant son corps, une lettre\n * française met l'expéditeur à gauche et le destinataire à droite. Le reste —\n * papier, titre, signatures, pied — vient des mêmes pièces que le devis.\n */\n\n/* Un corps de texte long : la mesure compte plus que la taille. */\n.a4-corps {\n  margin-top: 6mm;\n  font-size: 9.5pt;\n  line-height: 1.7;\n  color: var(--encre);\n  text-align: justify;\n}\n\n.a4-corps p {\n  margin: 0 0 3.5mm;\n}\n\n/* Les deux parties d'un acte, nommées avant le corps. */\n.a4-parties {\n  margin-top: 6mm;\n  font-size: 9.5pt;\n  line-height: 1.9;\n}\n\n.a4-parties .qui {\n  font-weight: 700;\n  color: var(--pa);\n}\n\n/* Le montant encadré : ce que l'œil doit trouver en premier sur l'acte. */\n.a4-encadre {\n  margin-top: 6mm;\n  padding: 4mm 5mm;\n  border: 0.5mm solid var(--pa);\n  border-radius: 1mm;\n  break-inside: avoid;\n}\n\n.a4-encadre .etiquette {\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.12em;\n  text-transform: uppercase;\n  color: var(--pa);\n}\n\n.a4-encadre .chiffre {\n  margin-top: 1mm;\n  font-size: 16pt;\n  font-weight: 800;\n  letter-spacing: -0.01em;\n}\n\n.a4-encadre .lettres {\n  margin-top: 0.8mm;\n  font-size: 9pt;\n  font-style: italic;\n  color: var(--gris);\n}\n\n.a4-encadre .echeance {\n  margin-top: 2.5mm;\n  font-size: 9pt;\n}\n\n/* La disposition d'une lettre française. */\n.a4-lettre-tete {\n  display: flex;\n  justify-content: space-between;\n  gap: 10mm;\n  font-size: 9pt;\n  line-height: 1.5;\n}\n\n.a4-lettre-tete .expediteur {\n  max-width: 70mm;\n}\n\n.a4-lettre-tete .destinataire {\n  max-width: 80mm;\n  text-align: right;\n  color: var(--gris);\n}\n\n.a4-lettre-date {\n  margin-top: 8mm;\n  font-size: 9pt;\n  text-align: right;\n  color: var(--gris);\n}\n\n.a4-lettre-objet {\n  display: inline-block;\n  margin-top: 6mm;\n  padding-bottom: 1mm;\n  border-bottom: 0.3mm solid var(--pa);\n  font-size: 10pt;\n  font-weight: 600;\n}\n\n.a4-lettre-signature {\n  margin-top: 10mm;\n  font-size: 10pt;\n  text-align: right;\n}\n\n/* ───────────────────────────── curriculum vitæ ─────────────────────────────\n *\n * Quatre gabarits pour une même feuille. Ils ne diffèrent que par la police,\n * la façon d'annoncer une section et la présence d'une colonne : la structure\n * du contenu est la même pour les quatre, et c'est ce qui permet de changer de\n * gabarit sans rien ressaisir.\n *\n * Aucune police web ici non plus (invariant § 2.6). « Serif » et « grotesque »\n * se jouent avec les familles génériques que tout téléphone possède.\n */\n\n.a4-cv {\n  --cv-inter: 1.5;\n  --cv-saut: 5mm;\n}\n\n.a4-cv.dense {\n  --cv-inter: 1.28;\n  --cv-saut: 3mm;\n  font-size: 9pt;\n}\n\n.a4-cv .cv-nom {\n  font-size: 20pt;\n  font-weight: 700;\n  letter-spacing: 0.02em;\n  line-height: 1.15;\n}\n\n.a4-cv .cv-titre {\n  margin-top: 1mm;\n  color: var(--pa);\n  font-size: 11pt;\n  font-weight: 600;\n}\n\n.a4-cv .cv-contact {\n  margin-top: 2mm;\n  color: var(--gris);\n  font-size: 9pt;\n}\n\n.a4-cv .cv-section {\n  margin: var(--cv-saut) 0 2mm;\n  color: var(--pa);\n  font-size: 9pt;\n  font-weight: 700;\n  letter-spacing: 0.08em;\n  text-transform: uppercase;\n}\n\n.a4-cv .cv-profil {\n  line-height: var(--cv-inter);\n  text-align: justify;\n}\n\n.a4-cv .cv-profil p {\n  margin: 0 0 2mm;\n}\n\n.a4-cv .cv-item {\n  margin-bottom: 3mm;\n  line-height: var(--cv-inter);\n}\n\n.a4-cv .cv-quoi {\n  font-size: 10pt;\n  font-weight: 600;\n}\n\n.a4-cv .cv-ou {\n  color: var(--gris);\n  font-size: 9pt;\n}\n\n/* La puce est dessinée, pas listée : un <ul> imprime des marges que le\n * gabarit ne contrôle pas d'un navigateur à l'autre. */\n.a4-cv .cv-fait {\n  position: relative;\n  margin-top: 1mm;\n  padding-left: 4mm;\n  font-size: 9.5pt;\n}\n\n.a4-cv .cv-fait::before {\n  content: \"\";\n  position: absolute;\n  top: 1.7mm;\n  left: 0.8mm;\n  width: 1.2mm;\n  height: 1.2mm;\n  background: var(--pa);\n}\n\n.a4-cv .cv-serie {\n  font-size: 9.5pt;\n  line-height: var(--cv-inter);\n}\n\n/* — Notaire : sérif, tout centré, pour une administration. — */\n.a4-cv.notaire {\n  font-family: Georgia, \"Times New Roman\", serif;\n}\n\n.a4-cv.notaire .cv-tete {\n  padding-bottom: 3mm;\n  border-bottom: 0.4mm solid var(--pa);\n  text-align: center;\n}\n\n.a4-cv.notaire .cv-section {\n  border-bottom: 0.2mm solid var(--trait);\n  padding-bottom: 1mm;\n  text-align: center;\n  letter-spacing: 0.14em;\n}\n\n.a4-cv.notaire .cv-serie {\n  text-align: center;\n}\n\n/* — Exécutif : grotesque, un filet de couleur, pour le privé. — */\n\n/*\n * Le filet sort dans la marge : posé dans la colonne de texte, il décalait le\n * nom de quatre millimètres vers la droite et l'entête ne s'alignait plus sur\n * les titres de section en dessous.\n */\n.a4-cv.executif .cv-tete {\n  /* 5 mm de retrait plus l'épaisseur du filet : sans elle, le nom reste décalé\n   * du filet lui-même et rate l'alignement d'un millimètre et demi. */\n  margin-left: -6.5mm;\n  border-left: 1.5mm solid var(--pa);\n  padding-left: 5mm;\n}\n\n.a4-cv.executif .cv-section {\n  border-bottom: 0.2mm solid var(--trait);\n  padding-bottom: 1mm;\n}\n\n/* — Éditorial : le nom en display, la date en marge, pour un métier créatif. — */\n.a4-cv.editorial .cv-nom {\n  font-size: 28pt;\n  font-weight: 300;\n  letter-spacing: -0.01em;\n}\n\n.a4-cv.editorial .cv-tete {\n  padding-bottom: 4mm;\n  border-bottom: 0.8mm solid var(--pa);\n}\n\n.a4-cv.editorial .cv-section {\n  color: var(--gris-clair);\n  letter-spacing: 0.18em;\n}\n\n/*\n * `column-gap`, pas `gap` : chaque fait occupe sa propre rangée de la grille,\n * et un `gap` de quatre millimètres les écartait tous les uns des autres —\n * trois puces séparées comme trois paragraphes.\n */\n.a4-cv.editorial .cv-item {\n  display: grid;\n  grid-template-columns: 28mm 1fr;\n  column-gap: 4mm;\n}\n\n.a4-cv.editorial .cv-marge {\n  grid-column: 1;\n  grid-row: 1;\n  color: var(--gris);\n  font-size: 9pt;\n  text-align: right;\n}\n\n.a4-cv.editorial .cv-quoi,\n.a4-cv.editorial .cv-ou,\n.a4-cv.editorial .cv-fait {\n  grid-column: 2;\n}\n\n/* — Bloc : une bande latérale porte le contact et les listes. — */\n\n/*\n * La hauteur est celle de la zone de texte de la feuille : 297 mm moins les\n * marges haute et basse. Sans elle, le filet de la bande s'arrête où le\n * contenu s'arrête, et un CV court montre un trait qui meurt au milieu de la\n * page — ce qui se lit comme un défaut de rendu, pas comme un parti pris.\n */\n.a4-cv.bloc {\n  display: grid;\n  grid-template-columns: 58mm 1fr;\n  gap: 8mm;\n  min-height: calc(297mm - 15mm - 20mm);\n}\n\n/* Justifier une colonne de cent millimètres ouvre des rivières entre les mots. */\n.a4-cv.bloc .cv-profil {\n  text-align: left;\n}\n\n.a4-cv.bloc .cv-bande {\n  padding-right: 6mm;\n  border-right: 0.3mm solid var(--trait);\n}\n\n.a4-cv.bloc .cv-bande .cv-nom {\n  font-size: 16pt;\n}\n\n.a4-cv.bloc .cv-bande .cv-titre {\n  font-size: 10pt;\n}\n\n.a4-cv.bloc .cv-ligne {\n  margin-top: 1mm;\n  font-size: 9pt;\n  line-height: 1.35;\n  overflow-wrap: anywhere;\n}\n\n.a4-cv.bloc .cv-principal .cv-section:first-child {\n  margin-top: 0;\n}\n";
 //#endregion
 //#region ../render/src/styles/vitrine.css?raw
-var vitrine_default = "/*\n * La page composée par le modèle.\n *\n * Elle vit à deux endroits : en aperçu dans l'application, et publiée sur le\n * serveur pour qui reçoit le lien. Une seule feuille, pour que les deux\n * montrent la même chose — celle que le client voit ne doit pas être la\n * surprise.\n *\n * Elle se lit d'un pouce, sur un téléphone d'entrée de gamme, souvent dans le\n * navigateur intégré de WhatsApp. Aucune animation, aucune police à charger :\n * ce qui arrive est fini quand il arrive.\n */\n\n.vitrine {\n  max-width: 560px;\n  margin: 0 auto;\n  padding: 4px 0 8px;\n}\n\n.vitrine-tete {\n  padding-bottom: 18px;\n  border-bottom: 2px solid var(--accent);\n}\n\n.vitrine-tete .kicker {\n  margin: 0 0 6px;\n  color: var(--accent);\n  font-size: 12px;\n  font-weight: 700;\n  letter-spacing: 0.14em;\n  text-transform: uppercase;\n}\n\n.vitrine-tete h1 {\n  margin: 0;\n  font-size: 27px;\n  line-height: 1.15;\n  letter-spacing: -0.02em;\n}\n\n.vitrine-tete .accroche {\n  margin: 8px 0 0;\n  color: var(--encre-2);\n  font-size: 15px;\n  line-height: 1.45;\n}\n\n.vitrine-section {\n  margin-top: 24px;\n}\n\n.vitrine-section h2 {\n  margin: 0 0 10px;\n  font-size: 12px;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  color: var(--encre-3);\n}\n\n.vitrine-section p {\n  margin: 0 0 8px;\n  font-size: 15px;\n  line-height: 1.55;\n  color: var(--encre-2);\n}\n\n.vitrine-liste,\n.vitrine-prix {\n  margin: 0;\n  padding: 0;\n  list-style: none;\n}\n\n.vitrine-liste li,\n.vitrine-prix li {\n  display: flex;\n  align-items: baseline;\n  justify-content: space-between;\n  gap: 14px;\n  padding: 9px 0;\n  border-top: 1px solid var(--trait);\n  font-size: 15px;\n}\n\n.vitrine-liste li:first-child,\n.vitrine-prix li:first-child {\n  border-top: 0;\n}\n\n.vitrine-liste .quoi,\n.vitrine-prix .quoi {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  min-width: 0;\n}\n\n.vitrine-liste .detail,\n.vitrine-prix .detail {\n  color: var(--encre-3);\n  font-size: 13px;\n}\n\n/* Le prix ne se coupe jamais : c'est le chiffre qu'on cherche du regard. */\n.vitrine-prix .combien {\n  flex: none;\n  color: var(--accent);\n  font-weight: 700;\n  white-space: nowrap;\n}\n\n.vitrine-liste .combien {\n  flex: none;\n  color: var(--encre-3);\n  white-space: nowrap;\n}\n\n.vitrine-pied {\n  margin-top: 26px;\n  padding-top: 18px;\n  border-top: 1px solid var(--trait);\n}\n\n/*\n * Le bouton qui rapporte.\n *\n * Quelqu'un qui lit la page et veut acheter ne doit pas avoir à recopier dix\n * chiffres : `wa.me` ouvre WhatsApp avec le message déjà écrit, gratuitement\n * et sans compte (§ 6).\n */\n.vitrine-appel {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  padding: 13px 16px;\n  border-radius: 12px;\n  background: var(--accent);\n  color: #fff;\n  font-weight: 700;\n  text-decoration: none;\n}\n\n.vitrine-appel span {\n  font-weight: 400;\n  font-size: 13px;\n  opacity: 0.85;\n}\n\n.vitrine-ou {\n  display: flex;\n  gap: 10px;\n  margin: 12px 0 0;\n  color: var(--encre-2);\n  font-size: 14px;\n}\n\n.vitrine-ou .etiquette {\n  /*\n   * Assez large pour « QUAND », le plus long des libellés. À 46 px il touchait\n   * le texte alors que « OÙ » gardait sa gouttière : la colonne était taillée\n   * pour le mot le plus court.\n   */\n  flex: none;\n  width: 58px;\n  color: var(--encre-3);\n  font-size: 11px;\n  font-weight: 700;\n  letter-spacing: 0.08em;\n  text-transform: uppercase;\n  line-height: 1.6;\n}\n\n/*\n * Le sommaire d'un « site ».\n *\n * Des ancres et non des adresses : sur une connexion qui hoquette, un menu qui\n * recharge est un menu qu'on n'ose plus toucher. Il défile horizontalement\n * plutôt que de passer à la ligne — six titres empilés repousseraient la\n * première section sous le pli, et on cacherait le contenu pour montrer son\n * plan.\n */\n.vitrine-sommaire {\n  display: flex;\n  gap: 8px;\n  margin-top: 14px;\n  overflow-x: auto;\n  scrollbar-width: none;\n}\n\n.vitrine-sommaire a {\n  flex: none;\n  padding: 7px 12px;\n  border: 1px solid var(--trait);\n  border-radius: 999px;\n  color: var(--encre-2);\n  font-size: 13px;\n  text-decoration: none;\n  white-space: nowrap;\n}\n\n/* Une section visée par le sommaire ne doit pas coller au bord de l'écran. */\n.vitrine-section {\n  scroll-margin-top: 12px;\n}\n\n/*\n * Le jour d'un événement.\n *\n * Le délai est le gros caractère, pas la date : on ne lit pas une affiche pour\n * sa date, on la lit pour savoir si on a le temps. Quand le jour est passé, le\n * bloc s'éteint — une affiche qui garde son air d'urgence après coup fait\n * traverser la ville pour rien.\n */\n.vitrine-jour {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  margin: 14px 0 0;\n  padding: 12px 14px;\n  border-radius: 12px;\n  background: var(--accent);\n  color: #fff;\n}\n\n.vitrine-jour b {\n  font-size: 19px;\n  line-height: 1.2;\n}\n\n.vitrine-jour span {\n  font-size: 14px;\n  opacity: 0.9;\n}\n\n.vitrine-jour.passe {\n  background: var(--surface);\n  border: 1px solid var(--trait);\n  color: var(--encre-3);\n}\n";
+var vitrine_default = "/*\n * La page composée par le modèle.\n *\n * Elle vit à deux endroits : en aperçu dans l'application, et publiée sur le\n * serveur pour qui reçoit le lien. Une seule feuille, pour que les deux\n * montrent la même chose — celle que le client voit ne doit pas être la\n * surprise.\n *\n * Elle se lit d'un pouce, sur un téléphone d'entrée de gamme, souvent dans le\n * navigateur intégré de WhatsApp. Aucune animation, aucune police à charger :\n * ce qui arrive est fini quand il arrive.\n */\n\n.vitrine {\n  max-width: 560px;\n  margin: 0 auto;\n  padding: 4px 0 8px;\n}\n\n.vitrine-tete {\n  padding-bottom: 18px;\n  border-bottom: 2px solid var(--accent);\n}\n\n.vitrine-tete .kicker {\n  margin: 0 0 6px;\n  color: var(--accent);\n  font-size: 12px;\n  font-weight: 700;\n  letter-spacing: 0.14em;\n  text-transform: uppercase;\n}\n\n.vitrine-tete h1 {\n  margin: 0;\n  font-size: 27px;\n  line-height: 1.15;\n  letter-spacing: -0.02em;\n}\n\n.vitrine-tete .accroche {\n  margin: 8px 0 0;\n  color: var(--encre-2);\n  font-size: 15px;\n  line-height: 1.45;\n}\n\n.vitrine-section {\n  margin-top: 24px;\n}\n\n.vitrine-section h2 {\n  margin: 0 0 10px;\n  font-size: 12px;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  color: var(--encre-3);\n}\n\n.vitrine-section p {\n  margin: 0 0 8px;\n  font-size: 15px;\n  line-height: 1.55;\n  color: var(--encre-2);\n}\n\n.vitrine-liste,\n.vitrine-prix {\n  margin: 0;\n  padding: 0;\n  list-style: none;\n}\n\n.vitrine-liste li,\n.vitrine-prix li {\n  display: flex;\n  align-items: baseline;\n  justify-content: space-between;\n  gap: 14px;\n  padding: 9px 0;\n  border-top: 1px solid var(--trait);\n  font-size: 15px;\n}\n\n.vitrine-liste li:first-child,\n.vitrine-prix li:first-child {\n  border-top: 0;\n}\n\n.vitrine-liste .quoi,\n.vitrine-prix .quoi {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  min-width: 0;\n}\n\n.vitrine-liste .detail,\n.vitrine-prix .detail {\n  color: var(--encre-3);\n  font-size: 13px;\n}\n\n/* Le prix ne se coupe jamais : c'est le chiffre qu'on cherche du regard. */\n.vitrine-prix .combien {\n  flex: none;\n  color: var(--accent);\n  font-weight: 700;\n  white-space: nowrap;\n}\n\n.vitrine-liste .combien {\n  flex: none;\n  color: var(--encre-3);\n  white-space: nowrap;\n}\n\n.vitrine-pied {\n  margin-top: 26px;\n  padding-top: 18px;\n  border-top: 1px solid var(--trait);\n}\n\n/*\n * Le bouton qui rapporte.\n *\n * Quelqu'un qui lit la page et veut acheter ne doit pas avoir à recopier dix\n * chiffres : `wa.me` ouvre WhatsApp avec le message déjà écrit, gratuitement\n * et sans compte (§ 6).\n */\n.vitrine-appel {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  padding: 13px 16px;\n  border-radius: 12px;\n  background: var(--accent);\n  color: #fff;\n  font-weight: 700;\n  text-decoration: none;\n}\n\n.vitrine-appel span {\n  font-weight: 400;\n  font-size: 13px;\n  opacity: 0.85;\n}\n\n.vitrine-ou {\n  display: flex;\n  gap: 10px;\n  margin: 12px 0 0;\n  color: var(--encre-2);\n  font-size: 14px;\n}\n\n.vitrine-ou .etiquette {\n  /*\n   * Assez large pour « QUAND », le plus long des libellés. À 46 px il touchait\n   * le texte alors que « OÙ » gardait sa gouttière : la colonne était taillée\n   * pour le mot le plus court.\n   */\n  flex: none;\n  width: 58px;\n  color: var(--encre-3);\n  font-size: 11px;\n  font-weight: 700;\n  letter-spacing: 0.08em;\n  text-transform: uppercase;\n  line-height: 1.6;\n}\n\n/*\n * Le sommaire d'un « site ».\n *\n * Des ancres et non des adresses : sur une connexion qui hoquette, un menu qui\n * recharge est un menu qu'on n'ose plus toucher. Il défile horizontalement\n * plutôt que de passer à la ligne — six titres empilés repousseraient la\n * première section sous le pli, et on cacherait le contenu pour montrer son\n * plan.\n */\n.vitrine-sommaire {\n  display: flex;\n  gap: 8px;\n  margin-top: 14px;\n  overflow-x: auto;\n  scrollbar-width: none;\n}\n\n.vitrine-sommaire a {\n  flex: none;\n  padding: 7px 12px;\n  border: 1px solid var(--trait);\n  border-radius: 999px;\n  color: var(--encre-2);\n  font-size: 13px;\n  text-decoration: none;\n  white-space: nowrap;\n}\n\n/* Une section visée par le sommaire ne doit pas coller au bord de l'écran. */\n.vitrine-section {\n  scroll-margin-top: 12px;\n}\n\n/*\n * Le jour d'un événement.\n *\n * Le délai est le gros caractère, pas la date : on ne lit pas une affiche pour\n * sa date, on la lit pour savoir si on a le temps. Quand le jour est passé, le\n * bloc s'éteint — une affiche qui garde son air d'urgence après coup fait\n * traverser la ville pour rien.\n */\n.vitrine-jour {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  margin: 14px 0 0;\n  padding: 12px 14px;\n  border-radius: 12px;\n  background: var(--accent);\n  color: #fff;\n}\n\n.vitrine-jour b {\n  font-size: 19px;\n  line-height: 1.2;\n}\n\n.vitrine-jour span {\n  font-size: 14px;\n  opacity: 0.9;\n}\n\n.vitrine-jour.passe {\n  background: var(--surface);\n  border: 1px solid var(--trait);\n  color: var(--encre-3);\n}\n\n/*\n * Le formulaire.\n *\n * Il partage l'entête de la vitrine — même titre, même accroche, même trait —\n * parce que c'est la même page : ce qui change est qu'elle reçoit au lieu de\n * se lire. Les cibles font 48 px comme partout : on remplit ça au pouce, dans\n * un taxi.\n *\n * Plus étroit qu'une vitrine, et pas par goût : un champ de saisie large de\n * 560 px se remplit sans qu'on voie où il commence, et une question dont\n * l'étiquette est loin de sa réponse se relit deux fois.\n */\n.vitrine.form {\n  max-width: 480px;\n}\n\n.form-corps {\n  display: flex;\n  flex-direction: column;\n  gap: 18px;\n  margin-top: 22px;\n}\n\n.form-champ {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n}\n\n.form-question {\n  font-size: 14px;\n  font-weight: 700;\n}\n\n.form-question i {\n  color: var(--accent);\n  font-style: normal;\n}\n\n.form-aide {\n  color: var(--encre-3);\n  font-size: 13px;\n}\n\n.form-champ input[type=\"text\"],\n.form-champ input[type=\"tel\"],\n.form-champ select,\n.form-champ textarea {\n  width: 100%;\n  min-height: 48px;\n  padding: 12px 14px;\n  border: 1px solid var(--trait);\n  border-radius: 12px;\n  background: var(--surface);\n  color: var(--encre);\n  font: inherit;\n}\n\n.form-champ textarea {\n  min-height: 92px;\n  resize: vertical;\n}\n\n/* La case est petite, mais son étiquette fait la cible. */\n.form-champ input[type=\"checkbox\"] {\n  width: 24px;\n  height: 24px;\n  accent-color: var(--accent);\n}\n\n.form-envoyer {\n  min-height: 52px;\n  padding: 14px 18px;\n  border: 0;\n  border-radius: 12px;\n  background: var(--accent);\n  color: #fff;\n  font: inherit;\n  font-weight: 700;\n  cursor: pointer;\n}\n\n.form-envoyer:disabled {\n  opacity: 0.55;\n}\n\n/*\n * Le champ que personne ne doit remplir : hors écran plutôt que `display:\n * none`, qu'un robot un peu sérieux sait reconnaître. Il sort aussi de l'ordre\n * de tabulation, pour qu'un doigt ou un clavier ne tombe jamais dessus.\n */\n.form-piege {\n  position: absolute;\n  left: -9999px;\n  width: 1px;\n  height: 1px;\n  overflow: hidden;\n}\n\n.form-manque,\n.form-clos {\n  margin: 0;\n  padding: 12px 14px;\n  border-radius: 12px;\n  background: var(--surface);\n  border: 1px solid var(--alerte);\n  color: var(--alerte);\n  font-size: 14px;\n}\n\n.form-clos {\n  margin-top: 22px;\n}\n\n.form-merci {\n  margin: 24px 0 0;\n  font-size: 17px;\n  line-height: 1.5;\n}\n";
 //#endregion
 //#region src/a4.css?raw
 var a4_default = "/*\n * Ce que seuls les écrits A4 emportent : la mise à l'échelle de la feuille et\n * le lien d'impression. Une vitrine ne se met pas dans une chemise, et une\n * carte ne s'imprime pas — leur donner ces règles serait du poids sans dessin.\n */\n/*\n * La feuille A4 occupe exactement la largeur disponible.\n *\n * Par paliers — 0,44 puis 0,66 puis 0,86 — elle ne la remplissait presque\n * jamais : sur un écran de 500 px elle restait dessinée pour 390, et son texte\n * finissait plus petit que celui du pied de page. Or c'est le document qu'on\n * vient lire. Le calcul le met à la largeur juste à chaque taille d'écran, et\n * s'arrête à 1 : un devis agrandi au-delà de sa taille réelle n'apprend rien de\n * plus et se met à baver.\n *\n * 210 mm valent 793,7 px à 96 ppp ; les 32 px sont les marges du corps. Le\n * diviseur porte son unité : diviser une longueur par un nombre rend une\n * longueur, et `min(1, 0.41px)` mélange un nombre et une longueur — déclaration\n * invalide, silencieusement ignorée. L'échelle retombait alors à 1 et le\n * document sortait à sa taille réelle, coupé par le cadre sur un téléphone.\n */\n.a4-cadre {\n  --echelle: min(1, calc((100vw - 32px) / 793.7px));\n  margin: 0 auto;\n}\n@media print {\n  body { padding: 0; background: #fff; }\n  .lecture-pied { display: none; }\n}\n\n/*\n * « Enregistrer en PDF » : un lien, pas un bouton.\n *\n * La page n'a aucun script, et c'est ce qui la rend fiable dans le navigateur\n * intégré de WhatsApp, sur un téléphone d'entrée de gamme. Un lien de\n * téléchargement n'en demande pas.\n */\n.lecture-pdf { margin: 10px 0 0; }\n.lecture-pdf a {\n  color: var(--accent);\n  font-weight: 600;\n  text-decoration: none;\n  border-bottom: 1px solid currentColor;\n}\n";
@@ -5382,34 +5911,6 @@ function sansCommentaires(css) {
 	return sortie;
 }
 //#endregion
-//#region ../../node_modules/.pnpm/preact@10.29.8_preact-render-to-string@6.7.0/node_modules/preact/jsx-runtime/dist/jsxRuntime.module.js
-var f = 0;
-Array.isArray;
-function u(e, t, n, o, i, u) {
-	t || (t = {});
-	var a, c, p = t;
-	if ("ref" in p) for (c in p = {}, t) "ref" == c ? a = t[c] : p[c] = t[c];
-	var l = {
-		type: e,
-		props: p,
-		key: n,
-		ref: a,
-		__k: null,
-		__: null,
-		__b: 0,
-		__e: null,
-		__c: null,
-		constructor: void 0,
-		__v: --f,
-		__i: -1,
-		__u: 0,
-		__source: i,
-		__self: u
-	};
-	if ("function" == typeof e && (a = e.defaultProps)) for (c in a) void 0 === p[c] && (p[c] = a[c]);
-	return l$1.vnode && l$1.vnode(l), l;
-}
-//#endregion
 //#region src/page.tsx
 /**
 * Le pied de page.
@@ -5420,23 +5921,19 @@ function u(e, t, n, o, i, u) {
 */
 function PiedLecture(props) {
 	const quand = new Date(props.instantane.publieLe);
-	return /* @__PURE__ */ u("footer", {
+	return /* @__PURE__ */ u$1("footer", {
 		class: "lecture-pied",
 		children: [
-			/* @__PURE__ */ u("p", { children: [
-				"Arrêté le ",
-				Number.isNaN(quand.getTime()) ? "—" : dateLongue(quand),
-				". Document en lecture seule."
-			] }),
-			props.pdf !== void 0 && /* @__PURE__ */ u("p", {
+			/* @__PURE__ */ u$1("p", { children: props.recoit === true ? "Ta réponse va à la personne qui t’a envoyé ce lien, et à personne d’autre." : `Arrêté le ${Number.isNaN(quand.getTime()) ? "—" : dateLongue(quand)}. Document en lecture seule.` }),
+			props.pdf !== void 0 && /* @__PURE__ */ u$1("p", {
 				class: "lecture-pdf",
-				children: /* @__PURE__ */ u("a", {
+				children: /* @__PURE__ */ u$1("a", {
 					href: props.pdf,
 					download: true,
 					children: "Enregistrer en PDF"
 				})
 			}),
-			/* @__PURE__ */ u("p", {
+			/* @__PURE__ */ u$1("p", {
 				class: "lecture-marque",
 				children: "Atelier\xA0237"
 			})
@@ -5450,12 +5947,12 @@ function PiedLecture(props) {
 * lien est peut-être mal recopié, ou le document n'est plus publié.
 */
 function PageIntrouvable() {
-	return /* @__PURE__ */ u("main", {
+	return /* @__PURE__ */ u$1("main", {
 		class: "lecture lecture-vide",
 		children: [
-			/* @__PURE__ */ u("h1", { children: "Ce lien ne mène à rien" }),
-			/* @__PURE__ */ u("p", { children: "Le document n’est plus publié, ou le lien a été recopié de travers. Demande-le à nouveau à la personne qui te l’a envoyé." }),
-			/* @__PURE__ */ u("p", {
+			/* @__PURE__ */ u$1("h1", { children: "Ce lien ne mène à rien" }),
+			/* @__PURE__ */ u$1("p", { children: "Le document n’est plus publié, ou le lien a été recopié de travers. Demande-le à nouveau à la personne qui te l’a envoyé." }),
+			/* @__PURE__ */ u$1("p", {
 				class: "lecture-marque",
 				children: "Atelier\xA0237"
 			})
@@ -5471,114 +5968,14 @@ function PageIntrouvable() {
 * qui est correcte.
 */
 function PageIllisible() {
-	return /* @__PURE__ */ u("main", {
+	return /* @__PURE__ */ u$1("main", {
 		class: "lecture lecture-vide",
 		children: [
-			/* @__PURE__ */ u("h1", { children: "Ce document ne peut pas être affiché" }),
-			/* @__PURE__ */ u("p", { children: "Le lien est bon, mais le document déposé n’est pas lisible ici. Demande à la personne qui te l’a envoyé de le rediffuser." }),
-			/* @__PURE__ */ u("p", {
+			/* @__PURE__ */ u$1("h1", { children: "Ce document ne peut pas être affiché" }),
+			/* @__PURE__ */ u$1("p", { children: "Le lien est bon, mais le document déposé n’est pas lisible ici. Demande à la personne qui te l’a envoyé de le rediffuser." }),
+			/* @__PURE__ */ u$1("p", {
 				class: "lecture-marque",
 				children: "Atelier\xA0237"
-			})
-		]
-	});
-}
-//#endregion
-//#region ../render/src/page/vitrine.tsx
-/**
-* Une page composée, dessinée à la main.
-*
-* C'est le même composant qui sert l'aperçu dans l'application et la page
-* publiée sur le serveur. Deux dessins pour une même configuration finiraient
-* par ne plus montrer la même chose, et c'est celui que le client voit qui
-* aurait tort.
-*
-* Il n'y a **aucun script** : ni ici, ni dans ce que le modèle a le droit
-* d'écrire. Une page composée ne peut pas en contenir, parce qu'aucun champ du
-* contrat n'en accepte — l'invariant § 2.1 tient par la forme du contrat, pas
-* par un filtre qu'on pourrait oublier.
-*/
-function Lignes$1(props) {
-	const lignes = props.section.lignes ?? [];
-	return /* @__PURE__ */ u("ul", {
-		class: props.section.sorte === "prix" ? "vitrine-prix" : "vitrine-liste",
-		children: lignes.map((l) => /* @__PURE__ */ u("li", { children: [/* @__PURE__ */ u("span", {
-			class: "quoi",
-			children: [/* @__PURE__ */ u("b", { children: l.nom }), l.detail !== void 0 && l.detail !== "" && /* @__PURE__ */ u("span", {
-				class: "detail",
-				children: l.detail
-			})]
-		}), l.valeur !== void 0 && l.valeur !== "" && /* @__PURE__ */ u("span", {
-			class: "combien",
-			children: l.valeur
-		})] }, l.nom))
-	});
-}
-function PageVitrine(props) {
-	const p = props.page;
-	const jour = p.date === void 0 ? null : direLeJour(p.date, props.maintenant);
-	const sections = sectionsAncrees(p.sections);
-	const sommaire = avecSommaire(p);
-	const message = `Bonjour ${p.titre}, j’ai vu votre page.`;
-	const whatsapp = p.telephone === void 0 || p.telephone === "" ? null : lienWhatsApp(p.telephone, message);
-	return /* @__PURE__ */ u("article", {
-		class: "vitrine",
-		children: [
-			/* @__PURE__ */ u("header", {
-				class: "vitrine-tete",
-				children: [
-					/* @__PURE__ */ u("p", {
-						class: "kicker",
-						children: p.kicker
-					}),
-					/* @__PURE__ */ u("h1", { children: p.titre }),
-					/* @__PURE__ */ u("p", {
-						class: "accroche",
-						children: p.accroche
-					})
-				]
-			}),
-			jour !== null && /* @__PURE__ */ u("p", {
-				class: jour.passe ? "vitrine-jour passe" : "vitrine-jour",
-				children: [/* @__PURE__ */ u("b", { children: jour.delai }), /* @__PURE__ */ u("span", { children: [jour.quand, jour.heure === "" ? "" : ` ${jour.heure}`] })]
-			}),
-			sommaire && /* @__PURE__ */ u("nav", {
-				class: "vitrine-sommaire",
-				"aria-label": "Sections",
-				children: sections.map(({ section, ancre }) => /* @__PURE__ */ u("a", {
-					href: `#${ancre}`,
-					children: section.titre
-				}, ancre))
-			}),
-			sections.map(({ section, ancre }) => /* @__PURE__ */ u("section", {
-				class: "vitrine-section",
-				id: sommaire ? ancre : void 0,
-				children: [/* @__PURE__ */ u("h2", { children: section.titre }), section.sorte === "texte" ? (section.texte ?? "").split("\n").filter((bout) => bout.trim() !== "").map((bout) => /* @__PURE__ */ u("p", { children: bout }, bout)) : /* @__PURE__ */ u(Lignes$1, { section })]
-			}, ancre)),
-			(whatsapp !== null || p.adresse !== void 0 && p.adresse !== "" || p.horaires !== void 0 && p.horaires !== "") && /* @__PURE__ */ u("footer", {
-				class: "vitrine-pied",
-				children: [
-					whatsapp !== null && /* @__PURE__ */ u("a", {
-						class: "vitrine-appel",
-						href: whatsapp,
-						rel: "noreferrer",
-						children: ["Écrire sur WhatsApp", /* @__PURE__ */ u("span", { children: numeroLisible(p.telephone ?? "") })]
-					}),
-					p.adresse !== void 0 && p.adresse !== "" && /* @__PURE__ */ u("p", {
-						class: "vitrine-ou",
-						children: [/* @__PURE__ */ u("span", {
-							class: "etiquette",
-							children: "Où"
-						}), p.adresse]
-					}),
-					p.horaires !== void 0 && p.horaires !== "" && /* @__PURE__ */ u("p", {
-						class: "vitrine-ou",
-						children: [/* @__PURE__ */ u("span", {
-							class: "etiquette",
-							children: "Quand"
-						}), p.horaires]
-					})
-				]
 			})
 		]
 	});
@@ -5626,9 +6023,9 @@ function hexEncre(e) {
 */
 /** Une feuille A4 à la taille vraie. L'aperçu est mis à l'échelle par le CSS. */
 function PageA4(props) {
-	return /* @__PURE__ */ u("div", {
+	return /* @__PURE__ */ u$1("div", {
 		class: "a4-cadre",
-		children: /* @__PURE__ */ u("article", {
+		children: /* @__PURE__ */ u$1("article", {
 			class: "a4",
 			style: { "--pa": hexEncre(props.encre) },
 			children: props.children
@@ -5637,7 +6034,7 @@ function PageA4(props) {
 }
 /** Ne rend une ligne que si elle porte quelque chose. */
 function Lignes(props) {
-	return /* @__PURE__ */ u(S, { children: props.valeurs.filter((v) => v !== null && v.trim() !== "").map((v, i) => /* @__PURE__ */ u("div", { children: v }, `${i}-${v}`)) });
+	return /* @__PURE__ */ u$1(S, { children: props.valeurs.filter((v) => v !== null && v.trim() !== "").map((v, i) => /* @__PURE__ */ u$1("div", { children: v }, `${i}-${v}`)) });
 }
 /**
 * L'entête légal. Il porte les mentions de la section 5 du brief : raison
@@ -5646,21 +6043,21 @@ function Lignes(props) {
 */
 function Entete(props) {
 	const e = props.emetteur;
-	return /* @__PURE__ */ u("header", {
+	return /* @__PURE__ */ u$1("header", {
 		class: "a4-entete",
-		children: [/* @__PURE__ */ u("div", { children: [/* @__PURE__ */ u("div", {
+		children: [/* @__PURE__ */ u$1("div", { children: [/* @__PURE__ */ u$1("div", {
 			class: "raison",
 			children: e.nom
-		}), /* @__PURE__ */ u("div", {
+		}), /* @__PURE__ */ u$1("div", {
 			class: "coordonnees",
-			children: /* @__PURE__ */ u(Lignes, { valeurs: [
+			children: /* @__PURE__ */ u$1(Lignes, { valeurs: [
 				e.activite,
 				e.adresse,
 				[e.tel && `Tél. ${e.tel}`, e.mail].filter(Boolean).join(" · ") || null
 			] })
-		})] }), /* @__PURE__ */ u("div", {
+		})] }), /* @__PURE__ */ u$1("div", {
 			class: "immat",
-			children: /* @__PURE__ */ u(Lignes, { valeurs: [
+			children: /* @__PURE__ */ u$1(Lignes, { valeurs: [
 				e.forme,
 				e.rccm && `RCCM ${e.rccm}`,
 				e.niu && `NIU ${e.niu}`,
@@ -5670,10 +6067,10 @@ function Entete(props) {
 	});
 }
 function TitreDocument(props) {
-	return /* @__PURE__ */ u(S, { children: [/* @__PURE__ */ u("h1", {
+	return /* @__PURE__ */ u$1(S, { children: [/* @__PURE__ */ u$1("h1", {
 		class: "a4-titre",
 		children: props.titre
-	}), /* @__PURE__ */ u("div", {
+	}), /* @__PURE__ */ u$1("div", {
 		class: "a4-sous-titre",
 		children: props.sousTitre
 	})] });
@@ -5683,46 +6080,46 @@ function TitreDocument(props) {
 * obligatoire, et sans lui le client ne peut pas déduire.
 */
 function BlocClient(props) {
-	return /* @__PURE__ */ u("section", {
+	return /* @__PURE__ */ u$1("section", {
 		class: "a4-bloc-client",
 		children: [
-			/* @__PURE__ */ u("div", {
+			/* @__PURE__ */ u$1("div", {
 				class: "etiquette",
 				children: "Client"
 			}),
-			/* @__PURE__ */ u("div", { children: /* @__PURE__ */ u("strong", { children: props.nom }) }),
-			/* @__PURE__ */ u(Lignes, { valeurs: [props.niu && `NIU ${props.niu}`, props.complement] })
+			/* @__PURE__ */ u$1("div", { children: /* @__PURE__ */ u$1("strong", { children: props.nom }) }),
+			/* @__PURE__ */ u$1(Lignes, { valeurs: [props.niu && `NIU ${props.niu}`, props.complement] })
 		]
 	});
 }
 function ZonesSignature(props) {
-	return /* @__PURE__ */ u("section", {
+	return /* @__PURE__ */ u$1("section", {
 		class: "a4-signatures",
-		children: props.zones.map((z) => /* @__PURE__ */ u("div", {
+		children: props.zones.map((z) => /* @__PURE__ */ u$1("div", {
 			class: "zone",
 			children: [
-				/* @__PURE__ */ u("div", {
+				/* @__PURE__ */ u$1("div", {
 					class: "libelle",
 					children: z.libelle
 				}),
-				z.mention !== void 0 && /* @__PURE__ */ u("div", {
+				z.mention !== void 0 && /* @__PURE__ */ u$1("div", {
 					class: "mention",
 					children: z.mention
 				}),
-				/* @__PURE__ */ u("div", { class: "cadre" })
+				/* @__PURE__ */ u$1("div", { class: "cadre" })
 			]
 		}, z.libelle))
 	});
 }
 /** Le pied légal, obligatoire, plus d'éventuelles mentions propres au document. */
 function PiedLegal(props) {
-	return /* @__PURE__ */ u("footer", {
+	return /* @__PURE__ */ u$1("footer", {
 		class: "a4-pied",
-		children: [/* @__PURE__ */ u("div", { children: piedLegal(props.emetteur) }), props.complement !== void 0 && /* @__PURE__ */ u("div", { children: props.complement })]
+		children: [/* @__PURE__ */ u$1("div", { children: piedLegal(props.emetteur) }), props.complement !== void 0 && /* @__PURE__ */ u$1("div", { children: props.complement })]
 	});
 }
 function NumeroPage(props) {
-	return /* @__PURE__ */ u("div", {
+	return /* @__PURE__ */ u$1("div", {
 		class: "a4-numero-page",
 		children: [
 			props.page,
@@ -5733,7 +6130,7 @@ function NumeroPage(props) {
 }
 /** Un texte libre découpé en paragraphes sur les lignes vides. Jamais de HTML. */
 function Paragraphes(props) {
-	return /* @__PURE__ */ u(S, { children: props.texte.split(/\n\s*\n/).map((b) => b.trim()).filter((b) => b !== "").map((b, i) => /* @__PURE__ */ u("p", { children: b }, `${i}-${b.slice(0, 12)}`)) });
+	return /* @__PURE__ */ u$1(S, { children: props.texte.split(/\n\s*\n/).map((b) => b.trim()).filter((b) => b !== "").map((b, i) => /* @__PURE__ */ u$1("p", { children: b }, `${i}-${b.slice(0, 12)}`)) });
 }
 //#endregion
 //#region ../render/src/doc/tableau.tsx
@@ -5763,53 +6160,53 @@ function neDitRien(ligne) {
 }
 function TableauLignes(props) {
 	const lignes = props.totaux.lignes.filter((l) => !neDitRien(l));
-	if (lignes.length === 0) return /* @__PURE__ */ u("div", {
+	if (lignes.length === 0) return /* @__PURE__ */ u$1("div", {
 		class: "a4-vide",
 		children: "Aucune ligne pour l’instant."
 	});
-	return /* @__PURE__ */ u("table", {
+	return /* @__PURE__ */ u$1("table", {
 		class: "a4-tableau",
-		children: [/* @__PURE__ */ u("thead", { children: /* @__PURE__ */ u("tr", { children: [
-			/* @__PURE__ */ u("th", { children: "Désignation" }),
-			/* @__PURE__ */ u("th", {
+		children: [/* @__PURE__ */ u$1("thead", { children: /* @__PURE__ */ u$1("tr", { children: [
+			/* @__PURE__ */ u$1("th", { children: "Désignation" }),
+			/* @__PURE__ */ u$1("th", {
 				class: "nombre",
 				children: "Qté"
 			}),
-			/* @__PURE__ */ u("th", {
+			/* @__PURE__ */ u$1("th", {
 				class: "nombre",
 				children: "P.U. HT"
 			}),
-			/* @__PURE__ */ u("th", {
+			/* @__PURE__ */ u$1("th", {
 				class: "nombre",
 				children: "Montant HT"
 			}),
-			/* @__PURE__ */ u("th", {
+			/* @__PURE__ */ u$1("th", {
 				class: "nombre",
 				children: LIBELLE_TVA_CM
 			}),
-			/* @__PURE__ */ u("th", {
+			/* @__PURE__ */ u$1("th", {
 				class: "nombre",
 				children: "Montant TTC"
 			})
-		] }) }), /* @__PURE__ */ u("tbody", { children: lignes.map((l, i) => /* @__PURE__ */ u("tr", { children: [
-			/* @__PURE__ */ u("td", { children: l.designation }),
-			/* @__PURE__ */ u("td", {
+		] }) }), /* @__PURE__ */ u$1("tbody", { children: lignes.map((l, i) => /* @__PURE__ */ u$1("tr", { children: [
+			/* @__PURE__ */ u$1("td", { children: l.designation }),
+			/* @__PURE__ */ u$1("td", {
 				class: "nombre",
 				children: nf(l.quantite)
 			}),
-			/* @__PURE__ */ u("td", {
+			/* @__PURE__ */ u$1("td", {
 				class: "nombre",
 				children: nf(l.prixUnitaire)
 			}),
-			/* @__PURE__ */ u("td", {
+			/* @__PURE__ */ u$1("td", {
 				class: "nombre",
 				children: nf(l.montantHT)
 			}),
-			/* @__PURE__ */ u("td", {
+			/* @__PURE__ */ u$1("td", {
 				class: "nombre",
 				children: nf(l.tva)
 			}),
-			/* @__PURE__ */ u("td", {
+			/* @__PURE__ */ u$1("td", {
 				class: "nombre",
 				children: nf(l.montantTTC)
 			})
@@ -5818,11 +6215,11 @@ function TableauLignes(props) {
 }
 /** Le bloc HT / TVA / TTC, plus ce que le document ajoute au-dessous. */
 function BlocTotaux(props) {
-	return /* @__PURE__ */ u("section", {
+	return /* @__PURE__ */ u$1("section", {
 		class: "a4-totaux",
-		children: props.lignes.map((l) => /* @__PURE__ */ u("div", {
+		children: props.lignes.map((l) => /* @__PURE__ */ u$1("div", {
 			class: l.fort === true ? "ligne fort" : "ligne",
-			children: [/* @__PURE__ */ u("span", { children: l.libelle }), /* @__PURE__ */ u("span", { children: montantF(l.montant) })]
+			children: [/* @__PURE__ */ u$1("span", { children: l.libelle }), /* @__PURE__ */ u$1("span", { children: montantF(l.montant) })]
 		}, l.libelle))
 	});
 }
@@ -5842,27 +6239,27 @@ function BlocTotaux(props) {
 */
 function DocumentAttestation(props) {
 	const etat = props.etat;
-	return /* @__PURE__ */ u(PageA4, {
+	return /* @__PURE__ */ u$1(PageA4, {
 		encre: etat.encre,
 		children: [
-			/* @__PURE__ */ u(Entete, { emetteur: etat.emetteur }),
-			/* @__PURE__ */ u(TitreDocument, {
+			/* @__PURE__ */ u$1(Entete, { emetteur: etat.emetteur }),
+			/* @__PURE__ */ u$1(TitreDocument, {
 				titre: etat.objet === "" ? "Attestation" : etat.objet,
 				sousTitre: `N° ${etat.numero}`
 			}),
-			/* @__PURE__ */ u("section", {
+			/* @__PURE__ */ u$1("section", {
 				class: "a4-mentions a4-corps",
-				children: etat.texte.trim() === "" ? /* @__PURE__ */ u("div", {
+				children: etat.texte.trim() === "" ? /* @__PURE__ */ u$1("div", {
 					class: "a4-vide",
 					children: "Le corps de l’attestation reste à écrire."
-				}) : /* @__PURE__ */ u(Paragraphes, { texte: etat.texte })
+				}) : /* @__PURE__ */ u$1(Paragraphes, { texte: etat.texte })
 			}),
-			/* @__PURE__ */ u(ZonesSignature, { zones: [{
+			/* @__PURE__ */ u$1(ZonesSignature, { zones: [{
 				libelle: `${etat.emetteur.adresse === "" ? "Fait" : "Fait à " + villeDe(etat.emetteur.adresse)}, le ${dateLongue(dateEmission(etat))}`,
 				mention: "Le responsable — cachet et signature"
 			}] }),
-			/* @__PURE__ */ u(PiedLegal, { emetteur: etat.emetteur }),
-			/* @__PURE__ */ u(NumeroPage, {
+			/* @__PURE__ */ u$1(PiedLegal, { emetteur: etat.emetteur }),
+			/* @__PURE__ */ u$1(NumeroPage, {
 				page: 1,
 				total: 1
 			})
@@ -5885,35 +6282,35 @@ function DocumentRecu(props) {
 	const etat = props.etat;
 	const t = totauxRecu(etat);
 	const lignes = etat.lignes.filter((l) => l.designation.trim() !== "" || l.montant !== 0);
-	return /* @__PURE__ */ u(PageA4, {
+	return /* @__PURE__ */ u$1(PageA4, {
 		encre: etat.encre,
 		children: [
-			/* @__PURE__ */ u(Entete, { emetteur: etat.emetteur }),
-			/* @__PURE__ */ u(TitreDocument, {
+			/* @__PURE__ */ u$1(Entete, { emetteur: etat.emetteur }),
+			/* @__PURE__ */ u$1(TitreDocument, {
 				titre: "Reçu",
 				sousTitre: `N° ${etat.numero} · ${dateLongue(dateEmission(etat))}`
 			}),
-			/* @__PURE__ */ u("section", {
+			/* @__PURE__ */ u$1("section", {
 				class: "a4-bloc-client",
-				children: [/* @__PURE__ */ u("div", {
+				children: [/* @__PURE__ */ u$1("div", {
 					class: "etiquette",
 					children: "Reçu de"
-				}), /* @__PURE__ */ u("div", { children: /* @__PURE__ */ u("strong", { children: etat.recuDe }) })]
+				}), /* @__PURE__ */ u$1("div", { children: /* @__PURE__ */ u$1("strong", { children: etat.recuDe }) })]
 			}),
-			lignes.length === 0 ? /* @__PURE__ */ u("div", {
+			lignes.length === 0 ? /* @__PURE__ */ u$1("div", {
 				class: "a4-vide",
 				children: "Aucune ligne pour l’instant."
-			}) : /* @__PURE__ */ u("table", {
+			}) : /* @__PURE__ */ u$1("table", {
 				class: "a4-tableau",
-				children: [/* @__PURE__ */ u("thead", { children: /* @__PURE__ */ u("tr", { children: [/* @__PURE__ */ u("th", { children: "Désignation" }), /* @__PURE__ */ u("th", {
+				children: [/* @__PURE__ */ u$1("thead", { children: /* @__PURE__ */ u$1("tr", { children: [/* @__PURE__ */ u$1("th", { children: "Désignation" }), /* @__PURE__ */ u$1("th", {
 					class: "nombre",
 					children: "Montant"
-				})] }) }), /* @__PURE__ */ u("tbody", { children: lignes.map((l, i) => /* @__PURE__ */ u("tr", { children: [/* @__PURE__ */ u("td", { children: l.designation }), /* @__PURE__ */ u("td", {
+				})] }) }), /* @__PURE__ */ u$1("tbody", { children: lignes.map((l, i) => /* @__PURE__ */ u$1("tr", { children: [/* @__PURE__ */ u$1("td", { children: l.designation }), /* @__PURE__ */ u$1("td", {
 					class: "nombre",
 					children: nf(l.montant)
 				})] }, `${i}-${l.designation}`)) })]
 			}),
-			/* @__PURE__ */ u(BlocTotaux, { lignes: [
+			/* @__PURE__ */ u$1(BlocTotaux, { lignes: [
 				{
 					libelle: "Total",
 					montant: t.total
@@ -5928,7 +6325,7 @@ function DocumentRecu(props) {
 					fort: true
 				}
 			] }),
-			/* @__PURE__ */ u("div", {
+			/* @__PURE__ */ u$1("div", {
 				class: "a4-en-lettres",
 				children: [
 					"Somme reçue ce jour : ",
@@ -5936,15 +6333,15 @@ function DocumentRecu(props) {
 					"."
 				]
 			}),
-			/* @__PURE__ */ u(ZonesSignature, { zones: [{
+			/* @__PURE__ */ u$1(ZonesSignature, { zones: [{
 				libelle: "Cachet et signature",
 				mention: ""
 			}] }),
-			/* @__PURE__ */ u(PiedLegal, {
+			/* @__PURE__ */ u$1(PiedLegal, {
 				emetteur: etat.emetteur,
 				complement: "Reçu établi en francs CFA. Il atteste d’un paiement reçu, il ne remplace pas la facture."
 			}),
-			/* @__PURE__ */ u(NumeroPage, {
+			/* @__PURE__ */ u$1(NumeroPage, {
 				page: 1,
 				total: 1
 			})
@@ -5953,25 +6350,25 @@ function DocumentRecu(props) {
 }
 function DocumentDette(props) {
 	const etat = props.etat;
-	return /* @__PURE__ */ u(PageA4, {
+	return /* @__PURE__ */ u$1(PageA4, {
 		encre: etat.encre,
 		children: [
-			/* @__PURE__ */ u(TitreDocument, {
+			/* @__PURE__ */ u$1(TitreDocument, {
 				titre: "Reconnaissance de dette",
 				sousTitre: `Acte sous seing privé · ${dateLongue(dateEmission(etat))}`
 			}),
-			/* @__PURE__ */ u("section", {
+			/* @__PURE__ */ u$1("section", {
 				class: "a4-parties",
-				children: [/* @__PURE__ */ u("div", { children: [
-					/* @__PURE__ */ u("span", {
+				children: [/* @__PURE__ */ u$1("div", { children: [
+					/* @__PURE__ */ u$1("span", {
 						class: "qui",
 						children: "L’emprunteur"
 					}),
 					" ",
 					etat.emprunteur.nom,
 					etat.emprunteur.piece === "" ? "" : `, ${etat.emprunteur.piece}`
-				] }), /* @__PURE__ */ u("div", { children: [
-					/* @__PURE__ */ u("span", {
+				] }), /* @__PURE__ */ u$1("div", { children: [
+					/* @__PURE__ */ u$1("span", {
 						class: "qui",
 						children: "Le prêteur"
 					}),
@@ -5980,22 +6377,22 @@ function DocumentDette(props) {
 					etat.preteur.piece === "" ? "" : `, ${etat.preteur.piece}`
 				] })]
 			}),
-			/* @__PURE__ */ u("section", {
+			/* @__PURE__ */ u$1("section", {
 				class: "a4-mentions a4-corps",
-				children: /* @__PURE__ */ u(Paragraphes, { texte: etat.texte })
+				children: /* @__PURE__ */ u$1(Paragraphes, { texte: etat.texte })
 			}),
-			/* @__PURE__ */ u("section", {
+			/* @__PURE__ */ u$1("section", {
 				class: "a4-encadre",
 				children: [
-					/* @__PURE__ */ u("div", {
+					/* @__PURE__ */ u$1("div", {
 						class: "etiquette",
 						children: "Montant du prêt"
 					}),
-					/* @__PURE__ */ u("div", {
+					/* @__PURE__ */ u$1("div", {
 						class: "chiffre",
 						children: montantF(etat.montant)
 					}),
-					/* @__PURE__ */ u("div", {
+					/* @__PURE__ */ u$1("div", {
 						class: "lettres",
 						children: [
 							"Soit ",
@@ -6003,30 +6400,30 @@ function DocumentDette(props) {
 							"."
 						]
 					}),
-					etat.echeance === "" ? null : /* @__PURE__ */ u("div", {
+					etat.echeance === "" ? null : /* @__PURE__ */ u$1("div", {
 						class: "echeance",
-						children: ["Échéance de remboursement : ", /* @__PURE__ */ u("strong", { children: etat.echeance })]
+						children: ["Échéance de remboursement : ", /* @__PURE__ */ u$1("strong", { children: etat.echeance })]
 					})
 				]
 			}),
-			/* @__PURE__ */ u(ZonesSignature, { zones: [{
+			/* @__PURE__ */ u$1(ZonesSignature, { zones: [{
 				libelle: "L’emprunteur",
 				mention: "« Lu et approuvé », date et signature"
 			}, {
 				libelle: "Le prêteur",
 				mention: "Date et signature"
 			}] }),
-			/* @__PURE__ */ u("footer", {
+			/* @__PURE__ */ u$1("footer", {
 				class: "a4-pied",
-				children: [/* @__PURE__ */ u("div", { children: [
+				children: [/* @__PURE__ */ u$1("div", { children: [
 					etat.lieu === "" ? "Fait" : `Fait à ${etat.lieu}`,
 					" le",
 					" ",
 					dateLongue(dateEmission(etat)),
 					", en deux exemplaires originaux, dont un remis à chaque partie."
-				] }), /* @__PURE__ */ u("div", { children: "Acte sous seing privé. Pour un montant important, l’enregistrement auprès des impôts est conseillé." })]
+				] }), /* @__PURE__ */ u$1("div", { children: "Acte sous seing privé. Pour un montant important, l’enregistrement auprès des impôts est conseillé." })]
 			}),
-			/* @__PURE__ */ u(NumeroPage, {
+			/* @__PURE__ */ u$1(NumeroPage, {
 				page: 1,
 				total: 1
 			})
@@ -6036,43 +6433,43 @@ function DocumentDette(props) {
 function DocumentMotivation(props) {
 	const etat = props.etat;
 	const e = etat.expediteur;
-	return /* @__PURE__ */ u(PageA4, {
+	return /* @__PURE__ */ u$1(PageA4, {
 		encre: etat.encre,
 		children: [
-			/* @__PURE__ */ u("section", {
+			/* @__PURE__ */ u$1("section", {
 				class: "a4-lettre-tete",
-				children: [/* @__PURE__ */ u("div", {
+				children: [/* @__PURE__ */ u$1("div", {
 					class: "expediteur",
-					children: [/* @__PURE__ */ u("strong", { children: e.nom }), [
+					children: [/* @__PURE__ */ u$1("strong", { children: e.nom }), [
 						e.tel,
 						e.mail,
 						e.ville
-					].filter((s) => s !== "").map((s) => /* @__PURE__ */ u("div", { children: s }, s))]
-				}), /* @__PURE__ */ u("div", {
+					].filter((s) => s !== "").map((s) => /* @__PURE__ */ u$1("div", { children: s }, s))]
+				}), /* @__PURE__ */ u$1("div", {
 					class: "destinataire",
-					children: etat.destinataire.split("\n").filter((l) => l.trim() !== "").map((l, i) => /* @__PURE__ */ u("div", { children: l }, `${i}-${l}`))
+					children: etat.destinataire.split("\n").filter((l) => l.trim() !== "").map((l, i) => /* @__PURE__ */ u$1("div", { children: l }, `${i}-${l}`))
 				})]
 			}),
-			/* @__PURE__ */ u("div", {
+			/* @__PURE__ */ u$1("div", {
 				class: "a4-lettre-date",
 				children: [e.ville === "" ? "" : `${e.ville}, le `, dateLongue(dateEmission(etat))]
 			}),
-			/* @__PURE__ */ u("div", {
+			/* @__PURE__ */ u$1("div", {
 				class: "a4-lettre-objet",
 				children: etat.objet
 			}),
-			/* @__PURE__ */ u("section", {
+			/* @__PURE__ */ u$1("section", {
 				class: "a4-mentions a4-corps",
-				children: etat.corps.trim() === "" ? /* @__PURE__ */ u("div", {
+				children: etat.corps.trim() === "" ? /* @__PURE__ */ u$1("div", {
 					class: "a4-vide",
 					children: "Le corps de la lettre reste à écrire."
-				}) : /* @__PURE__ */ u(Paragraphes, { texte: etat.corps })
+				}) : /* @__PURE__ */ u$1(Paragraphes, { texte: etat.corps })
 			}),
-			/* @__PURE__ */ u("div", {
+			/* @__PURE__ */ u$1("div", {
 				class: "a4-lettre-signature",
 				children: e.nom
 			}),
-			/* @__PURE__ */ u(NumeroPage, {
+			/* @__PURE__ */ u$1(NumeroPage, {
 				page: 1,
 				total: 1
 			})
@@ -6101,7 +6498,7 @@ function DocumentMotivation(props) {
 */
 /** Les puces d'un poste. Une ligne vide ne laisse pas de puce orpheline. */
 function Faits(props) {
-	return /* @__PURE__ */ u(S, { children: props.points.filter((p) => p.trim() !== "").map((p, i) => /* @__PURE__ */ u("div", {
+	return /* @__PURE__ */ u$1(S, { children: props.points.filter((p) => p.trim() !== "").map((p, i) => /* @__PURE__ */ u$1("div", {
 		class: "cv-fait",
 		children: p
 	}, `${i}-${p.slice(0, 12)}`)) });
@@ -6117,7 +6514,7 @@ function Faits(props) {
 */
 function Marge(props) {
 	if (!props.enMarge || props.quand.trim() === "") return null;
-	return /* @__PURE__ */ u("div", {
+	return /* @__PURE__ */ u$1("div", {
 		class: "cv-marge",
 		children: props.quand
 	});
@@ -6126,18 +6523,18 @@ function ligneOu(qui, quand, enMarge, separateur) {
 	return [qui, enMarge ? "" : quand].filter((s) => s.trim() !== "").join(` ${separateur} `);
 }
 function Diplomes(props) {
-	return /* @__PURE__ */ u(S, { children: props.diplomes.map((d, i) => /* @__PURE__ */ u("div", {
+	return /* @__PURE__ */ u$1(S, { children: props.diplomes.map((d, i) => /* @__PURE__ */ u$1("div", {
 		class: "cv-item",
 		children: [
-			/* @__PURE__ */ u(Marge, {
+			/* @__PURE__ */ u$1(Marge, {
 				quand: d.annee,
 				enMarge: props.enMarge
 			}),
-			/* @__PURE__ */ u("div", {
+			/* @__PURE__ */ u$1("div", {
 				class: "cv-quoi",
 				children: d.intitule
 			}),
-			/* @__PURE__ */ u("div", {
+			/* @__PURE__ */ u$1("div", {
 				class: "cv-ou",
 				children: ligneOu(d.etablissement, d.annee, props.enMarge, props.separateur)
 			})
@@ -6145,29 +6542,29 @@ function Diplomes(props) {
 	}, `${i}-${d.intitule}`)) });
 }
 function Postes(props) {
-	return /* @__PURE__ */ u(S, { children: props.postes.map((p, i) => /* @__PURE__ */ u("div", {
+	return /* @__PURE__ */ u$1(S, { children: props.postes.map((p, i) => /* @__PURE__ */ u$1("div", {
 		class: "cv-item",
 		children: [
-			/* @__PURE__ */ u(Marge, {
+			/* @__PURE__ */ u$1(Marge, {
 				quand: p.periode,
 				enMarge: props.enMarge
 			}),
-			/* @__PURE__ */ u("div", {
+			/* @__PURE__ */ u$1("div", {
 				class: "cv-quoi",
 				children: p.intitule
 			}),
-			/* @__PURE__ */ u("div", {
+			/* @__PURE__ */ u$1("div", {
 				class: "cv-ou",
 				children: ligneOu(p.employeur, p.periode, props.enMarge, props.separateur)
 			}),
-			/* @__PURE__ */ u(Faits, { points: p.points })
+			/* @__PURE__ */ u$1(Faits, { points: p.points })
 		]
 	}, `${i}-${p.intitule}`)) });
 }
 /** Le titre d'une section. Rien ne s'affiche si la section est vide. */
 function Section(props) {
 	if (props.vide) return null;
-	return /* @__PURE__ */ u(S, { children: [/* @__PURE__ */ u("h4", {
+	return /* @__PURE__ */ u$1(S, { children: [/* @__PURE__ */ u$1("h4", {
 		class: "cv-section",
 		children: props.titre
 	}), props.children] });
@@ -6175,16 +6572,16 @@ function Section(props) {
 /** Le profil, écrit en paragraphes comme partout ailleurs dans l'atelier. */
 function Profil(props) {
 	if (props.texte.trim() === "") return null;
-	return /* @__PURE__ */ u(S, { children: [/* @__PURE__ */ u("h4", {
+	return /* @__PURE__ */ u$1(S, { children: [/* @__PURE__ */ u$1("h4", {
 		class: "cv-section",
 		children: props.titre
-	}), /* @__PURE__ */ u("div", {
+	}), /* @__PURE__ */ u$1("div", {
 		class: "cv-profil",
-		children: /* @__PURE__ */ u(Paragraphes, { texte: props.texte })
+		children: /* @__PURE__ */ u$1(Paragraphes, { texte: props.texte })
 	})] });
 }
 function Contact(props) {
-	return /* @__PURE__ */ u("div", {
+	return /* @__PURE__ */ u$1("div", {
 		class: "cv-contact",
 		children: [
 			props.id.tel,
@@ -6203,72 +6600,72 @@ function DocumentCv(props) {
 	const classes = `a4-cv ${etat.gabarit}${etat.dense ? " dense" : ""}`;
 	const enMarge = etat.gabarit === "editorial";
 	const separateur = etat.gabarit === "notaire" ? "—" : "·";
-	const experience = /* @__PURE__ */ u(Section, {
+	const experience = /* @__PURE__ */ u$1(Section, {
 		titre: t.experience,
 		vide: etat.postes.length === 0,
-		children: /* @__PURE__ */ u(Postes, {
+		children: /* @__PURE__ */ u$1(Postes, {
 			postes: etat.postes,
 			enMarge,
 			separateur
 		})
 	});
-	const formation = /* @__PURE__ */ u(Section, {
+	const formation = /* @__PURE__ */ u$1(Section, {
 		titre: t.formation,
 		vide: etat.diplomes.length === 0,
-		children: /* @__PURE__ */ u(Diplomes, {
+		children: /* @__PURE__ */ u$1(Diplomes, {
 			diplomes: etat.diplomes,
 			enMarge,
 			separateur
 		})
 	});
-	if (etat.gabarit === "bloc") return /* @__PURE__ */ u(PageA4, {
+	if (etat.gabarit === "bloc") return /* @__PURE__ */ u$1(PageA4, {
 		encre: etat.encre,
-		children: [/* @__PURE__ */ u("div", {
+		children: [/* @__PURE__ */ u$1("div", {
 			class: classes,
-			children: [/* @__PURE__ */ u("aside", {
+			children: [/* @__PURE__ */ u$1("aside", {
 				class: "cv-bande",
 				children: [
-					/* @__PURE__ */ u("div", {
+					/* @__PURE__ */ u$1("div", {
 						class: "cv-nom",
 						children: id.nom
 					}),
-					/* @__PURE__ */ u("div", {
+					/* @__PURE__ */ u$1("div", {
 						class: "cv-titre",
 						children: id.titre
 					}),
-					/* @__PURE__ */ u(Section, {
+					/* @__PURE__ */ u$1(Section, {
 						titre: t.contact,
 						vide: false,
-						children: /* @__PURE__ */ u(S, { children: [
+						children: /* @__PURE__ */ u$1(S, { children: [
 							id.tel,
 							id.mail,
 							id.ville
-						].filter((s) => s.trim() !== "").map((s) => /* @__PURE__ */ u("div", {
+						].filter((s) => s.trim() !== "").map((s) => /* @__PURE__ */ u$1("div", {
 							class: "cv-ligne",
 							children: s
 						}, s)) })
 					}),
-					/* @__PURE__ */ u(Section, {
+					/* @__PURE__ */ u$1(Section, {
 						titre: t.competences,
 						vide: etat.competences.length === 0,
-						children: /* @__PURE__ */ u(S, { children: etat.competences.map((c) => /* @__PURE__ */ u("div", {
+						children: /* @__PURE__ */ u$1(S, { children: etat.competences.map((c) => /* @__PURE__ */ u$1("div", {
 							class: "cv-ligne",
 							children: c
 						}, c)) })
 					}),
-					/* @__PURE__ */ u(Section, {
+					/* @__PURE__ */ u$1(Section, {
 						titre: t.langues,
 						vide: etat.langues.length === 0,
-						children: /* @__PURE__ */ u(S, { children: etat.langues.map((l) => /* @__PURE__ */ u("div", {
+						children: /* @__PURE__ */ u$1(S, { children: etat.langues.map((l) => /* @__PURE__ */ u$1("div", {
 							class: "cv-ligne",
 							children: l
 						}, l)) })
 					})
 				]
-			}), /* @__PURE__ */ u("div", {
+			}), /* @__PURE__ */ u$1("div", {
 				class: "cv-principal",
 				children: [
-					/* @__PURE__ */ u(Profil, {
+					/* @__PURE__ */ u$1(Profil, {
 						texte: etat.resume,
 						titre: t.profil
 					}),
@@ -6276,54 +6673,54 @@ function DocumentCv(props) {
 					formation
 				]
 			})]
-		}), /* @__PURE__ */ u(NumeroPage, {
+		}), /* @__PURE__ */ u$1(NumeroPage, {
 			page: 1,
 			total: 1
 		})]
 	});
-	return /* @__PURE__ */ u(PageA4, {
+	return /* @__PURE__ */ u$1(PageA4, {
 		encre: etat.encre,
-		children: [/* @__PURE__ */ u("div", {
+		children: [/* @__PURE__ */ u$1("div", {
 			class: classes,
 			children: [
-				/* @__PURE__ */ u("header", {
+				/* @__PURE__ */ u$1("header", {
 					class: "cv-tete",
 					children: [
-						/* @__PURE__ */ u("div", {
+						/* @__PURE__ */ u$1("div", {
 							class: "cv-nom",
 							children: id.nom
 						}),
-						/* @__PURE__ */ u("div", {
+						/* @__PURE__ */ u$1("div", {
 							class: "cv-titre",
 							children: id.titre
 						}),
-						/* @__PURE__ */ u(Contact, { id })
+						/* @__PURE__ */ u$1(Contact, { id })
 					]
 				}),
-				/* @__PURE__ */ u(Profil, {
+				/* @__PURE__ */ u$1(Profil, {
 					texte: etat.resume,
 					titre: t.profil
 				}),
 				experience,
 				formation,
-				/* @__PURE__ */ u(Section, {
+				/* @__PURE__ */ u$1(Section, {
 					titre: t.competences,
 					vide: etat.competences.length === 0,
-					children: /* @__PURE__ */ u("div", {
+					children: /* @__PURE__ */ u$1("div", {
 						class: "cv-serie",
 						children: etat.competences.join(" · ")
 					})
 				}),
-				/* @__PURE__ */ u(Section, {
+				/* @__PURE__ */ u$1(Section, {
 					titre: t.langues,
 					vide: etat.langues.length === 0,
-					children: /* @__PURE__ */ u("div", {
+					children: /* @__PURE__ */ u$1("div", {
 						class: "cv-serie",
 						children: etat.langues.join(" · ")
 					})
 				})
 			]
-		}), /* @__PURE__ */ u(NumeroPage, {
+		}), /* @__PURE__ */ u$1(NumeroPage, {
 			page: 1,
 			total: 1
 		})]
@@ -6366,22 +6763,22 @@ function DocumentDevis(props) {
 			montant: c.soldeDu
 		});
 	}
-	return /* @__PURE__ */ u(PageA4, {
+	return /* @__PURE__ */ u$1(PageA4, {
 		encre: etat.encre,
 		children: [
-			/* @__PURE__ */ u(Entete, { emetteur: etat.emetteur }),
-			/* @__PURE__ */ u(TitreDocument, {
+			/* @__PURE__ */ u$1(Entete, { emetteur: etat.emetteur }),
+			/* @__PURE__ */ u$1(TitreDocument, {
 				titre: "Devis",
 				sousTitre: `N° ${etat.numero} · émis le ${dateLongue(dateEmission(etat))}`
 			}),
-			/* @__PURE__ */ u(BlocClient, {
+			/* @__PURE__ */ u$1(BlocClient, {
 				nom: etat.client.nom,
 				niu: etat.client.niu,
 				complement: etat.objet === void 0 ? null : `Objet : ${etat.objet}`
 			}),
-			/* @__PURE__ */ u(TableauLignes, { totaux: c }),
-			/* @__PURE__ */ u(BlocTotaux, { lignes: totaux }),
-			/* @__PURE__ */ u("div", {
+			/* @__PURE__ */ u$1(TableauLignes, { totaux: c }),
+			/* @__PURE__ */ u$1(BlocTotaux, { lignes: totaux }),
+			/* @__PURE__ */ u$1("div", {
 				class: "a4-en-lettres",
 				children: [
 					"Soit ",
@@ -6389,30 +6786,30 @@ function DocumentDevis(props) {
 					", toutes taxes comprises."
 				]
 			}),
-			/* @__PURE__ */ u("section", {
+			/* @__PURE__ */ u$1("section", {
 				class: "a4-mentions",
-				children: [/* @__PURE__ */ u("p", { children: [
+				children: [/* @__PURE__ */ u$1("p", { children: [
 					"Validité de la présente offre : ",
 					etat.validite,
 					" à compter de la date d’émission."
-				] }), etat.acompte > 0 && /* @__PURE__ */ u("p", { children: [
+				] }), etat.acompte > 0 && /* @__PURE__ */ u$1("p", { children: [
 					"Acompte de ",
 					etat.acompte,
 					" % à la commande, solde à la livraison."
 				] })]
 			}),
-			/* @__PURE__ */ u(ZonesSignature, { zones: [{
+			/* @__PURE__ */ u$1(ZonesSignature, { zones: [{
 				libelle: "Le fournisseur",
 				mention: "Cachet et signature"
 			}, {
 				libelle: "Bon pour accord — le client",
 				mention: "Date, signature et cachet"
 			}] }),
-			/* @__PURE__ */ u(PiedLegal, {
+			/* @__PURE__ */ u$1(PiedLegal, {
 				emetteur: etat.emetteur,
 				complement: "Devis établi en francs CFA. Numérotation unique, continue et chronologique."
 			}),
-			/* @__PURE__ */ u(NumeroPage, {
+			/* @__PURE__ */ u$1(NumeroPage, {
 				page: 1,
 				total: 1
 			})
@@ -6468,22 +6865,22 @@ function DocumentFacture(props) {
 		libelle: "Trop-perçu à restituer",
 		montant: c.tropPercu
 	});
-	return /* @__PURE__ */ u(PageA4, {
+	return /* @__PURE__ */ u$1(PageA4, {
 		encre: etat.encre,
 		children: [
-			/* @__PURE__ */ u(Entete, { emetteur: etat.emetteur }),
-			/* @__PURE__ */ u(TitreDocument, {
+			/* @__PURE__ */ u$1(Entete, { emetteur: etat.emetteur }),
+			/* @__PURE__ */ u$1(TitreDocument, {
 				titre: "Facture",
 				sousTitre: `N° ${etat.numero} · émise le ${dateLongue(dateEmission(etat))} · échéance le ${echeance}`
 			}),
-			/* @__PURE__ */ u(BlocClient, {
+			/* @__PURE__ */ u$1(BlocClient, {
 				nom: etat.client.nom,
 				niu: etat.client.niu,
 				complement: complementClient
 			}),
-			/* @__PURE__ */ u(TableauLignes, { totaux: c }),
-			/* @__PURE__ */ u(BlocTotaux, { lignes: totaux }),
-			/* @__PURE__ */ u("div", {
+			/* @__PURE__ */ u$1(TableauLignes, { totaux: c }),
+			/* @__PURE__ */ u$1(BlocTotaux, { lignes: totaux }),
+			/* @__PURE__ */ u$1("div", {
 				class: "a4-en-lettres",
 				children: [
 					"Arrêtée la présente facture à la somme de ",
@@ -6491,10 +6888,10 @@ function DocumentFacture(props) {
 					", toutes taxes comprises."
 				]
 			}),
-			/* @__PURE__ */ u("section", {
+			/* @__PURE__ */ u$1("section", {
 				class: "a4-mentions",
 				children: [
-					c.estSoldee ? /* @__PURE__ */ u("p", { children: "Facture soldée. Reçu vaut quittance." }) : /* @__PURE__ */ u("p", { children: [
+					c.estSoldee ? /* @__PURE__ */ u$1("p", { children: "Facture soldée. Reçu vaut quittance." }) : /* @__PURE__ */ u$1("p", { children: [
 						"Montant à régler : ",
 						montantF(c.reste),
 						", au plus tard le ",
@@ -6502,8 +6899,8 @@ function DocumentFacture(props) {
 						".",
 						retard > 0 && ` Échéance dépassée de ${retard} jour${retard > 1 ? "s" : ""}.`
 					] }),
-					etat.conditionsReglement !== "" && /* @__PURE__ */ u("p", { children: etat.conditionsReglement }),
-					etat.reglements.length > 0 && /* @__PURE__ */ u("p", { children: [
+					etat.conditionsReglement !== "" && /* @__PURE__ */ u$1("p", { children: etat.conditionsReglement }),
+					etat.reglements.length > 0 && /* @__PURE__ */ u$1("p", { children: [
 						"Règlements reçus :",
 						" ",
 						etat.reglements.map((r) => {
@@ -6515,15 +6912,15 @@ function DocumentFacture(props) {
 					] })
 				]
 			}),
-			/* @__PURE__ */ u(ZonesSignature, { zones: [{
+			/* @__PURE__ */ u$1(ZonesSignature, { zones: [{
 				libelle: "Cachet et signature",
 				mention: "Pour l’entreprise"
 			}] }),
-			/* @__PURE__ */ u(PiedLegal, {
+			/* @__PURE__ */ u$1(PiedLegal, {
 				emetteur: etat.emetteur,
 				complement: "Facture établie en francs CFA. Numérotation unique, continue et chronologique."
 			}),
-			/* @__PURE__ */ u(NumeroPage, {
+			/* @__PURE__ */ u$1(NumeroPage, {
 				page: 1,
 				total: 1
 			})
@@ -6569,23 +6966,35 @@ function pageDe(instantane) {
 	if (instantane.skeleton !== "compose-page") return null;
 	return verifierPage(instantane.etat).length > 0 ? null : instantane.etat;
 }
+/**
+* Le formulaire que porte l'instantané, si c'en est un et qu'il tient debout.
+*
+* Même raison que pour la page : ce qui est déjà dans KV a pu être déposé par
+* une version plus ancienne du contrôle. Et ici l'enjeu est plus lourd — une
+* configuration à trous ne fait pas seulement une page bancale, elle fait un
+* formulaire dont les réponses ne se rangent nulle part.
+*/
+function formulaireDe(instantane) {
+	if (instantane.skeleton !== "compose-formulaire") return null;
+	return verifierFormulaire(instantane.etat).length > 0 ? null : instantane.etat;
+}
 /** La facture a besoin de l'instant pour dire son retard ; les autres non. */
 function estFacture(skeleton) {
 	return skeleton === "facture";
 }
 function documentDe(instantane, ctx) {
 	const page = pageDe(instantane);
-	if (page !== null) return /* @__PURE__ */ u(PageVitrine, {
+	if (page !== null) return /* @__PURE__ */ u$1(PageVitrine, {
 		page,
 		maintenant: ctx.maintenant
 	});
 	const Composant = Object.hasOwn(DOCUMENTS, instantane.skeleton) ? DOCUMENTS[instantane.skeleton] : void 0;
 	if (Composant === void 0) return null;
 	const etat = instantane.etat;
-	return estFacture(instantane.skeleton) ? /* @__PURE__ */ u(DocumentFacture, {
+	return estFacture(instantane.skeleton) ? /* @__PURE__ */ u$1(DocumentFacture, {
 		etat,
 		maintenant: ctx.maintenant
-	}) : /* @__PURE__ */ u(Composant, { etat });
+	}) : /* @__PURE__ */ u$1(Composant, { etat });
 }
 /**
 * La carte d'un instantané, quand il n'y a pas de document à dessiner.
@@ -6601,6 +7010,7 @@ function documentDe(instantane, ctx) {
 function carteDe(instantane, ctx) {
 	const page = pageDe(instantane);
 	if (page !== null) return carteDePage(page, ctx);
+	if (formulaireDe(instantane) !== null) return null;
 	const squelette = squeletteCompose(instantane) ?? squeletteParId(instantane.skeleton);
 	if (squelette === null) return null;
 	try {
@@ -6628,61 +7038,61 @@ function VueCarte(props) {
 	const c = props.carte;
 	const { visibles, reste } = limiterItems(c.items);
 	const autres = texteReste(reste);
-	return /* @__PURE__ */ u("article", {
+	return /* @__PURE__ */ u$1("article", {
 		class: "lecture-carte",
 		children: [
-			/* @__PURE__ */ u("header", { children: [
-				/* @__PURE__ */ u("p", {
+			/* @__PURE__ */ u$1("header", { children: [
+				/* @__PURE__ */ u$1("p", {
 					class: "kicker",
 					children: c.kicker
 				}),
-				/* @__PURE__ */ u("h1", { children: c.title }),
-				c.sub !== "" && /* @__PURE__ */ u("p", {
+				/* @__PURE__ */ u$1("h1", { children: c.title }),
+				c.sub !== "" && /* @__PURE__ */ u$1("p", {
 					class: "sous",
 					children: c.sub
 				})
 			] }),
-			/* @__PURE__ */ u("section", {
+			/* @__PURE__ */ u$1("section", {
 				class: "grand",
 				children: [
-					/* @__PURE__ */ u("p", {
+					/* @__PURE__ */ u$1("p", {
 						class: "etiquette",
 						children: c.bigLabel
 					}),
-					/* @__PURE__ */ u("p", {
+					/* @__PURE__ */ u$1("p", {
 						class: "chiffre",
 						children: c.big
 					}),
-					c.pct !== null && /* @__PURE__ */ u("div", {
+					c.pct !== null && /* @__PURE__ */ u$1("div", {
 						class: "barre",
 						role: "img",
 						"aria-label": `${Math.round(c.pct * 100)} %`,
-						children: /* @__PURE__ */ u("i", { style: { width: `${Math.max(0, Math.min(100, Math.round(c.pct * 100)))}%` } })
+						children: /* @__PURE__ */ u$1("i", { style: { width: `${Math.max(0, Math.min(100, Math.round(c.pct * 100)))}%` } })
 					}),
-					c.subline !== "" && /* @__PURE__ */ u("p", {
+					c.subline !== "" && /* @__PURE__ */ u$1("p", {
 						class: "ligne",
 						children: c.subline
 					})
 				]
 			}),
-			visibles.length > 0 && /* @__PURE__ */ u("section", {
+			visibles.length > 0 && /* @__PURE__ */ u$1("section", {
 				class: "detail",
 				children: [
-					c.listTitle !== "" && /* @__PURE__ */ u("p", {
+					c.listTitle !== "" && /* @__PURE__ */ u$1("p", {
 						class: "etiquette",
 						children: c.listTitle
 					}),
-					/* @__PURE__ */ u("ul", { children: visibles.map((i) => /* @__PURE__ */ u("li", {
+					/* @__PURE__ */ u$1("ul", { children: visibles.map((i) => /* @__PURE__ */ u$1("li", {
 						class: i.warn ? "alerte" : i.ok ? "fait" : "",
-						children: [/* @__PURE__ */ u("span", {
+						children: [/* @__PURE__ */ u$1("span", {
 							class: "quoi",
 							children: i.n
-						}), i.val !== null && /* @__PURE__ */ u("span", {
+						}), i.val !== null && /* @__PURE__ */ u$1("span", {
 							class: "combien",
 							children: i.val
 						})]
 					}, i.n)) }),
-					autres !== null && /* @__PURE__ */ u("p", {
+					autres !== null && /* @__PURE__ */ u$1("p", {
 						class: "reste",
 						children: autres
 					})
@@ -6755,6 +7165,12 @@ function envelopper(meta, css, corps) {
 * parce qu'il donne l'air d'un lien douteux.
 */
 function metaDe(instantane, ctx, lien, image) {
+	const formulaire = formulaireDe(instantane);
+	if (formulaire !== null) return {
+		titre: formulaire.titre,
+		description: formulaire.accroche,
+		lien
+	};
 	const carte = carteDe(instantane, ctx);
 	return {
 		titre: carte === null ? instantane.nom : carte.title,
@@ -6776,65 +7192,158 @@ function pageIllisible() {
 		titre: "Document illisible — Atelier 237",
 		description: "Ce document ne peut pas être affiché.",
 		lien: ""
-	}, CSS_CADRE, K(/* @__PURE__ */ u(PageIllisible, {})));
+	}, CSS_CADRE, K(/* @__PURE__ */ u$1(PageIllisible, {})));
 }
-function pageDeLecture(instantane, ctx, lien, image) {
+function pageDeLecture(instantane, ctx, lien, image, etat) {
 	try {
-		return dessiner(instantane, ctx, lien, image);
+		return dessiner(instantane, ctx, lien, image, etat);
 	} catch {
 		return pageIllisible();
 	}
 }
-function dessiner(instantane, ctx, lien, image) {
+/**
+* La page qu'on lit une fois sa réponse partie.
+*
+* Une page à part, servie après une redirection, et non le même document avec
+* un message en haut : rafraîchir après un `POST` renvoie la même réponse une
+* deuxième fois, et personne ne le sait avant de compter les commandes.
+*/
+function pageDeMerci(instantane, lien) {
+	const formulaire = formulaireDe(instantane);
+	if (formulaire === null) return pageIntrouvable();
+	return envelopper({
+		titre: formulaire.titre,
+		description: formulaire.accroche,
+		lien
+	}, CSS_CADRE + CSS_VITRINE, `<main class="lecture">${K(/* @__PURE__ */ u$1(PageMerci, { formulaire }))}</main>` + K(/* @__PURE__ */ u$1(PiedLecture, {
+		instantane,
+		recoit: true
+	})));
+}
+function dessiner(instantane, ctx, lien, image, etat) {
 	const meta = metaDe(instantane, ctx, lien, image);
+	const formulaire = formulaireDe(instantane);
+	if (formulaire !== null) return envelopper(meta, CSS_CADRE + CSS_VITRINE, `<main class="lecture">${K(/* @__PURE__ */ u$1(PageFormulaire, {
+		formulaire,
+		action: lien,
+		manques: etat?.manques ?? [],
+		ferme: etat?.ferme ?? false
+	}))}</main>` + K(/* @__PURE__ */ u$1(PiedLecture, {
+		instantane,
+		recoit: true
+	})));
 	const vitrine = pageDe(instantane);
-	if (vitrine !== null) return envelopper(meta, CSS_CADRE + CSS_VITRINE, `<main class="lecture">${K(/* @__PURE__ */ u(PageVitrine, {
+	if (vitrine !== null) return envelopper(meta, CSS_CADRE + CSS_VITRINE, `<main class="lecture">${K(/* @__PURE__ */ u$1(PageVitrine, {
 		page: vitrine,
 		maintenant: ctx.maintenant
-	}))}</main>` + K(/* @__PURE__ */ u(PiedLecture, { instantane })));
+	}))}</main>` + K(/* @__PURE__ */ u$1(PiedLecture, { instantane })));
 	const document = documentDe(instantane, ctx);
-	if (document !== null) return envelopper(meta, CSS_CADRE + CSS_A4, `<main class="lecture">${K(document)}</main>` + K(/* @__PURE__ */ u(PiedLecture, {
+	if (document !== null) return envelopper(meta, CSS_CADRE + CSS_A4, `<main class="lecture">${K(document)}</main>` + K(/* @__PURE__ */ u$1(PiedLecture, {
 		instantane,
 		pdf: `${lien.replace("/d/", "/p/")}`
 	})));
 	const carte = carteDe(instantane, ctx);
 	if (carte === null) return pageIntrouvable();
-	return envelopper(meta, CSS_CADRE + CSS_CARTE, `<main class="lecture">${K(/* @__PURE__ */ u(VueCarte, { carte }))}</main>${K(/* @__PURE__ */ u(PiedLecture, { instantane }))}`);
+	return envelopper(meta, CSS_CADRE + CSS_CARTE, `<main class="lecture">${K(/* @__PURE__ */ u$1(VueCarte, { carte }))}</main>${K(/* @__PURE__ */ u$1(PiedLecture, { instantane }))}`);
 }
 function pageIntrouvable() {
 	return envelopper({
 		titre: "Lien introuvable — Atelier 237",
 		description: "Ce document n’est plus publié.",
 		lien: ""
-	}, CSS_CADRE, K(/* @__PURE__ */ u(PageIntrouvable, {})));
+	}, CSS_CADRE, K(/* @__PURE__ */ u$1(PageIntrouvable, {})));
 }
 //#endregion
 //#region src/worker-lire.ts
-function html(statut, corps, cache) {
+/**
+* `form-action` : `'none'` partout, `'self'` sur un formulaire.
+*
+* La politique interdisait tout envoi de formulaire — ce qui était juste tant
+* qu'aucune page n'en portait, et devient exactement le mur qui empêche la
+* réponse de partir. On ne l'ouvre donc que sur les pages qui reçoivent, et
+* seulement vers leur propre origine : une page de devis qui poste ailleurs
+* n'a aucune raison d'exister.
+*/
+function politique(recoit) {
+	return `default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action ${recoit ? "'self'" : "'none'"}; frame-ancestors 'none'`;
+}
+function html(statut, corps, cache, recoit = false) {
 	return new Response(corps, {
 		status: statut,
 		headers: {
 			"content-type": "text/html; charset=utf-8",
 			"cache-control": cache,
-			"content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+			"content-security-policy": politique(recoit),
 			"x-content-type-options": "nosniff",
 			"referrer-policy": "strict-origin-when-cross-origin"
 		}
 	});
 }
+/** Un corps de formulaire plus gros que ça vient d'ailleurs que d'un pouce. */
+var CORPS_MAX = 16384;
 async function onRequest(contexte) {
 	const brut = contexte.params.lien;
 	const lien = Array.isArray(brut) ? brut[0] ?? "" : brut ?? "";
 	if (!lienValide(lien)) return html(404, pageIntrouvable(), "no-store");
 	const instantane = await contexte.env.INSTANTANES.get(lien, "json");
 	if (instantane === null) return html(404, pageIntrouvable(), "no-store");
+	if (contexte.request.method === "POST") return repondreAuFormulaire(contexte, lien, instantane);
+	if (new URL(contexte.request.url).searchParams.has("merci")) {
+		if (formulaireDe(instantane) !== null) return html(200, pageDeMerci(instantane, lien), "no-store");
+	}
 	const origine = new URL(contexte.request.url).origin;
 	const ctx = {
 		lien: `${new URL(contexte.request.url).host}/d/${lien}`,
 		maintenant: /* @__PURE__ */ new Date()
 	};
 	const carte = await contexte.env.CARTES.head(lien) === null ? void 0 : `${origine}/c/${lien}.png`;
-	return html(200, pageDeLecture(instantane, ctx, `${origine}/d/${lien}`, carte), "public, max-age=60");
+	const recoit = formulaireDe(instantane) !== null;
+	const ferme = recoit && await combienDeReponses(contexte.env.COMPTES, lien) >= 500;
+	return html(200, pageDeLecture(instantane, ctx, `${origine}/d/${lien}`, carte, { ferme }), recoit ? "no-store" : "public, max-age=60", recoit);
+}
+/**
+* Une réponse à un formulaire publié.
+*
+* C'est la seule écriture que le produit accepte d'un inconnu, et trois choses
+* tiennent la porte ouverte sans la laisser fracturer : le piège à robots qui
+* vit dans la page, un délai entre deux envois du même endroit, et un plafond
+* par formulaire. Aucune ne demande quoi que ce soit au visiteur — ni image à
+* déchiffrer, ni case à cocher qui charge trois cents kilo-octets de script.
+*
+* Ce qui est renvoyé est **revalidé contre la configuration publiée** : le nom
+* des champs, leur nombre, leur longueur et les valeurs possibles d'un choix.
+* Personne ne fait confiance à un corps de requête.
+*/
+async function repondreAuFormulaire(contexte, lien, instantane) {
+	const formulaire = formulaireDe(instantane);
+	if (formulaire === null) return html(404, pageIntrouvable(), "no-store");
+	const db = contexte.env.COMPTES;
+	const maintenant = /* @__PURE__ */ new Date();
+	const url = new URL(contexte.request.url);
+	const versLaPage = (etat) => {
+		return html(200, pageDeLecture(instantane, {
+			lien: `${url.host}/d/${lien}`,
+			maintenant
+		}, `${url.origin}/d/${lien}`, void 0, etat), "no-store", true);
+	};
+	const brut = await contexte.request.text();
+	if (brut.length > CORPS_MAX) return versLaPage({});
+	const champs = new URLSearchParams(brut);
+	if ((champs.get("ne_rien_ecrire_ici") ?? "") !== "") return Response.redirect(`${url.origin}/d/${lien}?merci=1`, 303);
+	const recu = {};
+	for (const [clef, valeur] of champs.entries()) recu[clef] = valeur;
+	const { contenu, manques } = depouiller(formulaire, recu);
+	if (manques.length > 0) return versLaPage({ manques });
+	if (Object.keys(contenu).length === 0) return versLaPage({});
+	if (await combienDeReponses(db, lien) >= 500) return versLaPage({ ferme: true });
+	const source = await empreinteSource(lien, contexte.request.headers.get("cf-connecting-ip"));
+	if (source !== null && await tropTot(db, lien, source, maintenant)) return Response.redirect(`${url.origin}/d/${lien}?merci=1`, 303);
+	await rangerReponse(db, {
+		lien,
+		contenu,
+		source
+	}, maintenant);
+	return Response.redirect(`${url.origin}/d/${lien}?merci=1`, 303);
 }
 //#endregion
 export { onRequest };

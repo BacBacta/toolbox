@@ -9,8 +9,8 @@ import lectureCss from './lecture.css?raw'
 import { sansCommentaires } from './feuille.js'
 import { PageIllisible, PageIntrouvable, PiedLecture } from './page.js'
 import type { MetaPage } from './page.js'
-import { PageVitrine } from '@a237/render/page'
-import { VueCarte, carteDe, documentDe, pageDe } from './rendu.js'
+import { PageFormulaire, PageMerci, PageVitrine } from '@a237/render/page'
+import { VueCarte, carteDe, documentDe, formulaireDe, pageDe } from './rendu.js'
 
 /**
  * La page complète, en une chaîne.
@@ -93,6 +93,16 @@ export function metaDe(
   lien: string,
   image?: string,
 ): MetaPage {
+  /*
+   * Un formulaire s'annonce par son titre et son accroche, jamais par une
+   * carte : une carte résume ce qu'un outil contient, et ce qu'un formulaire
+   * contient est ce que des gens y ont écrit.
+   */
+  const formulaire = formulaireDe(instantane)
+  if (formulaire !== null) {
+    return { titre: formulaire.titre, description: formulaire.accroche, lien }
+  }
+
   const carte = carteDe(instantane, ctx)
   return {
     titre: carte === null ? instantane.nom : carte.title,
@@ -114,6 +124,11 @@ export function metaDe(
 export function rendable(instantane: Instantane): boolean {
   try {
     const ctx: RenderContext = { lien: '', maintenant: new Date(instantane.publieLe) }
+    const formulaire = formulaireDe(instantane)
+    if (formulaire !== null) {
+      enChaine(<PageFormulaire formulaire={formulaire} />)
+      return true
+    }
     const document = documentDe(instantane, ctx)
     if (document !== null) {
       enChaine(document)
@@ -145,17 +160,45 @@ export function pageIllisible(): string {
   )
 }
 
+/**
+ * Ce que le formulaire doit montrer en plus de lui-même : ce qui manque à la
+ * réponse qu'on vient d'essayer d'envoyer, ou le fait qu'il est plein.
+ */
+export interface EtatFormulaire {
+  readonly manques?: readonly string[]
+  readonly ferme?: boolean
+}
+
 export function pageDeLecture(
   instantane: Instantane,
   ctx: RenderContext,
   lien: string,
   image?: string,
+  etat?: EtatFormulaire,
 ): string {
   try {
-    return dessiner(instantane, ctx, lien, image)
+    return dessiner(instantane, ctx, lien, image, etat)
   } catch {
     return pageIllisible()
   }
+}
+
+/**
+ * La page qu'on lit une fois sa réponse partie.
+ *
+ * Une page à part, servie après une redirection, et non le même document avec
+ * un message en haut : rafraîchir après un `POST` renvoie la même réponse une
+ * deuxième fois, et personne ne le sait avant de compter les commandes.
+ */
+export function pageDeMerci(instantane: Instantane, lien: string): string {
+  const formulaire = formulaireDe(instantane)
+  if (formulaire === null) return pageIntrouvable()
+  return envelopper(
+    { titre: formulaire.titre, description: formulaire.accroche, lien },
+    CSS_CADRE + CSS_VITRINE,
+    `<main class="lecture">${enChaine(<PageMerci formulaire={formulaire} />)}</main>` +
+      enChaine(<PiedLecture instantane={instantane} recoit />),
+  )
 }
 
 function dessiner(
@@ -163,8 +206,30 @@ function dessiner(
   ctx: RenderContext,
   lien: string,
   image?: string,
+  etat?: EtatFormulaire,
 ): string {
   const meta = metaDe(instantane, ctx, lien, image)
+
+  /*
+   * Un formulaire d'abord : c'est la seule des formes qui reçoit, et son
+   * `action` pointe sur sa propre adresse. Le navigateur poste un `<form>`
+   * sans une ligne de script, même quand la page n'a pas fini de charger.
+   */
+  const formulaire = formulaireDe(instantane)
+  if (formulaire !== null) {
+    return envelopper(
+      meta,
+      CSS_CADRE + CSS_VITRINE,
+      `<main class="lecture">${enChaine(
+        <PageFormulaire
+          formulaire={formulaire}
+          action={lien}
+          manques={etat?.manques ?? []}
+          ferme={etat?.ferme ?? false}
+        />,
+      )}</main>` + enChaine(<PiedLecture instantane={instantane} recoit />),
+    )
+  }
 
   /*
    * Une page composée d'abord : c'est la seule des trois formes qui a été
