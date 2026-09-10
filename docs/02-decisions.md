@@ -314,3 +314,115 @@ cas réel — un téléphone perdu, un appareil neuf, un compte neuf, et le mêm
 numéro qui paie de nouveau. Le numéro **suit le compte qui vient de payer** :
 il désigne une personne, et il va au compte dont elle se sert aujourd'hui.
 L'ancien compte garde son abonnement et ses crédits ; il ne perd que le numéro.
+
+---
+
+## Ce que le modèle a le droit de composer — tranché le 10 septembre 2026
+
+Le point de départ est un défaut rapporté depuis un téléphone : « je veux un
+site internet » ne trouvait qu'un refus. Le refus était juste — rien derrière ne
+savait faire une page, et un outil qui invente un registre « Ventes » pour cette
+demande-là ment. C'est donc ce qu'il refusait qui manquait, pas le refus.
+
+Quatre formes, donc, et le choix se fait sur la demande.
+
+### « Un site » et « une page » sont le même objet
+
+Ce n'est pas une économie, c'est ce qui est juste. Un site, c'est un menu et
+plusieurs sujets ; une page sans script n'a pas besoin de plusieurs adresses
+pour les porter. Le sommaire saute d'une section à l'autre dans un document
+déjà arrivé, ce qui est exactement ce qu'on veut sur une connexion qui
+hoquette — un menu qui recharge est un menu qu'on n'ose plus toucher. Le champ
+`sommaire` dit simplement laquelle des deux on a demandée.
+
+Neuf demandes de site sur dix, ici, demandent une page à envoyer sur WhatsApp :
+un nom, ce qu'on vend, un numéro, des prix, des horaires.
+
+### Un événement est une page datée
+
+Une annonce de mariage, une réunion de tontine, une vente de fin d'année ont un
+nom, un lieu, un programme et une phrase — tout ce qu'une vitrine porte déjà. Ce
+qu'elles ont en plus est une date, et une date que la machine comprend permet à
+la page de dire « dans 3 jours » ou « c'est passé ». Une date écrite dans un
+texte libre ne sait rien dire, et une affiche qui garde son air d'urgence après
+coup fait traverser la ville pour rien.
+
+Un champ, donc, et non une quatrième forme. Le délai passe devant la date : on
+ne lit pas une affiche pour sa date, on la lit pour savoir si on a le temps.
+
+**Ce qui est écrit sans fuseau se lit à Douala.** `new Date('2026-09-12T15:00')`
+lit l'heure de la machine, et un Worker vit en UTC : un mariage annoncé à 15 h
+s'affichait à 16 h sur la page publiée et à 15 h dans l'aperçu du téléphone qui
+l'avait écrite, sans que rien ne dise lequel des deux croire.
+
+### Le formulaire public n'a pas une ligne de script
+
+Ce n'est pas une prouesse, c'est la seule façon que ça marche. Dans le
+navigateur intégré de WhatsApp, sur un téléphone d'entrée de gamme, sur une
+connexion qui hoquette, un formulaire qui dépend de JavaScript est un formulaire
+qui perd des réponses **sans que personne ne le sache** : celui qui remplit
+croit avoir envoyé, celui qui attend croit que personne n'a répondu. Le
+navigateur sait poster un `<form>` depuis 1995, et il le fait même quand la page
+n'a pas fini de charger.
+
+Le prix à payer est réel et on le paie : ce qui manque à une réponse se dit sur
+la page, avec ce qui a déjà été tapé perdu. C'est plus honnête qu'une validation
+qui laisse partir une réponse vide.
+
+### Un formulaire note son propriétaire, les autres formes non
+
+Publier une page, c'est mettre quelque chose à lire derrière une adresse, et
+lire ne demande pas de savoir qui a déposé. Publier un formulaire, c'est ouvrir
+une adresse où des inconnus écrivent — et ce qu'ils écrivent doit revenir à
+quelqu'un, et à personne d'autre. On ne range que ce qu'on relit.
+
+Le lien appartient à qui l'a tiré : republier dessus depuis un autre appareil ne
+le prend pas. Et un appareil qui n'est pas le propriétaire reçoit **404 et non
+403** — dire « ce n'est pas à toi » confirmerait à un inconnu que le lien existe
+et qu'il reçoit. Un formulaire de tontine n'a pas à se laisser énumérer.
+
+### Trois défenses, et aucune ne demande rien au visiteur
+
+Un champ piège que les robots remplissent, un délai de trente secondes entre
+deux envois du même endroit, un plafond par formulaire. Ni image à déchiffrer,
+ni case « je ne suis pas un robot » qui charge trois cents kilo-octets de
+script — sur la connexion de quelqu'un qui voulait juste dire qu'il vient
+samedi.
+
+L'adresse d'une réponse n'est jamais rangée telle quelle, et son empreinte est
+**salée par le lien** : sans sel, la même adresse donnerait la même empreinte
+partout, et on saurait qu'une même personne a répondu au formulaire de la
+tontine et à celui du lycée.
+
+### Le plafond de l'invite se mesure en francs, pas en caractères
+
+Il valait huit mille caractères, choisis quand l'invite portait trois schémas.
+En ajouter un quatrième l'a fait passer à neuf mille sept cents, et la question
+s'est posée : lever le chiffre, ou renoncer à la page. Aucune des deux n'était
+la bonne, parce que le chiffre n'était qu'un intermédiaire. Ce que le brief
+plafonne, c'est **un franc la génération** (§ 8).
+
+Où on en est : 0,86 F au pire cas — deux tours, reprise comprise — et de l'ordre
+de 0,36 F au premier tour, qui est le cas courant. Chaque forme ajoute son
+schéma à chaque appel, y compris aux appels qui n'en ont pas besoin. **Une
+cinquième forme ne passera pas**, et la réponse ne sera pas de lever le
+plafond : ce sera de router l'invite — reconnaître la famille demandée avant
+d'appeler, et n'envoyer que son schéma. On ne l'a pas fait plus tôt parce que se
+tromper de famille ferait payer un refus à quelqu'un dont la demande était
+faisable, et c'est le plus cher des deux échecs.
+
+### Le schéma sert deux publics, et ne leur dit pas la même chose
+
+Un même schéma dit au modèle quoi remplir **et** dresse le formulaire qui permet
+de corriger ce qu'il a rempli. C'est ce qui fait qu'une page composée se
+reprend : le contrat qui a servi à l'écrire sert à la modifier, et un champ
+ajouté apparaît des deux côtés sans qu'on y pense.
+
+Mais `title` nomme un champ dans un formulaire, et le modèle a la clef sous les
+yeux ; `ecran` dit quand montrer un champ et ce que disent ses boutons, et pour
+le modèle c'est un mot-clef inconnu au milieu d'un schéma qu'on lui demande de
+respecter à la lettre. Ils sont retirés avant l'envoi.
+
+Sous **une seule clef réservée**, et non un mot-clef par réglage : un registre a
+une propriété qui s'appelle `libelleAjout`, et un mot-clef d'éditeur du même nom
+devenait indiscernable de ce contenu-là.

@@ -1,20 +1,39 @@
 # Déploiement
 
-## Ce qui se déploie, et ce qui ne se déploie pas encore
+## Ce qui se déploie
 
-Ce qui part sur l'hébergeur, c'est **la PWA** : des fichiers statiques, un
-service worker, rien d'autre. Pas de serveur, pas de base, pas de secret.
-L'état vit sur le téléphone.
+La PWA — fichiers statiques et service worker — et les fonctions de
+`functions/`, dans le même déploiement. L'état des outils vit sur le téléphone
+(§ 2.7) ; ce qui vit sur le serveur est ce qui doit être public ou partagé :
+l'instantané publié dans KV, la carte dans R2, les comptes et les réponses dans
+D1, la clef du modèle dans l'environnement.
 
-La publication existe **côté serveur** : `POST /api/publier` dépose un
-instantané dans KV, `GET /d/:lien` rend la page de lecture. Ce qui manque
-encore, c'est le geste dans l'application — le bouton « Diffuser » produit
-toujours la carte et le résumé et **n'écrit aucun lien**. Une adresse inventée
-serait un lien mort envoyé par le trésorier à ses membres, sous son nom.
+Les routes serveur, et ce qu'elles font :
 
-L'`og:image` attend R2, qui demande une activation manuelle dans le tableau de
-bord Cloudflare. En attendant, l'aperçu WhatsApp porte le titre et la
-description tirés de la carte, pas l'image.
+| Route | Ce qu'elle fait |
+|---|---|
+| `POST /api/publier` | dépose un instantané. Note le propriétaire s'il s'agit d'un formulaire |
+| `GET /d/:lien` | la page de lecture : un écrit A4, la carte d'un registre, une vitrine, ou un formulaire |
+| `POST /d/:lien` | **la seule écriture venue de l'extérieur** : une réponse à un formulaire |
+| `GET /api/reponses/:lien` | ce qu'un formulaire a reçu, pour qui l'a publié — et pour personne d'autre |
+| `PUT /c/:lien.png` · `GET /c/:lien.png` | la carte partagée, dans R2 |
+| `GET /p/:lien` | le PDF d'un écrit A4, rendu par Browser Run |
+| `POST /api/ai` | le proxy du modèle. La clef ne franchit jamais la frontière (§ 2.8) |
+| `/api/compte/*` · `/api/pay/*` | le compte, le quota, le rappel de paiement |
+
+### Les migrations D1, à jouer avant le déploiement qui en dépend
+
+Elles ne partent pas avec le code : `wrangler` ne les joue pas tout seul, et une
+route qui écrit dans une table absente échoue en production sans prévenir.
+Elles sont toutes en `CREATE TABLE IF NOT EXISTS`, donc rejouables.
+
+```bash
+npx wrangler d1 execute COMPTES --remote --file=packages/comptes/migrations/0001-comptes.sql
+npx wrangler d1 execute COMPTES --remote --file=packages/comptes/migrations/0002-reponses.sql
+```
+
+Sans `--remote`, elles s'appliquent à la base locale de `wrangler pages dev` —
+ce qu'il faut faire aussi, avant de lancer les vérifications de bout en bout.
 
 ## Cloudflare Pages — en ligne
 
@@ -550,3 +569,47 @@ sur la clef borne la dépense, quoi qu'il arrive côté application. C'est le se
 garde-fou disponible tant que les comptes de D1 n'existent pas — il est global
 et non par utilisateur, donc le premier venu peut l'épuiser pour tout le monde.
 Raison de plus pour le poser bas.
+
+---
+
+## Les quatre formes composables, vérifiées en production le 10 septembre 2026
+
+Le navigateur sans tête ne joignait pas l'adresse publique depuis cette machine
+— le tunnel TLS du mandataire tombait, `curl` passant sans peine. Le parcours
+complet avec navigateur a donc été joué contre un vrai Worker local
+(`wrangler pages dev`, avec son KV, sa base D1 et `workerd`), et la production a
+été vérifiée en requêtes. Ce qui se mesure ainsi est tout ce qui vit sur le
+serveur ; ce qui vit dans le navigateur l'a été localement, JavaScript coupé
+compris.
+
+| Ce qui a été vérifié | Résultat |
+|---|---|
+| Publier un formulaire sans appareil | **401** — les réponses ne reviendraient à personne |
+| Publier avec l'appareil | 200, propriétaire noté |
+| La page publiée porte un vrai `<form method="post">` | oui, et **aucun script** |
+| `form-action` | `'self'` sur un formulaire, `'none'` partout ailleurs |
+| Le pied de page d'un formulaire | « Ta réponse va à la personne qui t'a envoyé ce lien » |
+| Un inconnu répond | **303** vers la page de remerciement |
+| Un robot remplit le champ piège | 303, et rien en base |
+| Une réponse sans l'obligatoire | la page revient en nommant ce qui manque |
+| Le propriétaire relit | sa réponse, avec le choix et le nombre |
+| Un autre appareil | **404** — il n'apprend pas que le lien existe |
+| Une vitrine | numéro lisible, sommaire avec ancres, aucun script, **7,7 Ko** |
+| Un événement | « dans 2 jours · Samedi 12 septembre 2026 **à 15 h** » |
+
+La dernière ligne est celle qui compte le plus : elle confirme en production que
+l'heure écrite sans fuseau est bien lue à Douala. Un Worker vit en UTC, et la
+même invitation se serait affichée à 16 h pour l'invité et à 15 h pour celui qui
+l'a écrite.
+
+Les instantanés déposés par cette vérification ont été retirés de KV, et les
+lignes de D1 avec eux. Les comptes d'essai ouverts au passage sont restés :
+cinq crédits chacun, jamais dépensés, et rien ne les distingue d'une vraie
+première visite.
+
+### Ce qu'il reste à voir sur un vrai téléphone
+
+Un formulaire rempli **depuis WhatsApp**, dans son navigateur intégré, sur une
+connexion mobile camerounaise. C'est le seul endroit où le pari « pas de
+script » se vérifie vraiment, et c'est le même critère que la phase 6 pose pour
+tout le reste : ce qui marche au bureau n'a rien prouvé.

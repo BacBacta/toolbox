@@ -61,7 +61,16 @@ const REPONSE = {
   fcfa: 0.12,
 }
 
-const navigateur = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] })
+/*
+ * Le navigateur ne lit pas `HTTPS_PROXY` : on le lui passe. Sans ça, viser une
+ * adresse publique depuis une machine qui sort par un mandataire échoue sur un
+ * « connexion réinitialisée » qui ressemble à une panne du serveur.
+ */
+const navigateur = await chromium.launch({
+  executablePath: CHROME,
+  args: ['--no-sandbox'],
+  ...(process.env.HTTPS_PROXY !== undefined ? { proxy: { server: process.env.HTTPS_PROXY } } : {}),
+})
 const contexte = await navigateur.newContext({ viewport: { width: 390, height: 844 } })
 
 /** Une calculatrice, capturée en production sur « ma marge sur chaque vente ». */
