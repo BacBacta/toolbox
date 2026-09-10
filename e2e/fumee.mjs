@@ -241,6 +241,25 @@ const carteListe = await page.evaluate(() => {
 })
 dit('sa carte se dessine aussi', carteListe?.l === 1080, `${carteListe?.l}×${carteListe?.h}`)
 
+/*
+ * Rien ne déborde de sa boîte, à la largeur que le brief vise.
+ *
+ * Trois cent soixante pixels : c'est écrit dans le brief, répété dans les
+ * commentaires, et personne ne l'avait mesuré. Une capture d'un vrai téléphone
+ * a montré « Reconnaissance de dette » coupé net au bord de sa carte — et à
+ * 360, « Attestation » débordait aussi, un seul mot sur une carte d'outil.
+ *
+ * Un essai unitaire ne peut pas voir ça : happy-dom ne fait pas de mise en
+ * page. Il n'y a que le vrai navigateur, à la vraie largeur, et c'est le seul
+ * endroit du dépôt où poser cette garde.
+ */
+await page.goto(BASE, { waitUntil: 'networkidle' })
+const deborde = await page.evaluate(() =>
+  [...document.querySelectorAll('.app *')]
+    .filter((e) => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflowX !== 'auto')
+    .map((e) => `${e.className || e.tagName} « ${(e.textContent || '').trim().slice(0, 30)} »`))
+dit('rien ne déborde de sa boîte à 360 px', deborde.length === 0, deborde.slice(0, 4).join(' | '))
+
 dit('aucune erreur de page', erreurs.length === 0, erreurs.slice(0, 3).join(' | '))
 
 await navigateur.close()
