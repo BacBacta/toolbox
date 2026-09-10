@@ -31,7 +31,7 @@ export {
 export { calculerLignes, montantAcompte } from './compute/tva.js'
 
 export {
-  anneeDe, arreteLe, dateCourte, dateLongue, dateLongueSiValide, ESPACE_INSECABLE,
+  anneeDe, arreteLe, coutF, dateCourte, dateLongue, dateLongueSiValide, ESPACE_INSECABLE,
   heureCourte, initiales, joursEntre, jourWAT, montantF, nf, normaliser,
 } from './format.js'
 
@@ -95,6 +95,7 @@ export { cvSchema } from './schema/cv.js'
 export { ID_COMPOSE_CALCUL } from './calcul.js'
 export type { CalculDemande, EntreeDemandee } from './calcul.js'
 export { MAX_ENTREES, schemaCalcul, verifierCalcul } from './calcul.js'
+export { pourLeModele } from './schema-modele.js'
 export type { ReponseModele } from './composition.js'
 export { lireReponseModele } from './composition.js'
 export type { Expression, Operation } from './expression.js'
@@ -113,7 +114,7 @@ export { ID_COMPOSE } from './registre.js'
  * sur des chaînes — aucune API de navigateur — et deux copies finiraient par ne
  * plus accepter les mêmes numéros.
  */
-export { INDICATIF_CM, lienWhatsApp, numeroInternational } from './whatsapp.js'
+export { INDICATIF_CM, lienWhatsApp, numeroInternational, numeroLisible } from './whatsapp.js'
 export type { ColonneDemandee, RefusModele, RegistreDemande } from './registre.js'
 export { MAX_COLONNES, schemaRefus, schemaRegistre, verifierRegistre } from './registre.js'
 export type { AvecMotsClefs, Correspondance } from './match.js'
@@ -150,7 +151,7 @@ export {
 } from './skeletons/index.js'
 
 export type {
-  CardItem, CardSpec, ComputeMap, Encre, EngineKind, ErreurValidation, JsonSchema,
+  CardItem, CardSpec, ComputeMap, Encre, EngineKind, ErreurValidation, JsonSchema, MontrerSi, ReglagesEcran,
   Ligne, LigneCalculee, Relance, RenderContext, BatirPartage, ShareSpec, Skeleton, SkeletonGroup,
   SkeletonAnonyme, SkeletonId, Totaux, XAF,
 } from './types.js'

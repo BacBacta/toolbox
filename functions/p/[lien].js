@@ -528,6 +528,31 @@ function lienWhatsApp(tel, message) {
 	if (numero === null) return null;
 	return `https://wa.me/${numero}?text=${encodeURIComponent(message)}`;
 }
+/**
+* Le numéro tel qu'on l'écrit sur une enseigne.
+*
+* Le modèle rend « 699412708 » aussi souvent que « +237 6 99 41 27 08 », selon
+* ce que la demande contenait, et la page affichait ce qu'elle recevait : une
+* vitrine sur deux montrait neuf chiffres collés sous son bouton. Le numéro
+* qu'un client recopie à la main sur un cahier doit se lire par groupes.
+*
+* Neuf chiffres, un seul puis quatre paires : c'est la façon dont un numéro
+* camerounais se dicte au téléphone. Un numéro d'ailleurs n'est pas regroupé —
+* on ne sait pas comment son pays le coupe, et le couper au hasard le rendrait
+* plus difficile à lire, pas moins. Ce qui n'est pas un numéro du tout revient
+* tel quel : c'est ce que quelqu'un a écrit, et le remplacer par du vide
+* effacerait la seule chose qu'il savait.
+*/
+function numeroLisible(brut) {
+	const numero = numeroInternational(brut);
+	if (numero === null) return brut;
+	if (numero.startsWith("237") && numero.length === 12) {
+		const local = numero.slice(3);
+		const paires = (local.slice(1).match(/\d{2}/g) ?? []).join(" ");
+		return `+237 ${local.charAt(0)} ${paires}`;
+	}
+	return `+${numero}`;
+}
 var schemaPage = {
 	type: "object",
 	additionalProperties: false,
@@ -589,7 +614,11 @@ var schemaPage = {
 						type: "string",
 						maxLength: 400,
 						title: "Texte",
-						description: "Pour une section « texte ». Deux paragraphes au plus."
+						description: "Pour une section « texte ». Deux paragraphes au plus.",
+						ecran: { montrerSi: {
+							champ: "sorte",
+							vaut: ["texte"]
+						} }
 					},
 					lignes: {
 						type: "array",
@@ -621,11 +650,23 @@ var schemaPage = {
 							}
 						},
 						title: "Lignes",
-						description: "Pour « liste » ou « prix »."
+						description: "Pour « liste » ou « prix ».",
+						ecran: {
+							montrerSi: {
+								champ: "sorte",
+								vaut: ["liste", "prix"]
+							},
+							ajout: "Ajouter une ligne",
+							retrait: "Retirer la ligne"
+						}
 					}
 				}
 			},
-			title: "Sections"
+			title: "Sections",
+			ecran: {
+				ajout: "Ajouter une section",
+				retrait: "Retirer la section"
+			}
 		},
 		telephone: {
 			type: "string",
@@ -681,21 +722,30 @@ function verifierPage(valeur) {
 	return erreurs;
 }
 /**
-* L'ancre d'une section, pour le sommaire.
+* Les sections, chacune avec son ancre.
 *
-* Elle se dérive du titre et non d'un compteur : une ancre numérotée change de
-* cible dès qu'on insère une section, et un lien déjà envoyé tombe alors sur
-* autre chose. Les accents sont dépliés, le reste devient un tiret ; deux
+* Elles voyagent ensemble et non dans deux tableaux parallèles : une ancre
+* seule ne sert à rien, et rapprocher deux listes par leur rang oblige à
+* traiter un cas — « et si le rang n'existait pas ? » — qui ne peut pas
+* arriver. Une branche qu'on ne peut pas atteindre est une branche qu'on ne
+* peut pas éprouver.
+*
+* L'ancre se dérive du titre et non d'un compteur : une ancre numérotée change
+* de cible dès qu'on insère une section, et un lien déjà envoyé tombe alors
+* sur autre chose. Les accents sont dépliés, le reste devient un tiret ; deux
 * titres qui se réduisent au même reçoivent leur rang, parce qu'un identifiant
 * en double fait sauter le menu au premier des deux.
 */
-function ancresDeSections(sections) {
+function sectionsAncrees(sections) {
 	const vues = /* @__PURE__ */ new Map();
 	return sections.map((section, i) => {
 		const base = section.titre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `section-${i + 1}`;
 		const deja = vues.get(base);
 		vues.set(base, (deja ?? 0) + 1);
-		return deja === void 0 ? base : `${base}-${deja + 1}`;
+		return {
+			section,
+			ancre: deja === void 0 ? base : `${base}-${deja + 1}`
+		};
 	});
 }
 /** Le menu a-t-il lieu d'être ? */
@@ -1405,7 +1455,7 @@ function Lignes$1(props) {
 }
 function PageVitrine(props) {
 	const p = props.page;
-	const ancres = ancresDeSections(p.sections);
+	const sections = sectionsAncrees(p.sections);
 	const sommaire = avecSommaire(p);
 	const message = `Bonjour ${p.titre}, j’ai vu votre page.`;
 	const whatsapp = p.telephone === void 0 || p.telephone === "" ? null : lienWhatsApp(p.telephone, message);
@@ -1429,16 +1479,16 @@ function PageVitrine(props) {
 			sommaire && /* @__PURE__ */ u("nav", {
 				class: "vitrine-sommaire",
 				"aria-label": "Sections",
-				children: p.sections.map((section, i) => /* @__PURE__ */ u("a", {
-					href: `#${ancres[i] ?? ""}`,
+				children: sections.map(({ section, ancre }) => /* @__PURE__ */ u("a", {
+					href: `#${ancre}`,
 					children: section.titre
-				}, section.titre))
+				}, ancre))
 			}),
-			p.sections.map((section, i) => /* @__PURE__ */ u("section", {
+			sections.map(({ section, ancre }) => /* @__PURE__ */ u("section", {
 				class: "vitrine-section",
-				id: sommaire ? ancres[i] : void 0,
+				id: sommaire ? ancre : void 0,
 				children: [/* @__PURE__ */ u("h2", { children: section.titre }), section.sorte === "texte" ? (section.texte ?? "").split("\n").filter((bout) => bout.trim() !== "").map((bout) => /* @__PURE__ */ u("p", { children: bout }, bout)) : /* @__PURE__ */ u(Lignes$1, { section })]
-			}, section.titre)),
+			}, ancre)),
 			(whatsapp !== null || p.adresse !== void 0 && p.adresse !== "" || p.horaires !== void 0 && p.horaires !== "") && /* @__PURE__ */ u("footer", {
 				class: "vitrine-pied",
 				children: [
@@ -1446,7 +1496,7 @@ function PageVitrine(props) {
 						class: "vitrine-appel",
 						href: whatsapp,
 						rel: "noreferrer",
-						children: ["Écrire sur WhatsApp", /* @__PURE__ */ u("span", { children: p.telephone })]
+						children: ["Écrire sur WhatsApp", /* @__PURE__ */ u("span", { children: numeroLisible(p.telephone ?? "") })]
 					}),
 					p.adresse !== void 0 && p.adresse !== "" && /* @__PURE__ */ u("p", {
 						class: "vitrine-ou",

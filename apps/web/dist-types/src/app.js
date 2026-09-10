@@ -1,5 +1,5 @@
 import { Fragment as _Fragment, jsx as _jsx, jsxs as _jsxs } from "preact/jsx-runtime";
-import { CATALOGUE, EXTRAIT_VIDE, lienPublic, montantF } from '@a237/engine';
+import { CATALOGUE, EXTRAIT_VIDE, coutF, lienPublic } from '@a237/engine';
 import { useEffect, useState } from 'preact/hooks';
 import { dernierEtatConnu } from './compte.js';
 import { Diffusion } from './diffusion.js';
@@ -234,7 +234,7 @@ export function App() {
     return (_jsxs("main", { class: "app", children: [_jsx("button", { type: "button", class: "retour", onClick: () => {
                     setOuvert(null);
                     setErreur('');
-                }, children: "\u2190 Mes outils" }), erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), coutDernier !== null && (_jsxs("p", { class: "note cout-compose", children: ["Compos\u00E9 par le mod\u00E8le pour ", montantF(coutDernier), "."] })), module === null ? (_jsx("p", { class: "note", children: "Chargement de l\u2019outil\u2026" })) : (_jsx(module.Outil, { outil: ouvert, glyphe: glyphePour(ouvert.skeleton), ctx: ctx, onChange: (etat) => tenter(() => changer(etat), 'Enregistrement impossible'), onDiffuser: (batir) => tenter(() => diffuser(batir, ouvert), 'Diffusion impossible') })), partage !== null && (_jsx(Diffusion, { partage: partage, mot: motPublication, 
+                }, children: "\u2190 Mes outils" }), erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), coutDernier !== null && (_jsxs("p", { class: "note cout-compose", children: ["Compos\u00E9 par le mod\u00E8le pour ", coutF(coutDernier), "."] })), module === null ? (_jsx("p", { class: "note", children: "Chargement de l\u2019outil\u2026" })) : (_jsx(module.Outil, { outil: ouvert, glyphe: glyphePour(ouvert.skeleton), ctx: ctx, onChange: (etat) => tenter(() => changer(etat), 'Enregistrement impossible'), onDiffuser: (batir) => tenter(() => diffuser(batir, ouvert), 'Diffusion impossible') })), partage !== null && (_jsx(Diffusion, { partage: partage, mot: motPublication, 
                 /*
                  * La carte suit le dépôt, elle ne le précède pas. Ce qui rate ici ne
                  * se dit pas : sans image, l'aperçu WhatsApp porte le titre et la

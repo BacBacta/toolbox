@@ -1,5 +1,5 @@
 import type { PageDemande, SectionDemandee } from '@a237/engine'
-import { avecSommaire, lienWhatsApp, sectionsAncrees } from '@a237/engine'
+import { avecSommaire, lienWhatsApp, numeroLisible, sectionsAncrees } from '@a237/engine'
 import type { JSX } from 'preact'
 
 /**
@@ -97,7 +97,7 @@ export function PageVitrine(props: { readonly page: PageDemande }): JSX.Element 
           {whatsapp !== null && (
             <a class="vitrine-appel" href={whatsapp} rel="noreferrer">
               Écrire sur WhatsApp
-              <span>{p.telephone}</span>
+              <span>{numeroLisible(p.telephone ?? '')}</span>
             </a>
           )}
           {p.adresse !== undefined && p.adresse !== '' && (

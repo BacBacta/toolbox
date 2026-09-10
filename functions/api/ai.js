@@ -708,6 +708,40 @@ function verifierCalcul(valeur) {
 	erreurs.push(...verifierExpression(c.sortie.formule, clefs, "$.sortie.formule"));
 	return erreurs;
 }
+//#endregion
+//#region ../engine/src/schema-modele.ts
+/**
+* Le schéma tel qu'il part au modèle : sans ce qui ne sert qu'à l'écran.
+*
+* Un même schéma fait deux métiers. Il dit au modèle quoi remplir, et il dresse
+* le formulaire qui permet de corriger ce qu'il a rempli — c'est ce qui fait
+* qu'une page composée se reprend : le contrat qui a servi à l'écrire sert à la
+* modifier, et un champ ajouté apparaît des deux côtés sans qu'on y pense.
+*
+* Mais les deux publics ne lisent pas la même chose. `title` nomme un champ
+* dans un formulaire ; le modèle, lui, a déjà la clef sous les yeux et n'en
+* fait rien. `montrerSi` dit à l'écran quand un champ a lieu d'être montré ;
+* pour le modèle, c'est un mot-clef inconnu au milieu d'un schéma qu'on lui
+* demande de respecter à la lettre.
+*
+* Chaque caractère d'invite se paie à chaque appel, sur un budget d'un franc
+* la génération (§ 8). Ce qui n'aide pas à remplir un JSON n'a rien à y faire.
+*/
+function pourLeModele(schema) {
+	const { title, ecran, ...reste } = schema;
+	if (reste.type === "array") return {
+		...reste,
+		items: pourLeModele(reste.items)
+	};
+	if (reste.type === "object") {
+		const proprietes = reste.properties;
+		return {
+			...reste,
+			properties: Object.fromEntries(Object.entries(proprietes).map(([clef, sous]) => [clef, pourLeModele(sous)]))
+		};
+	}
+	return reste;
+}
 var schemaPage = {
 	type: "object",
 	additionalProperties: false,
@@ -769,7 +803,11 @@ var schemaPage = {
 						type: "string",
 						maxLength: 400,
 						title: "Texte",
-						description: "Pour une section « texte ». Deux paragraphes au plus."
+						description: "Pour une section « texte ». Deux paragraphes au plus.",
+						ecran: { montrerSi: {
+							champ: "sorte",
+							vaut: ["texte"]
+						} }
 					},
 					lignes: {
 						type: "array",
@@ -801,11 +839,23 @@ var schemaPage = {
 							}
 						},
 						title: "Lignes",
-						description: "Pour « liste » ou « prix »."
+						description: "Pour « liste » ou « prix ».",
+						ecran: {
+							montrerSi: {
+								champ: "sorte",
+								vaut: ["liste", "prix"]
+							},
+							ajout: "Ajouter une ligne",
+							retrait: "Retirer la ligne"
+						}
 					}
 				}
 			},
-			title: "Sections"
+			title: "Sections",
+			ecran: {
+				ajout: "Ajouter une section",
+				retrait: "Retirer la section"
+			}
 		},
 		telephone: {
 			type: "string",
@@ -1471,20 +1521,24 @@ Règles :
 - Si la demande décrit une dette entre personnes, ne mets aucun montant en
   sur-titre : ça se partage, et humilier quelqu'un fait perdre le client avec
   l'argent.`;
+var REGISTRE = JSON.stringify(pourLeModele(schemaRegistre));
+var CALCUL = JSON.stringify(pourLeModele(schemaCalcul));
+var PAGE = JSON.stringify(pourLeModele(schemaPage));
+var REFUS = JSON.stringify(pourLeModele(schemaRefus));
 function batirInvite(demande) {
 	return `${CONSIGNES}
 
 Un registre doit respecter ce schéma :
-${JSON.stringify(schemaRegistre)}
+${REGISTRE}
 
 Une calculatrice doit respecter celui-ci :
-${JSON.stringify(schemaCalcul)}
+${CALCUL}
 
 Une page, celui-ci :
-${JSON.stringify(schemaPage)}
+${PAGE}
 
 Un refus, celui-ci :
-${JSON.stringify(schemaRefus)}
+${REFUS}
 
 Demande de l'utilisateur :
 ${demande}`;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  anneeDe, arreteLe, dateCourte, dateLongue, ESPACE_INSECABLE, heureCourte,
+  anneeDe, arreteLe, coutF, dateCourte, dateLongue, ESPACE_INSECABLE, heureCourte,
   initiales, montantF, nf, normaliser,
 } from '../src/format.js'
 
@@ -87,5 +87,37 @@ describe('normaliser', () => {
     ['  Écran   cassé  ', 'ecran casse'],
   ])('normaliser(%s) = %s', (s, attendu) => {
     expect(normaliser(s)).toBe(attendu)
+  })
+})
+
+describe('ce qu’une génération a coûté', () => {
+  /*
+   * `montantF` arrondit au franc — juste pour un prix, faux pour une dépense
+   * de dix-neuf centimes, qui s'affichait « 0 F ». Toutes les compositions se
+   * sont annoncées gratuites depuis qu'elles existent, alors que cette ligne
+   * est là pour qu'une dépense ne se découvre pas à la fin du mois.
+   */
+  it('montre les centimes, que le franc arrondissait à zéro', () => {
+    expect(coutF(0.19)).toBe(`0,19${ESPACE_INSECABLE}F`)
+    expect(montantF(0.19)).toBe(`0${ESPACE_INSECABLE}F`)
+  })
+
+  it('garde deux décimales même quand la seconde est nulle', () => {
+    // « 0,2 F » se lit comme un chiffre tronqué ; « 0,20 F » comme un prix.
+    expect(coutF(0.2)).toBe(`0,20${ESPACE_INSECABLE}F`)
+    expect(coutF(1)).toBe(`1,00${ESPACE_INSECABLE}F`)
+  })
+
+  it('groupe les milliers comme partout ailleurs', () => {
+    expect(coutF(1234.5)).toBe(`1${ESPACE_INSECABLE}234,50${ESPACE_INSECABLE}F`)
+  })
+
+  it('arrondit au centime plutôt que d’étaler un flottant', () => {
+    expect(coutF(0.005)).toBe(`0,01${ESPACE_INSECABLE}F`)
+    expect(coutF(0.344)).toBe(`0,34${ESPACE_INSECABLE}F`)
+  })
+
+  it('refuse un nombre qui n’en est pas un', () => {
+    expect(() => coutF(Number.NaN)).toThrow(RangeError)
   })
 })

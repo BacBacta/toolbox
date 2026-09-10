@@ -19,6 +19,16 @@ export interface ProprietesChamps {
     /** Chemins à ne pas montrer : dérivés, ou tenus par un autre écran. */
     readonly masques?: readonly string[];
     readonly chemin?: string;
+    /**
+     * L'objet dont ce champ fait partie. Il sert à `montrerSi` : un champ dont
+     * la pertinence dépend d'un voisin doit pouvoir lire ce voisin.
+     */
+    readonly voisins?: unknown;
+    /**
+     * Vrai pour le premier élément d'une liste, et pour tout ce qui n'est pas
+     * dans une liste. Les aides ne se répètent pas huit fois.
+     */
+    readonly premier?: boolean;
 }
 export declare function ChampsSchema(props: ProprietesChamps): JSX.Element | null;
 /** Une valeur neuve conforme au schéma, pour l'ajout d'une ligne. */

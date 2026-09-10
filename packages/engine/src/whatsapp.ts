@@ -40,3 +40,30 @@ export function lienWhatsApp(tel: string, message: string): string | null {
   if (numero === null) return null
   return `https://wa.me/${numero}?text=${encodeURIComponent(message)}`
 }
+
+/**
+ * Le numéro tel qu'on l'écrit sur une enseigne.
+ *
+ * Le modèle rend « 699412708 » aussi souvent que « +237 6 99 41 27 08 », selon
+ * ce que la demande contenait, et la page affichait ce qu'elle recevait : une
+ * vitrine sur deux montrait neuf chiffres collés sous son bouton. Le numéro
+ * qu'un client recopie à la main sur un cahier doit se lire par groupes.
+ *
+ * Neuf chiffres, un seul puis quatre paires : c'est la façon dont un numéro
+ * camerounais se dicte au téléphone. Un numéro d'ailleurs n'est pas regroupé —
+ * on ne sait pas comment son pays le coupe, et le couper au hasard le rendrait
+ * plus difficile à lire, pas moins. Ce qui n'est pas un numéro du tout revient
+ * tel quel : c'est ce que quelqu'un a écrit, et le remplacer par du vide
+ * effacerait la seule chose qu'il savait.
+ */
+export function numeroLisible(brut: string): string {
+  const numero = numeroInternational(brut)
+  if (numero === null) return brut
+
+  if (numero.startsWith(INDICATIF_CM) && numero.length === INDICATIF_CM.length + 9) {
+    const local = numero.slice(INDICATIF_CM.length)
+    const paires = (local.slice(1).match(/\d{2}/g) ?? []).join(' ')
+    return `+${INDICATIF_CM} ${local.charAt(0)} ${paires}`
+  }
+  return `+${numero}`
+}

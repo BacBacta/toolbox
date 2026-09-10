@@ -27,7 +27,7 @@ import { batirInvite, batirReproches } from '../src/invite.js'
  * reprise — au tarif du modèle par défaut et au taux du jour. Ce garde-fou-là
  * ne se relève pas sans changer la promesse.
  *
- * Où en est-on : **0,77 F** au pire cas, pour une moyenne mesurée à 0,198 F sur
+ * Où en est-on : **0,75 F** au pire cas, pour une moyenne mesurée à 0,198 F sur
  * dix générations réelles — la plupart aboutissent au premier tour. Il reste
  * donc à peu près trois mille caractères avant le mur, et c'est trop peu pour
  * deux schémas de plus : un formulaire et un événement porteraient le pire cas
@@ -68,6 +68,27 @@ describe('l’invite tient dans son budget', () => {
     const courte = batirInvite('a')
     const longue = batirInvite('x'.repeat(400))
     expect(longue.length - courte.length).toBeLessThan(500)
+  })
+})
+
+describe('l’invite n’emporte pas ce qui ne sert qu’à l’écran', () => {
+  it('ne montre au modèle ni libellés de formulaire ni règles d’affichage', () => {
+    // `title` nomme un champ dans un formulaire ; `ecran` dit quand le montrer
+    // et ce que disent ses boutons. Le modèle a la clef sous les yeux et n'en
+    // fait rien — et chaque caractère se paie à chaque appel.
+    //
+    // Un seul nom réservé, et non un par réglage : un registre a une propriété
+    // qui s'appelle `libelleAjout`, et un mot-clef d'éditeur du même nom
+    // devenait indiscernable de ce contenu-là.
+    const invite = batirInvite('un registre')
+    expect(invite).not.toContain('"title"')
+    expect(invite).not.toContain('"ecran"')
+  })
+
+  it('garde les descriptions, qui sont ce que le modèle lit vraiment', () => {
+    // Ce sont elles qui font la différence entre une colonne « montant » et
+    // une colonne « nombre ».
+    expect(batirInvite('un registre')).toContain('"description"')
   })
 })
 

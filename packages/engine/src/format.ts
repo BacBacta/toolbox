@@ -81,6 +81,26 @@ export function montantF(n: number): string {
   return `${nf(n)}${ESPACE_INSECABLE}F`
 }
 
+/**
+ * Ce qu'une génération a coûté, écrit pour être lu.
+ *
+ * `montantF` arrondit au franc, ce qui est juste pour un prix — le franc CFA
+ * n'a pas de subdivision en circulation — et faux pour une dépense de dix-neuf
+ * centimes : elle s'affichait « 0 F ». Toutes les compositions se sont donc
+ * annoncées gratuites depuis qu'elles existent, alors que cette ligne est là
+ * précisément pour qu'une dépense ne se découvre pas à la fin du mois.
+ *
+ * Deux décimales, virgule française. Un chiffre qu'on ne peut pas payer en
+ * pièces reste un chiffre qu'on peut additionner.
+ */
+export function coutF(n: number): string {
+  if (!Number.isFinite(n)) throw new RangeError(`coût non représentable : ${n}`)
+  const centimes = Math.round(Math.abs(n) * 100)
+  const francs = Math.floor(centimes / 100)
+  const reste = (centimes % 100).toString().padStart(2, '0')
+  return `${n < 0 ? '-' : ''}${nf(francs)},${reste}${ESPACE_INSECABLE}F`
+}
+
 /** `dateLongue()` → `9 septembre 2026`. */
 export function dateLongue(d: Date): string {
   const p = partsWAT(d)

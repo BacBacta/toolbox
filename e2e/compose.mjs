@@ -83,10 +83,52 @@ const CALCUL = {
   fcfa: 0.16,
 }
 
-/** Un refus, capturé en production sur « je veux un site internet ». */
+/**
+ * Une page, sur « je veux un site internet pour ma quincaillerie ».
+ *
+ * C'était le refus, jusqu'ici : « Je ne peux pas créer un site internet. Je
+ * suis un outil de gestion de registres. » Le refus était juste tant que rien
+ * derrière ne savait faire une page — c'est ce qu'il refusait qui manquait.
+ */
+const PAGE = {
+  page: {
+    titre: 'Quincaillerie Bépanda',
+    kicker: 'QUINCAILLERIE',
+    accroche: 'Tôles, ciment et outillage, à Bépanda depuis 2012.',
+    sommaire: true,
+    sections: [
+      {
+        titre: 'Ce que je vends',
+        sorte: 'liste',
+        lignes: [
+          { nom: 'Tôles bac 30/100', detail: 'toutes longueurs' },
+          { nom: 'Ciment CIMENCAM', valeur: 'en stock' },
+        ],
+      },
+      {
+        titre: 'Quelques prix',
+        sorte: 'prix',
+        lignes: [
+          { nom: 'Tôle bac 30/100', valeur: '12 500 F', detail: 'la feuille' },
+          { nom: 'Sac de ciment 50 kg', valeur: '5 800 F' },
+        ],
+      },
+      {
+        titre: 'La livraison',
+        sorte: 'texte',
+        texte: 'Nous livrons sur tout Douala, du lundi au samedi.',
+      },
+    ],
+    telephone: '699412708',
+    adresse: 'Rue Bépanda-Omnisport, en face du marché',
+    horaires: 'Lundi à samedi, 7 h – 19 h',
+  },
+  fcfa: 0.19,
+}
+
+/** Un refus, sur une demande qu'aucune des trois formes ne porte. */
 const REFUS = {
-  impossible:
-    'Je ne peux pas créer un site internet. Je suis un outil de gestion de registres.',
+  impossible: 'Un logo se dessine, il ne se tient ni en lignes ni en pages.',
   fcfa: 0.08,
 }
 
@@ -100,7 +142,13 @@ await contexte.route('**/api/ai', async (route) => {
   appels++
   const { demande } = JSON.parse(route.request().postData() ?? '{}')
   const d = String(demande)
-  const corps = d.includes('site internet') ? REFUS : d.includes('marge') ? CALCUL : REPONSE
+  const corps = d.includes('logo')
+    ? REFUS
+    : d.includes('site internet')
+      ? PAGE
+      : d.includes('marge')
+        ? CALCUL
+        : REPONSE
   await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(corps) })
 })
 
@@ -231,20 +279,112 @@ dit(
 )
 
 /*
+ * La troisième forme : une page — et c'est la demande qu'on refusait.
+ *
+ * Le parcours entier compte ici, parce qu'il ne se ressemble à aucun autre :
+ * ce qu'on modifie **est** ce qui se publie, l'aperçu est le composant de la
+ * page publiée, et la page publiée n'est pas une carte mais la vitrine
+ * elle-même.
+ */
+await page.goto(BASE, { waitUntil: 'networkidle' })
+await page.fill('#demande', 'je veux un site internet pour ma quincaillerie')
+await page.waitForTimeout(150)
+dit(
+  (await page.textContent('body')).includes('une page à envoyer sur'),
+  'les trois formes sont annoncées avant qu’on paie',
+)
+await page.getByText('Compose-le pour moi').click()
+await page.waitForSelector('text=Quincaillerie Bépanda', { timeout: 10000 })
+dit(true, 'la page composée s’ouvre')
+
+const vitrine = await page.textContent('.page-apercu')
+dit(vitrine.includes('12 500 F'), 'l’aperçu montre les prix, pas un résumé')
+dit(
+  (await page.locator('.vitrine-appel').getAttribute('href')).includes('wa.me/237699412708'),
+  'et le bouton qui rapporte pointe sur WhatsApp',
+)
+dit(
+  (await page.locator('.vitrine-sommaire a').count()) === 3,
+  'le sommaire saute d’une section à l’autre — c’est tout ce qu’« un site » ajoute',
+)
+
+/*
+ * On corrige un prix : c'est la configuration elle-même qu'on modifie.
+ *
+ * Le champ se cherche par sa valeur vivante et non par son attribut : Preact
+ * pose `value` comme propriété, et un sélecteur d'attribut ne voit rien.
+ */
+await page.getByRole('tab', { name: 'Modifier' }).click()
+await page.waitForTimeout(200)
+
+const champs = page.locator('.champ input')
+let corrige = false
+for (let i = 0; i < (await champs.count()); i++) {
+  if ((await champs.nth(i).inputValue()) === '12 500 F') {
+    await champs.nth(i).fill('13 000 F')
+    corrige = true
+    break
+  }
+}
+dit(corrige, 'le prix composé s’édite dans le formulaire')
+await page.waitForTimeout(300)
+await page.getByRole('tab', { name: 'Aperçu' }).click()
+await page.waitForTimeout(200)
+dit(
+  (await page.textContent('.page-apercu')).includes('13 000 F'),
+  'ce qu’on modifie est ce qui se publie',
+)
+
+await page.getByText('Publier et partager', { exact: true }).first().click()
+await page.waitForSelector('canvas', { timeout: 10000 })
+await page.waitForTimeout(400)
+
+const lienPage = await page.evaluate(
+  () =>
+    new Promise((res) => {
+      const q = indexedDB.open('atelier237-outils')
+      q.onsuccess = () => {
+        const t = q.result.transaction('outils', 'readonly').objectStore('outils').getAll()
+        t.onsuccess = () => res(t.result.find((o) => o.skeleton === 'compose-page')?.lien ?? null)
+        t.onerror = () => res(null)
+      }
+      q.onerror = () => res(null)
+    }),
+)
+dit(lienPage !== null, 'la page est publiée et garde son adresse', String(lienPage))
+
+if (lienPage !== null) {
+  const lue = await contexte.newPage()
+  const reponse = await lue.goto(`${BASE}/d/${lienPage}`, { waitUntil: 'domcontentloaded' })
+  const html = await reponse.text()
+  const lu = await lue.textContent('body')
+  dit(reponse.status() === 200, 'la page publiée répond', String(reponse.status()))
+  dit(lu.includes('Quincaillerie Bépanda'), 'la vitrine se lit derrière son lien')
+  dit(lu.includes('13 000 F'), 'avec la correction, pas la version du modèle')
+  dit(!lu.includes('ne mène à rien'), 'et ce n’est pas la page « lien introuvable »')
+  dit(!html.includes('<script'), 'sans un seul script — c’est ce qui la rend fiable')
+  dit(html.length <= 25 * 1024, 'sous les 25 Ko du § 8', `${(html.length / 1024).toFixed(1)} Ko`)
+  // Le sommaire saute dans le document, sans recharger : la cible doit exister.
+  dit(html.includes('id="quelques-prix"'), 'le sommaire a bien où sauter')
+  await lue.close()
+}
+
+/*
  * Le refus, qui est l'autre moitié du contrat.
  *
- * « Je veux un site internet » créait un registre « Ventes » inventé de bout
- * en bout : le modèle n'avait aucune sortie et faisait ce qu'on lui demandait.
+ * Il ne disparaît pas parce qu'une forme de plus existe : il se resserre. Un
+ * outil qui ne sait pas dire non finit par mentir, et « fais-moi un logo »
+ * n'est ni un registre, ni un calcul, ni une page.
  */
 await page.goto(BASE, { waitUntil: 'networkidle' })
 const avant = appels
-await page.fill('#demande', 'je veux un site internet')
+await page.fill('#demande', 'fais-moi un logo')
 await page.waitForTimeout(150)
 await page.getByText('Compose-le pour moi').click()
 await page.waitForTimeout(800)
 
 const texte = await page.textContent('body')
-dit(texte.includes('Je ne peux pas créer un site internet'), 'le refus du modèle est rapporté tel quel')
+dit(texte.includes('Un logo se dessine'), 'le refus du modèle est rapporté tel quel')
 dit(!texte.includes('Ventes'), 'et aucun outil n’est inventé')
 dit(!texte.includes('Réessaie'), 'sans proposer de recommencer : la réponse ne changera pas')
 dit(appels === avant + 1, 'un seul appel payé pour le refus', `${appels - avant}`)

@@ -1,4 +1,22 @@
 import { Fragment as _Fragment, jsx as _jsx, jsxs as _jsxs } from "preact/jsx-runtime";
+/**
+ * Ce champ a-t-il lieu d'être montré, vu ce que valent ses voisins ?
+ *
+ * Une section de page porte `texte` **ou** `lignes`, jamais les deux, et le
+ * schéma ne sait dire que « facultatif ». L'éditeur montrait donc une zone de
+ * texte vide sous chaque liste de prix, et une liste vide sous chaque
+ * paragraphe : ce qu'on y tape ne s'affiche jamais sur la page, et rien ne le
+ * dit.
+ */
+function pertinent(schema, voisins) {
+    const regle = schema.ecran?.montrerSi;
+    if (regle === undefined)
+        return true;
+    if (typeof voisins !== 'object' || voisins === null)
+        return true;
+    const valeur = voisins[regle.champ];
+    return typeof valeur === 'string' && regle.vaut.includes(valeur);
+}
 function libelle(schema, clef) {
     return schema.title ?? clef;
 }
@@ -11,8 +29,15 @@ function ChampTexte(props) {
     if (props.schema.enum !== undefined) {
         return (_jsx("select", { id: props.id, value: valeur, onChange: (e) => props.onChange(e.target.value), children: props.schema.enum.map((o) => (_jsx("option", { value: o, children: o }, o))) }));
     }
-    // Au-delà de cent vingt caractères on écrit un paragraphe, pas une ligne.
-    if ((props.schema.maxLength ?? 0) > 120) {
+    /*
+     * À partir de cent caractères on écrit une phrase, pas une étiquette.
+     *
+     * Le seuil était à cent vingt, et l'accroche d'une page en fait exactement
+     * cent vingt : elle tombait donc du mauvais côté, dans un champ d'une ligne
+     * qui n'en montrait que la moitié. On ne relit pas une phrase qu'on ne voit
+     * pas en entier.
+     */
+    if ((props.schema.maxLength ?? 0) >= 100) {
         return (_jsx("textarea", { id: props.id, rows: 4, value: valeur, onInput: (e) => props.onChange(e.target.value) }));
     }
     return (_jsx("input", { id: props.id, type: "text", value: valeur, maxLength: props.schema.maxLength ?? undefined, onInput: (e) => props.onChange(e.target.value) }));
@@ -23,9 +48,14 @@ export function ChampsSchema(props) {
     if (masques.includes(chemin))
         return null;
     const schema = props.schema;
+    if (!pertinent(schema, props.voisins))
+        return null;
+    // Les aides se disent une fois par liste, pas une fois par ligne.
+    const premier = props.premier ?? true;
+    const aide = premier ? schema.description : undefined;
     if (schema.type === 'object') {
         const valeur = props.valeur;
-        const champs = Object.entries(schema.properties).map(([clef, sous]) => (_jsx(ChampsSchema, { schema: sous, chemin: `${chemin}.${clef}`, masques: masques, valeur: typeof valeur === 'object' && valeur !== null
+        const champs = Object.entries(schema.properties).map(([clef, sous]) => (_jsx(ChampsSchema, { schema: sous, chemin: `${chemin}.${clef}`, masques: masques, voisins: valeur, premier: premier, valeur: typeof valeur === 'object' && valeur !== null
                 ? valeur[clef]
                 : undefined, onChange: (v) => props.onChange(objetAvec(valeur, clef, v)) }, clef)));
         /*
@@ -47,7 +77,23 @@ export function ChampsSchema(props) {
     if (schema.type === 'array') {
         const liste = Array.isArray(props.valeur) ? props.valeur : [];
         const plein = schema.maxItems !== undefined && liste.length >= schema.maxItems;
-        return (_jsxs("fieldset", { class: "champ-groupe", children: [_jsx("legend", { children: libelle(schema, chemin) }), liste.length === 0 && _jsx("p", { class: "champ-vide", children: "Rien pour l\u2019instant." }), liste.map((element, i) => (_jsxs("div", { class: "champ-element", children: [_jsx(ChampsSchema, { schema: schema.items, chemin: `${chemin}[]`, masques: masques, valeur: element, onChange: (v) => props.onChange(liste.map((x, j) => (j === i ? v : x))) }), _jsx("button", { type: "button", class: "champ-retirer", "aria-label": `Retirer la ligne ${i + 1}`, onClick: () => props.onChange(liste.filter((_, j) => j !== i)), children: "Retirer" })] }, `${chemin}-${i}`))), _jsx("button", { type: "button", class: "champ-ajouter", disabled: plein, onClick: () => props.onChange([...liste, valeurNeuve(schema.items)]), children: "Ajouter une ligne" })] }));
+        /*
+         * Une section de page contient une liste de lignes : les deux sont des
+         * listes, et les deux boutons disaient la même chose. Deux boutons
+         * identiques qui détruisent des choses différentes se distinguent au
+         * moment où on s'est trompé.
+         */
+        const ajout = schema.ecran?.ajout ?? 'Ajouter une ligne';
+        /*
+         * Le bouton dit ce qu'il retire, et non « Retirer ».
+         *
+         * Le mot seul était clair tant qu'il n'y avait qu'une liste à l'écran. Une
+         * section de page en contient une deuxième : deux boutons identiques,
+         * l'un qui retire une ligne et l'autre la section entière. Sur un
+         * téléphone, la différence se découvrait après.
+         */
+        const retrait = schema.ecran?.retrait ?? 'Retirer la ligne';
+        return (_jsxs("fieldset", { class: "champ-groupe", children: [_jsx("legend", { children: libelle(schema, chemin) }), liste.length === 0 && _jsx("p", { class: "champ-vide", children: "Rien pour l\u2019instant." }), liste.map((element, i) => (_jsxs("div", { class: "champ-element", children: [_jsx(ChampsSchema, { schema: schema.items, chemin: `${chemin}[]`, masques: masques, premier: i === 0, valeur: element, onChange: (v) => props.onChange(liste.map((x, j) => (j === i ? v : x))) }), _jsx("button", { type: "button", class: "champ-retirer", "aria-label": `${retrait} ${i + 1}`, onClick: () => props.onChange(liste.filter((_, j) => j !== i)), children: retrait })] }, `${chemin}-${i}`))), _jsx("button", { type: "button", class: "champ-ajouter", disabled: plein, onClick: () => props.onChange([...liste, valeurNeuve(schema.items)]), children: ajout })] }));
     }
     const id = `champ-${chemin.replace(/[^a-zA-Z0-9]+/g, '-')}`;
     if (schema.type === 'boolean') {
@@ -60,10 +106,10 @@ export function ChampsSchema(props) {
                         const brut = e.target.value.replace(/\s/g, '').replace(',', '.');
                         const nombre = brut === '' ? 0 : Number(brut);
                         props.onChange(Number.isFinite(nombre) ? nombre : 0);
-                    } }), schema.description !== undefined && _jsx("span", { class: "champ-aide", children: schema.description })] }));
+                    } }), aide !== undefined && _jsx("span", { class: "champ-aide", children: aide })] }));
     }
     if (schema.type === 'string') {
-        return (_jsxs("label", { class: "champ", for: id, children: [_jsx("span", { class: "champ-libelle", children: libelle(schema, chemin) }), _jsx(ChampTexte, { schema: schema, id: id, valeur: props.valeur, onChange: props.onChange }), schema.description !== undefined && _jsx("span", { class: "champ-aide", children: schema.description })] }));
+        return (_jsxs("label", { class: "champ", for: id, children: [_jsx("span", { class: "champ-libelle", children: libelle(schema, chemin) }), _jsx(ChampTexte, { schema: schema, id: id, valeur: props.valeur, onChange: props.onChange }), aide !== undefined && _jsx("span", { class: "champ-aide", children: aide })] }));
     }
     return null;
 }

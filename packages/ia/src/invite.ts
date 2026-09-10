@@ -1,5 +1,6 @@
 import {
-  MAX_COLONNES, MAX_ENTREES, MAX_SECTIONS, schemaCalcul, schemaPage, schemaRefus, schemaRegistre,
+  MAX_COLONNES, MAX_ENTREES, MAX_SECTIONS, pourLeModele, schemaCalcul, schemaPage, schemaRefus,
+  schemaRegistre,
 } from '@a237/engine'
 
 /**
@@ -70,20 +71,32 @@ Règles :
   sur-titre : ça se partage, et humilier quelqu'un fait perdre le client avec
   l'argent.`
 
+/*
+ * Les schémas partent déshabillés de ce qui ne sert qu'à l'écran : `title`
+ * nomme un champ dans un formulaire, `montrerSi` dit quand le montrer. Le
+ * modèle a la clef sous les yeux et n'en fait rien, et chaque caractère se paie
+ * à chaque appel. Ils sont réduits une fois pour toutes au chargement du
+ * module, pas à chaque demande.
+ */
+const REGISTRE = JSON.stringify(pourLeModele(schemaRegistre))
+const CALCUL = JSON.stringify(pourLeModele(schemaCalcul))
+const PAGE = JSON.stringify(pourLeModele(schemaPage))
+const REFUS = JSON.stringify(pourLeModele(schemaRefus))
+
 export function batirInvite(demande: string): string {
   return `${CONSIGNES}
 
 Un registre doit respecter ce schéma :
-${JSON.stringify(schemaRegistre)}
+${REGISTRE}
 
 Une calculatrice doit respecter celui-ci :
-${JSON.stringify(schemaCalcul)}
+${CALCUL}
 
 Une page, celui-ci :
-${JSON.stringify(schemaPage)}
+${PAGE}
 
 Un refus, celui-ci :
-${JSON.stringify(schemaRefus)}
+${REFUS}
 
 Demande de l'utilisateur :
 ${demande}`

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { lienWhatsApp, numeroInternational } from '../src/whatsapp.js'
+import { lienWhatsApp, numeroInternational, numeroLisible } from '../src/whatsapp.js'
 
 describe('numeroInternational — ce qu’un utilisateur tape vraiment', () => {
   it.each([
@@ -41,5 +41,34 @@ describe('lienWhatsApp', () => {
   it('survit à un message qui contient des caractères d’URL', () => {
     const lien = lienWhatsApp('699112233', 'Le détail : atl.cm/n/ZBV3?t=36&x=1')
     expect(lien).toContain('%3Ft%3D36%26x%3D1')
+  })
+})
+
+describe('le numéro tel qu’on l’écrit sur une enseigne', () => {
+  /*
+   * Le modèle rend « 699412708 » aussi souvent que « +237 6 99 41 27 08 »,
+   * selon ce que la demande contenait, et la vitrine affichait ce qu'elle
+   * recevait : neuf chiffres collés sous le bouton. Un numéro qu'un client
+   * recopie à la main sur un cahier doit se lire par groupes.
+   */
+  it.each([
+    ['699412708', '+237 6 99 41 27 08'],
+    ['+237 699 41 27 08', '+237 6 99 41 27 08'],
+    ['00237-6.99.41.27.08', '+237 6 99 41 27 08'],
+    ['237699412708', '+237 6 99 41 27 08'],
+    ['233 41 27 08', '+237 2 33 41 27 08'],
+  ])('%s se lit « %s »', (brut, attendu) => {
+    expect(numeroLisible(brut)).toBe(attendu)
+  })
+
+  it('ne regroupe pas un numéro d’ailleurs : on ignore comment son pays le coupe', () => {
+    expect(numeroLisible('+33 6 12 34 56 78')).toBe('+33612345678')
+  })
+
+  it('rend tel quel ce qui n’est pas un numéro', () => {
+    // C'est ce que quelqu'un a écrit. Le remplacer par du vide effacerait la
+    // seule chose qu'il savait.
+    expect(numeroLisible('au comptoir')).toBe('au comptoir')
+    expect(numeroLisible('')).toBe('')
   })
 })

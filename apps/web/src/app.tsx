@@ -1,5 +1,5 @@
 import type { BatirPartage, RenderContext, ShareSpec } from '@a237/engine'
-import { CATALOGUE, EXTRAIT_VIDE, lienPublic, montantF } from '@a237/engine'
+import { CATALOGUE, EXTRAIT_VIDE, coutF, lienPublic } from '@a237/engine'
 import type { Extrait } from '@a237/engine'
 import type { JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
@@ -381,7 +381,7 @@ export function App(): JSX.Element {
 
       {coutDernier !== null && (
         <p class="note cout-compose">
-          Composé par le modèle pour {montantF(coutDernier)}.
+          Composé par le modèle pour {coutF(coutDernier)}.
         </p>
       )}
 

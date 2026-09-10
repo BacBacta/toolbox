@@ -1,7 +1,7 @@
 import { arreteLe } from './format.js'
 import type { CardItem, CardSpec, ErreurValidation, JsonSchema, RenderContext, ShareSpec } from './types.js'
 import { valider } from './valider.js'
-import { numeroInternational } from './whatsapp.js'
+import { numeroInternational, numeroLisible } from './whatsapp.js'
 
 /**
  * La troisième chose que le modèle a le droit de composer : une page.
@@ -114,13 +114,24 @@ const schemaSection: JsonSchema = {
       type: 'string', enum: ['texte', 'liste', 'prix'], title: 'Sorte',
       description: 'texte : un paragraphe. liste : des noms. prix : des noms avec un montant.',
     },
+    /*
+     * Une section porte l'un ou l'autre, jamais les deux : `montrerSi` dit à
+     * l'éditeur lequel montrer. Sans lui, chaque liste de prix traînait une
+     * zone de texte vide, et chaque paragraphe une liste vide — la moitié des
+     * champs à l'écran ne menaient nulle part.
+     */
     texte: {
       type: 'string', maxLength: 400, title: 'Texte',
       description: 'Pour une section « texte ». Deux paragraphes au plus.',
+      ecran: { montrerSi: { champ: 'sorte', vaut: ['texte'] } },
     },
     lignes: {
       type: 'array', maxItems: MAX_LIGNES_SECTION, items: schemaLigne, title: 'Lignes',
       description: 'Pour « liste » ou « prix ».',
+      ecran: {
+        montrerSi: { champ: 'sorte', vaut: ['liste', 'prix'] },
+        ajout: 'Ajouter une ligne', retrait: 'Retirer la ligne',
+      },
     },
   },
 }
@@ -144,6 +155,7 @@ export const schemaPage: JsonSchema = {
     },
     sections: {
       type: 'array', minItems: 1, maxItems: MAX_SECTIONS, items: schemaSection, title: 'Sections',
+      ecran: { ajout: 'Ajouter une section', retrait: 'Retirer la section' },
     },
     telephone: {
       type: 'string', maxLength: 20, title: 'WhatsApp',
@@ -271,7 +283,7 @@ export function carteDePage(page: PageDemande, ctx: RenderContext): CardSpec {
 
 function grandDeLaPage(page: PageDemande): { readonly libelle: string; readonly valeur: string } {
   const tel = page.telephone === undefined ? null : numeroInternational(page.telephone)
-  if (tel !== null) return { libelle: 'WHATSAPP', valeur: page.telephone ?? '' }
+  if (tel !== null) return { libelle: 'WHATSAPP', valeur: numeroLisible(page.telephone ?? '') }
 
   const prix = page.sections.find((s) => s.sorte === 'prix')
   const premiere = prix?.lignes?.find((l) => l.valeur !== undefined && l.valeur !== '')
@@ -320,7 +332,9 @@ export function partageDePage(page: PageDemande, ctx: RenderContext): ShareSpec 
           .map((l) => `• ${l.nom}${l.valeur !== undefined && l.valeur !== '' ? ` — ${l.valeur}` : ''}`)),
     page.adresse === undefined || page.adresse === '' ? '' : `Où : ${page.adresse}`,
     page.horaires === undefined || page.horaires === '' ? '' : `Quand : ${page.horaires}`,
-    page.telephone === undefined || page.telephone === '' ? '' : `WhatsApp : ${page.telephone}`,
+    page.telephone === undefined || page.telephone === ''
+      ? ''
+      : `WhatsApp : ${numeroLisible(page.telephone)}`,
     ctx.lien,
   ].filter((l) => l !== '')
 

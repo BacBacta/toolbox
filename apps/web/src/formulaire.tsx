@@ -21,6 +21,33 @@ export interface ProprietesChamps {
   /** Chemins à ne pas montrer : dérivés, ou tenus par un autre écran. */
   readonly masques?: readonly string[]
   readonly chemin?: string
+  /**
+   * L'objet dont ce champ fait partie. Il sert à `montrerSi` : un champ dont
+   * la pertinence dépend d'un voisin doit pouvoir lire ce voisin.
+   */
+  readonly voisins?: unknown
+  /**
+   * Vrai pour le premier élément d'une liste, et pour tout ce qui n'est pas
+   * dans une liste. Les aides ne se répètent pas huit fois.
+   */
+  readonly premier?: boolean
+}
+
+/**
+ * Ce champ a-t-il lieu d'être montré, vu ce que valent ses voisins ?
+ *
+ * Une section de page porte `texte` **ou** `lignes`, jamais les deux, et le
+ * schéma ne sait dire que « facultatif ». L'éditeur montrait donc une zone de
+ * texte vide sous chaque liste de prix, et une liste vide sous chaque
+ * paragraphe : ce qu'on y tape ne s'affiche jamais sur la page, et rien ne le
+ * dit.
+ */
+function pertinent(schema: JsonSchema, voisins: unknown): boolean {
+  const regle = schema.ecran?.montrerSi
+  if (regle === undefined) return true
+  if (typeof voisins !== 'object' || voisins === null) return true
+  const valeur = (voisins as Record<string, unknown>)[regle.champ]
+  return typeof valeur === 'string' && regle.vaut.includes(valeur)
 }
 
 function libelle(schema: JsonSchema, clef: string): string {
@@ -56,8 +83,15 @@ function ChampTexte(props: {
     )
   }
 
-  // Au-delà de cent vingt caractères on écrit un paragraphe, pas une ligne.
-  if ((props.schema.maxLength ?? 0) > 120) {
+  /*
+   * À partir de cent caractères on écrit une phrase, pas une étiquette.
+   *
+   * Le seuil était à cent vingt, et l'accroche d'une page en fait exactement
+   * cent vingt : elle tombait donc du mauvais côté, dans un champ d'une ligne
+   * qui n'en montrait que la moitié. On ne relit pas une phrase qu'on ne voit
+   * pas en entier.
+   */
+  if ((props.schema.maxLength ?? 0) >= 100) {
     return (
       <textarea
         id={props.id}
@@ -85,6 +119,11 @@ export function ChampsSchema(props: ProprietesChamps): JSX.Element | null {
   if (masques.includes(chemin)) return null
 
   const schema = props.schema
+  if (!pertinent(schema, props.voisins)) return null
+
+  // Les aides se disent une fois par liste, pas une fois par ligne.
+  const premier = props.premier ?? true
+  const aide = premier ? schema.description : undefined
 
   if (schema.type === 'object') {
     const valeur = props.valeur
@@ -94,6 +133,8 @@ export function ChampsSchema(props: ProprietesChamps): JSX.Element | null {
         schema={sous}
         chemin={`${chemin}.${clef}`}
         masques={masques}
+        voisins={valeur}
+        premier={premier}
         valeur={
           typeof valeur === 'object' && valeur !== null
             ? (valeur as Record<string, unknown>)[clef]
@@ -129,6 +170,22 @@ export function ChampsSchema(props: ProprietesChamps): JSX.Element | null {
   if (schema.type === 'array') {
     const liste = Array.isArray(props.valeur) ? (props.valeur as unknown[]) : []
     const plein = schema.maxItems !== undefined && liste.length >= schema.maxItems
+    /*
+     * Une section de page contient une liste de lignes : les deux sont des
+     * listes, et les deux boutons disaient la même chose. Deux boutons
+     * identiques qui détruisent des choses différentes se distinguent au
+     * moment où on s'est trompé.
+     */
+    const ajout = schema.ecran?.ajout ?? 'Ajouter une ligne'
+    /*
+     * Le bouton dit ce qu'il retire, et non « Retirer ».
+     *
+     * Le mot seul était clair tant qu'il n'y avait qu'une liste à l'écran. Une
+     * section de page en contient une deuxième : deux boutons identiques,
+     * l'un qui retire une ligne et l'autre la section entière. Sur un
+     * téléphone, la différence se découvrait après.
+     */
+    const retrait = schema.ecran?.retrait ?? 'Retirer la ligne'
     return (
       <fieldset class="champ-groupe">
         <legend>{libelle(schema, chemin)}</legend>
@@ -139,16 +196,17 @@ export function ChampsSchema(props: ProprietesChamps): JSX.Element | null {
               schema={schema.items}
               chemin={`${chemin}[]`}
               masques={masques}
+              premier={i === 0}
               valeur={element}
               onChange={(v) => props.onChange(liste.map((x, j) => (j === i ? v : x)))}
             />
             <button
               type="button"
               class="champ-retirer"
-              aria-label={`Retirer la ligne ${i + 1}`}
+              aria-label={`${retrait} ${i + 1}`}
               onClick={() => props.onChange(liste.filter((_, j) => j !== i))}
             >
-              Retirer
+              {retrait}
             </button>
           </div>
         ))}
@@ -158,7 +216,7 @@ export function ChampsSchema(props: ProprietesChamps): JSX.Element | null {
           disabled={plein}
           onClick={() => props.onChange([...liste, valeurNeuve(schema.items)])}
         >
-          Ajouter une ligne
+          {ajout}
         </button>
       </fieldset>
     )
@@ -197,7 +255,7 @@ export function ChampsSchema(props: ProprietesChamps): JSX.Element | null {
             props.onChange(Number.isFinite(nombre) ? nombre : 0)
           }}
         />
-        {schema.description !== undefined && <span class="champ-aide">{schema.description}</span>}
+        {aide !== undefined && <span class="champ-aide">{aide}</span>}
       </label>
     )
   }
@@ -207,7 +265,7 @@ export function ChampsSchema(props: ProprietesChamps): JSX.Element | null {
       <label class="champ" for={id}>
         <span class="champ-libelle">{libelle(schema, chemin)}</span>
         <ChampTexte schema={schema} id={id} valeur={props.valeur} onChange={props.onChange} />
-        {schema.description !== undefined && <span class="champ-aide">{schema.description}</span>}
+        {aide !== undefined && <span class="champ-aide">{aide}</span>}
       </label>
     )
   }
