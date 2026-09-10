@@ -72,7 +72,16 @@ export const MAX_COLONNES = 6
 export const schemaRegistre: JsonSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['titre', 'kicker', 'titreNom', 'colonnes', 'libelleVide', 'libelleAjout', 'relancesVides'],
+  /*
+   * Les trois libellés d'ambiance ne sont pas exigés.
+   *
+   * `libelleVide`, `libelleAjout` et `relancesVides` habillent des écrans
+   * vides ; la personne n'en a demandé aucun. Les exiger mettait trois champs
+   * décoratifs sur le chemin de chaque registre — dont un au nom trompeur, qui
+   * a coûté deux registres justes sur trente en production. `redresserRegistre`
+   * les remplit quand ils manquent ; le modèle les écrit toujours, et mieux.
+   */
+  required: ['titre', 'kicker', 'titreNom', 'colonnes'],
   properties: {
     titre: {
       type: 'string', minLength: 2, maxLength: 40, title: 'Nom de l’outil',
@@ -186,11 +195,33 @@ export const schemaRefus: JsonSchema = {
  * Pure, et tolérante à ce qui n'est pas un registre : elle reçoit ce que le
  * modèle a rendu, et le schéma s'expliquera mieux qu'elle.
  */
+export const LIBELLES_PAR_DEFAUT = {
+  libelleVide: 'Rien de noté pour l’instant.',
+  libelleAjout: 'Ajouter une ligne',
+  relancesVides: 'Personne à relancer pour l’instant.',
+} as const
+
+/**
+ * Les libellés d'ambiance, remplis quand ils manquent ou qu'ils ont glissé.
+ *
+ * Ce sont des écrans vides, pas le travail de la personne : un registre sans
+ * eux se tient parfaitement, un registre sans colonnes non. On remplace donc,
+ * là où pour une colonne on refuserait.
+ */
+function avecLesLibelles(valeur: object): object {
+  const r = valeur as Record<string, unknown>
+  const manquants = Object.entries(LIBELLES_PAR_DEFAUT).filter(
+    ([clef]) => typeof r[clef] !== 'string' || (r[clef] as string).trim() === '',
+  )
+  return manquants.length === 0 ? valeur : { ...r, ...Object.fromEntries(manquants) }
+}
+
 export function redresserRegistre(valeur: unknown): unknown {
   if (typeof valeur !== 'object' || valeur === null) return valeur
-  const r = valeur as { colonnes?: unknown; total?: unknown }
+  const habille = avecLesLibelles(valeur)
+  const r = habille as { colonnes?: unknown; total?: unknown }
   const pliage = plierLesClefs(r.colonnes)
-  if (pliage === null || !pliage.change) return valeur
+  if (pliage === null || !pliage.change) return habille
 
   const suivre = (clef: unknown): unknown =>
     typeof clef === 'string' ? (pliage.renommes.get(clef) ?? clef) : clef
@@ -206,7 +237,7 @@ export function redresserRegistre(valeur: unknown): unknown {
         )
       : r.total
 
-  return { ...valeur, colonnes: pliage.liste, ...(r.total === undefined ? {} : { total }) }
+  return { ...habille, colonnes: pliage.liste, ...(r.total === undefined ? {} : { total }) }
 }
 
 export function verifierRegistre(valeur: unknown): readonly ErreurValidation[] {

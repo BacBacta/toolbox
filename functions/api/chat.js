@@ -1267,10 +1267,7 @@ var schemaRegistre = {
 		"titre",
 		"kicker",
 		"titreNom",
-		"colonnes",
-		"libelleVide",
-		"libelleAjout",
-		"relancesVides"
+		"colonnes"
 	],
 	properties: {
 		titre: {
@@ -1418,15 +1415,36 @@ var schemaRefus = {
 * Pure, et tolérante à ce qui n'est pas un registre : elle reçoit ce que le
 * modèle a rendu, et le schéma s'expliquera mieux qu'elle.
 */
+var LIBELLES_PAR_DEFAUT = {
+	libelleVide: "Rien de noté pour l’instant.",
+	libelleAjout: "Ajouter une ligne",
+	relancesVides: "Personne à relancer pour l’instant."
+};
+/**
+* Les libellés d'ambiance, remplis quand ils manquent ou qu'ils ont glissé.
+*
+* Ce sont des écrans vides, pas le travail de la personne : un registre sans
+* eux se tient parfaitement, un registre sans colonnes non. On remplace donc,
+* là où pour une colonne on refuserait.
+*/
+function avecLesLibelles(valeur) {
+	const r = valeur;
+	const manquants = Object.entries(LIBELLES_PAR_DEFAUT).filter(([clef]) => typeof r[clef] !== "string" || r[clef].trim() === "");
+	return manquants.length === 0 ? valeur : {
+		...r,
+		...Object.fromEntries(manquants)
+	};
+}
 function redresserRegistre(valeur) {
 	if (typeof valeur !== "object" || valeur === null) return valeur;
-	const r = valeur;
+	const habille = avecLesLibelles(valeur);
+	const r = habille;
 	const pliage = plierLesClefs(r.colonnes);
-	if (pliage === null || !pliage.change) return valeur;
+	if (pliage === null || !pliage.change) return habille;
 	const suivre = (clef) => typeof clef === "string" ? pliage.renommes.get(clef) ?? clef : clef;
 	const total = typeof r.total === "object" && r.total !== null ? Object.fromEntries(Object.entries(r.total).map(([champ, v]) => champ === "clef" || champ === "plus" || champ === "moins" ? [champ, suivre(v)] : [champ, v])) : r.total;
 	return {
-		...valeur,
+		...habille,
 		colonnes: pliage.liste,
 		...r.total === void 0 ? {} : { total }
 	};
@@ -1498,6 +1516,29 @@ function raccourcir(texte, max) {
 function estUnSchema(valeur) {
 	return "properties" in valeur && ("type" in valeur || "$schema" in valeur);
 }
+/**
+* L'étiquette de famille, jetée avant le jugement.
+*
+* Le modèle a quatre schémas devant lui et aucun endroit où dire lequel il a
+* pris ; il se le dit à lui-même, en tête de l'outil : `"type":
+* "calculatrice"`. Le contrat interdit les champs en trop, et une calculatrice
+* juste mourait pour ce mot-là — deux fois sur vingt-quatre, mesuré en
+* production. C'est le même geste que le `colonnes: []` oublié à côté d'un
+* refus : ce qui compte est ce qu'il a dit, pas ce qu'il a ajouté par-dessus.
+*
+* Aucune des quatre familles ne porte `type` ni `sorte` à sa racine — `sorte`
+* vit dans une section ou un champ, jamais au-dessus — et la frontière aiguille
+* sur la forme, pas sur ce mot. Il ne dit donc rien que la forme ne dise déjà,
+* et le jeter ne peut rien emporter avec lui.
+*
+* **Seule une chaîne s'en va.** La tolérance s'arrête là où le contenu
+* commence : un objet ou un tableau sous ce nom est autre chose, et le refus
+* doit le nommer plutôt que de l'effacer en silence.
+*/
+function sansLEtiquette(valeur) {
+	const reste = Object.fromEntries(Object.entries(valeur).filter(([clef, v]) => !((clef === "type" || clef === "sorte") && typeof v === "string")));
+	return Object.keys(reste).length === Object.keys(valeur).length ? valeur : reste;
+}
 function lireReponseModele(valeur) {
 	if (typeof valeur !== "object" || valeur === null) return {
 		sorte: "invalide",
@@ -1513,8 +1554,9 @@ function lireReponseModele(valeur) {
 			message: "tu as renvoyé le schéma. Renvoie un objet qui le respecte : ses champs remplis pour la demande, pas sa description."
 		}]
 	};
-	if ("impossible" in valeur) {
-		const brut = valeur.impossible;
+	const outil = sansLEtiquette(valeur);
+	if ("impossible" in outil) {
+		const brut = outil.impossible;
 		const coupe = typeof brut === "string" ? raccourcir(brut, 160) : brut;
 		const erreurs = valider(schemaRefus, { impossible: coupe });
 		return erreurs.length > 0 ? {
@@ -1525,8 +1567,8 @@ function lireReponseModele(valeur) {
 			pourquoi: coupe
 		};
 	}
-	if ("champs" in valeur) {
-		const redresse = redresserFormulaire(valeur);
+	if ("champs" in outil) {
+		const redresse = redresserFormulaire(outil);
 		const erreurs = verifierFormulaire(redresse);
 		return erreurs.length > 0 ? {
 			sorte: "invalide",
@@ -1536,8 +1578,8 @@ function lireReponseModele(valeur) {
 			formulaire: redresse
 		};
 	}
-	if ("sections" in valeur) {
-		const redressee = redresserPage(valeur);
+	if ("sections" in outil) {
+		const redressee = redresserPage(outil);
 		const erreurs = verifierPage(redressee);
 		return erreurs.length > 0 ? {
 			sorte: "invalide",
@@ -1547,8 +1589,8 @@ function lireReponseModele(valeur) {
 			page: redressee
 		};
 	}
-	if ("entrees" in valeur) {
-		const redresse = redresserCalcul(valeur);
+	if ("entrees" in outil) {
+		const redresse = redresserCalcul(outil);
 		const erreurs = verifierCalcul(redresse);
 		return erreurs.length > 0 ? {
 			sorte: "invalide",
@@ -1558,7 +1600,7 @@ function lireReponseModele(valeur) {
 			calcul: redresse
 		};
 	}
-	const redresse = redresserRegistre(valeur);
+	const redresse = redresserRegistre(outil);
 	const erreurs = verifierRegistre(redresse);
 	return erreurs.length > 0 ? {
 		sorte: "invalide",
@@ -2167,6 +2209,16 @@ Règles :
   personne. Si tu ne sais pas encore ce qu’il vend, n’ouvre pas une liste vide :
   écris ce que tu sais dans une section « texte », et demande le reste dans ton
   mot. On complétera au tour suivant.
+- **Des titres ne sont pas un plan à remplir.** « Nos entrées », « Nos plats »,
+  « Nos desserts » avec des listes vides ne font pas un menu : ils font trois
+  titres suivis de rien, et la personne se retrouve devant un outil qui ne dit
+  rien de son restaurant. Tant que tu n’as pas les plats et les prix, demande-
+  les — c’est un tour, le même que celui que tu allais dépenser.
+- **Un outil vide n’est pas un outil**, et ton mot ne promet que ce que ton
+  outil porte. Pas une seule ligne sous tes sections, pas une seule colonne,
+  pas une seule question : alors ne rends que le mot, et demande ce qui manque.
+  « Je te prépare ça » suivi de rien est la pire réponse — elle coûte le même
+  tour qu’une question, et la personne attend quelque chose qui ne viendra pas.
 - Si la demande décrit une dette entre personnes, ne mets aucun montant en
   sur-titre : ça se partage, et humilier quelqu’un fait perdre le client avec
   l’argent.`;
@@ -2178,7 +2230,7 @@ Règles :
 * conversation pendant que l'outil se construit à côté. L'inverse laisserait
 * quelqu'un devant un aperçu qui bouge sans un mot d'explication.
 */
-var ENVELOPPE = `{"type":"object","required":["mot"],"properties":{"mot":{"type":"string","minLength":2,"maxLength":300,"description":"Ce que tu dis à la personne. Une ou deux phrases. Écris-le en premier."},"outil":{"description":"L’outil, quand ce tour en fabrique un. Il respecte l'un des schémas ci-dessous."}}}`;
+var ENVELOPPE = `{"type":"object","required":["mot"],"properties":{"mot":{"type":"string","minLength":2,"maxLength":300,"description":"Ce que tu dis à la personne. Une ou deux phrases. Écris-le en premier."},"outil":{"description":"L’outil, quand ce tour en fabrique un. Il respecte l'un des schémas ci-dessous, et n'ajoute aucun champ qui ne s'y trouve pas — surtout pas un champ qui dirait de quelle sorte il est : sa forme le dit déjà."}}}`;
 var SCHEMAS = {
 	registre: schemaRegistre,
 	calcul: schemaCalcul,

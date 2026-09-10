@@ -155,3 +155,59 @@ describe('une page dont une étiquette contredisait son contenu', () => {
       .toBe('invalide')
   })
 })
+
+/**
+ * Le modèle nomme la famille de l'outil, et le contrat ne prévoit pas de le lui
+ * laisser dire.
+ *
+ * Mesuré en production : deux fois sur vingt-quatre, une calculatrice
+ * parfaitement juste — entrées, formule, unités — refusée pour un seul champ
+ * en trop, `"type": "calculatrice"`. Le modèle a quatre schémas devant lui et
+ * aucun moyen de dire lequel il a choisi ; il se le dit à lui-même. La forme
+ * le disait déjà : c'est ainsi que la frontière aiguille.
+ *
+ * Une étiquette de famille ne porte aucun contenu — c'est ce qui la rend
+ * jetable, et ce qui distingue ce cas d'un champ mal nommé, où le contenu, lui,
+ * partirait avec.
+ */
+describe('un outil qui se nomme lui-même', () => {
+  const CALCUL = {
+    type: 'calculatrice',
+    titre: 'Commission',
+    kicker: 'COMMISSION',
+    titreNom: 'Transfert',
+    entrees: [{ clef: 'montant', titre: 'Montant', defaut: 0, unite: 'F' }],
+    sortie: { libelle: 'Commission', unite: 'F', formule: { ref: 'montant' } },
+  }
+
+  it('perd son étiquette et passe', () => {
+    const lu = lireReponseModele(CALCUL)
+    expect(lu.sorte).toBe('calcul')
+    if (lu.sorte !== 'calcul') return
+    expect(lu.calcul).not.toHaveProperty('type')
+  })
+
+  it('« sorte » à la racine se jette aussi : aucun des quatre n’en porte', () => {
+    const { type: _, ...sansType } = CALCUL
+    expect(lireReponseModele({ ...sansType, sorte: 'calcul' }).sorte).toBe('calcul')
+  })
+
+  /*
+   * Ce qui n'est pas une étiquette reste refusé. Sans cette limite, la
+   * tolérance deviendrait « on jette ce qu'on ne comprend pas » — et une
+   * section rangée sous un nom de champ inventé partirait en silence, en
+   * laissant une page à trous publiée sous le nom de quelqu'un.
+   */
+  it('mais un champ inconnu qui porte quelque chose reste refusé', () => {
+    expect(lireReponseModele({ ...CALCUL, type: 'calculatrice', bonus: { a: 1 } }).sorte).toBe('invalide')
+    expect(lireReponseModele({ ...CALCUL, type: ['calculatrice'] }).sorte).toBe('invalide')
+    expect(lireReponseModele({ ...CALCUL, type: 'calculatrice', colonnes: [] }).sorte).toBe('invalide')
+  })
+
+  it('et le schéma renvoyé tel quel reste reconnu comme tel', () => {
+    const lu = lireReponseModele({ type: 'object', properties: { titre: { type: 'string' } } })
+    expect(lu.sorte).toBe('invalide')
+    if (lu.sorte !== 'invalide') return
+    expect(lu.erreurs[0]?.message).toMatch(/tu as renvoyé le schéma/)
+  })
+})

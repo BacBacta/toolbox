@@ -59,6 +59,40 @@ describe('ce que l’invite dit', () => {
     expect(invite).toMatch(/n’ouvre pas une liste vide/)
   })
 
+  /*
+   * « Un menu pour mon restaurant » : trois fois sur trois, le modèle
+   * annonçait « je te prépare ça tout de suite » et rendait une page à zéro
+   * section. Le mot s'affiche, l'outil ne s'ouvre pas, et la personne attend.
+   * Une question aurait coûté le même tour et aurait servi.
+   */
+  /*
+   * Quatre schémas devant lui et aucun endroit où dire lequel il a pris : le
+   * modèle se le disait à lui-même, en tête de l'outil. La frontière jette
+   * cette étiquette ; autant ne pas la lui faire écrire.
+   */
+  it('dit que la forme de l’outil suffit à le nommer', () => {
+    expect(batirInviteAgent()).toMatch(/sa forme le dit déjà/)
+  })
+
+  /*
+   * « Un menu pour mon restaurant » : le modèle rendait « Nos entrées », « Nos
+   * plats », « Nos desserts » — trois sections « prix » à zéro ligne. La règle
+   * abstraite ne l'attrapait pas : il croyait connaître le contenu parce qu'il
+   * connaissait les rubriques. Les modèles suivent un exemple nommé bien mieux
+   * qu'un principe, et celui-ci a coûté six générations sur six.
+   */
+  it('nomme le plan de menu vide, parce que la règle abstraite ne l’attrapait pas', () => {
+    const invite = batirInviteAgent('page')
+    expect(invite).toMatch(/Des titres ne sont pas un plan à remplir/)
+    expect(invite).toMatch(/Nos entrées/)
+  })
+
+  it('interdit de promettre dans le mot ce que l’outil ne porte pas', () => {
+    const invite = batirInviteAgent()
+    expect(invite).toContain('Un outil vide n’est pas un outil')
+    expect(invite).toMatch(/ne rends que le mot/)
+  })
+
   it('donne le droit de ne rendre qu’un mot', () => {
     // Personne ne décrit du premier coup l'outil qu'il veut, et une question
     // coûte le même tour qu'un outil inventé.

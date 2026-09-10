@@ -106,9 +106,11 @@ describe('un registre dont les clefs portent des accents', () => {
     expect(redresserRegistre(bon)).toBe(bon)
   })
 
-  it('ce qui n’est pas un registre ressort tel quel', () => {
+  it('ce qui n’est pas un registre reste refusé, et rien ne s’invente à sa place', () => {
     expect(redresserRegistre(null)).toBe(null)
-    expect(redresserRegistre({ colonnes: 'deux' })).toEqual({ colonnes: 'deux' })
+    const rendu = redresserRegistre({ colonnes: 'deux' }) as { colonnes: unknown }
+    expect(rendu.colonnes).toBe('deux')
+    expect(verifierRegistre(rendu).length).toBeGreaterThan(0)
   })
 })
 
@@ -204,5 +206,65 @@ describe('la frontière plie avant de juger, et garde ce qu’elle a plié', () 
     expect(lu.sorte).toBe('formulaire')
     if (lu.sorte !== 'formulaire') return
     expect(lu.formulaire.champs[1]?.clef).toBe('quantiteVoulue')
+  })
+})
+
+/**
+ * Les trois libellés d'ambiance, et pourquoi ils ne tuent plus un registre.
+ *
+ * Mesuré en production, deux fois sur trente, sur « je veux noter qui me doit
+ * de l'argent » :
+ *
+ *     "relancesVides": { "total": { "type": "somme", "clef": "montantDû", … } }
+ *
+ * Le modèle avait rangé le total *dans* le libellé au lieu d'à côté. Colonnes
+ * justes, titres justes, tout le reste bon — et le registre mourait sur une
+ * phrase que personne n'avait demandée : « Pourquoi ce registre ne se relance
+ * pas. » C'est l'écran vide de la relance, pas le travail de la personne.
+ *
+ * Les exiger du modèle, c'est mettre trois champs décoratifs sur le chemin de
+ * chaque registre, dont un au nom trompeur. Ils restent proposés — le modèle
+ * les écrit mieux que nous, « Ajouter une dette » vaut mieux qu'« Ajouter » —
+ * mais leur absence, ou une glissade dedans, ne coûte plus l'outil entier.
+ */
+describe('les libellés d’ambiance d’un registre', () => {
+  const SANS = {
+    titre: 'Suivi des dettes',
+    kicker: 'SUIVI DES DETTES',
+    titreNom: 'Nom du client',
+    colonnes: [{ clef: 'montant', titre: 'Montant dû', type: 'montant' }],
+  }
+
+  it('absents, ils se remplissent tout seuls', () => {
+    const lu = lireReponseModele(SANS)
+    expect(lu.sorte).toBe('registre')
+    if (lu.sorte !== 'registre') return
+    expect(lu.registre.libelleVide.length).toBeGreaterThan(3)
+    expect(lu.registre.libelleAjout.length).toBeGreaterThan(3)
+    expect(lu.registre.relancesVides.length).toBeGreaterThan(3)
+  })
+
+  it('glissés, ils se remplacent — le registre vaut mieux que sa phrase d’ambiance', () => {
+    const lu = lireReponseModele({
+      ...SANS,
+      relancesVides: { total: { type: 'somme', clef: 'montant', libelle: 'Total', unite: 'F' } },
+    })
+    expect(lu.sorte).toBe('registre')
+  })
+
+  it('mais ce que le modèle a bien écrit lui reste', () => {
+    const lu = lireReponseModele({ ...SANS, libelleAjout: 'Ajouter une dette' })
+    expect(lu.sorte).toBe('registre')
+    if (lu.sorte !== 'registre') return
+    expect(lu.registre.libelleAjout).toBe('Ajouter une dette')
+  })
+
+  /*
+   * La tolérance s'arrête aux libellés. Un registre sans colonnes est un
+   * tableau sans rien dedans : lui inventer des colonnes serait inventer le
+   * travail de quelqu'un.
+   */
+  it('et un registre sans colonnes reste refusé', () => {
+    expect(lireReponseModele({ ...SANS, colonnes: [] }).sorte).toBe('invalide')
   })
 })

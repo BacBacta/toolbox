@@ -81,6 +81,16 @@ Règles :
   personne. Si tu ne sais pas encore ce qu’il vend, n’ouvre pas une liste vide :
   écris ce que tu sais dans une section « texte », et demande le reste dans ton
   mot. On complétera au tour suivant.
+- **Des titres ne sont pas un plan à remplir.** « Nos entrées », « Nos plats »,
+  « Nos desserts » avec des listes vides ne font pas un menu : ils font trois
+  titres suivis de rien, et la personne se retrouve devant un outil qui ne dit
+  rien de son restaurant. Tant que tu n’as pas les plats et les prix, demande-
+  les — c’est un tour, le même que celui que tu allais dépenser.
+- **Un outil vide n’est pas un outil**, et ton mot ne promet que ce que ton
+  outil porte. Pas une seule ligne sous tes sections, pas une seule colonne,
+  pas une seule question : alors ne rends que le mot, et demande ce qui manque.
+  « Je te prépare ça » suivi de rien est la pire réponse — elle coûte le même
+  tour qu’une question, et la personne attend quelque chose qui ne viendra pas.
 - Si la demande décrit une dette entre personnes, ne mets aucun montant en
   sur-titre : ça se partage, et humilier quelqu’un fait perdre le client avec
   l’argent.`
@@ -93,7 +103,7 @@ Règles :
  * conversation pendant que l'outil se construit à côté. L'inverse laisserait
  * quelqu'un devant un aperçu qui bouge sans un mot d'explication.
  */
-const ENVELOPPE = `{"type":"object","required":["mot"],"properties":{"mot":{"type":"string","minLength":2,"maxLength":300,"description":"Ce que tu dis à la personne. Une ou deux phrases. Écris-le en premier."},"outil":{"description":"L’outil, quand ce tour en fabrique un. Il respecte l'un des schémas ci-dessous."}}}`
+const ENVELOPPE = `{"type":"object","required":["mot"],"properties":{"mot":{"type":"string","minLength":2,"maxLength":300,"description":"Ce que tu dis à la personne. Une ou deux phrases. Écris-le en premier."},"outil":{"description":"L’outil, quand ce tour en fabrique un. Il respecte l'un des schémas ci-dessous, et n'ajoute aucun champ qui ne s'y trouve pas — surtout pas un champ qui dirait de quelle sorte il est : sa forme le dit déjà."}}}`
 
 const SCHEMAS: Readonly<Record<Exclude<FamilleOutil, 'refus'>, JsonSchema>> = {
   registre: schemaRegistre,

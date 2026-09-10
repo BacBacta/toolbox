@@ -64,6 +64,34 @@ function estUnSchema(valeur: object): boolean {
   return 'properties' in valeur && ('type' in valeur || '$schema' in valeur)
 }
 
+/**
+ * L'étiquette de famille, jetée avant le jugement.
+ *
+ * Le modèle a quatre schémas devant lui et aucun endroit où dire lequel il a
+ * pris ; il se le dit à lui-même, en tête de l'outil : `"type":
+ * "calculatrice"`. Le contrat interdit les champs en trop, et une calculatrice
+ * juste mourait pour ce mot-là — deux fois sur vingt-quatre, mesuré en
+ * production. C'est le même geste que le `colonnes: []` oublié à côté d'un
+ * refus : ce qui compte est ce qu'il a dit, pas ce qu'il a ajouté par-dessus.
+ *
+ * Aucune des quatre familles ne porte `type` ni `sorte` à sa racine — `sorte`
+ * vit dans une section ou un champ, jamais au-dessus — et la frontière aiguille
+ * sur la forme, pas sur ce mot. Il ne dit donc rien que la forme ne dise déjà,
+ * et le jeter ne peut rien emporter avec lui.
+ *
+ * **Seule une chaîne s'en va.** La tolérance s'arrête là où le contenu
+ * commence : un objet ou un tableau sous ce nom est autre chose, et le refus
+ * doit le nommer plutôt que de l'effacer en silence.
+ */
+function sansLEtiquette(valeur: object): object {
+  const reste = Object.fromEntries(
+    Object.entries(valeur as Record<string, unknown>).filter(
+      ([clef, v]) => !((clef === 'type' || clef === 'sorte') && typeof v === 'string'),
+    ),
+  )
+  return Object.keys(reste).length === Object.keys(valeur).length ? valeur : reste
+}
+
 export function lireReponseModele(valeur: unknown): ReponseModele {
   if (typeof valeur !== 'object' || valeur === null) {
     return { sorte: 'invalide', erreurs: [{ chemin: '$', message: 'la réponse n’est pas un objet' }] }
@@ -83,7 +111,9 @@ export function lireReponseModele(valeur: unknown): ReponseModele {
     }
   }
 
-  if ('impossible' in valeur) {
+  const outil = sansLEtiquette(valeur)
+
+  if ('impossible' in outil) {
     /*
      * On coupe avant de valider, et non l'inverse.
      *
@@ -97,7 +127,7 @@ export function lireReponseModele(valeur: unknown): ReponseModele {
      * réponse juste. Le plancher, lui, reste : un refus vide n'est pas un
      * refus.
      */
-    const brut = (valeur as { impossible: unknown }).impossible
+    const brut = (outil as { impossible: unknown }).impossible
     const coupe = typeof brut === 'string' ? raccourcir(brut, MAX_REFUS) : brut
     /*
      * On valide **le refus seul**, et non l'objet qui le porte.
@@ -114,15 +144,15 @@ export function lireReponseModele(valeur: unknown): ReponseModele {
       : { sorte: 'refus', pourquoi: coupe as RefusModele['impossible'] }
   }
 
-  if ('champs' in valeur) {
-    const redresse = redresserFormulaire(valeur)
+  if ('champs' in outil) {
+    const redresse = redresserFormulaire(outil)
     const erreurs = verifierFormulaire(redresse)
     return erreurs.length > 0
       ? { sorte: 'invalide', erreurs }
       : { sorte: 'formulaire', formulaire: redresse as FormulaireDemande }
   }
 
-  if ('sections' in valeur) {
+  if ('sections' in outil) {
     /*
      * Redressé avant d'être jugé, et c'est le redressé qu'on garde.
      *
@@ -131,22 +161,22 @@ export function lireReponseModele(valeur: unknown): ReponseModele {
      * jusqu'à l'écran. Redresser ne desserre rien : ce qui sort repasse entier
      * devant le schéma, champs interdits compris.
      */
-    const redressee = redresserPage(valeur)
+    const redressee = redresserPage(outil)
     const erreurs = verifierPage(redressee)
     return erreurs.length > 0
       ? { sorte: 'invalide', erreurs }
       : { sorte: 'page', page: redressee as PageDemande }
   }
 
-  if ('entrees' in valeur) {
-    const redresse = redresserCalcul(valeur)
+  if ('entrees' in outil) {
+    const redresse = redresserCalcul(outil)
     const erreurs = verifierCalcul(redresse)
     return erreurs.length > 0
       ? { sorte: 'invalide', erreurs }
       : { sorte: 'calcul', calcul: redresse as CalculDemande }
   }
 
-  const redresse = redresserRegistre(valeur)
+  const redresse = redresserRegistre(outil)
   const erreurs = verifierRegistre(redresse)
   return erreurs.length > 0
     ? { sorte: 'invalide', erreurs }
