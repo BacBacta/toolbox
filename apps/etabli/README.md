@@ -15,10 +15,11 @@ navigateur** : le code s'exécute sur l'appareil, dans un cadre isolé, et rien
 ne part sur le réseau — ni pour ouvrir un projet, ni pour le lancer, ni pour
 le partager.
 
-**Onze kilo-octets et huit cents**, tout compris : éditeur, exécution, console,
-modèles, export. C'est l'argument, et il est mesuré à chaque construction par
-`scripts/budget.mjs`. Les éditeurs qu'on installe ailleurs pèsent de deux
-cents kilo-octets à cinq mégaoctets pour la seule zone de saisie.
+**Dix-huit kilo-octets et neuf cents**, tout compris : éditeur, exécution,
+console, couleur, modèles, dépôt, export. C'est l'argument, et il est mesuré à
+chaque construction par `scripts/budget.mjs`. Les éditeurs qu'on installe
+ailleurs pèsent de deux cents kilo-octets à cinq mégaoctets pour la seule zone
+de saisie.
 
 ## Ce qui est adapté, concrètement
 
@@ -32,6 +33,12 @@ cents kilo-octets à cinq mégaoctets pour la seule zone de saisie.
 - **Une console.** Il n'y a ni touche F12 ni outils de développement sur ces
   téléphones. Sans elle, une page blanche est indiscernable d'une page qui
   charge, et quelqu'un qui apprend en conclut qu'il n'y arrive pas.
+- **La couleur, sans bibliothèque.** Mots-clefs, chaînes, nombres et
+  commentaires se distinguent, en JavaScript, en CSS et en HTML. Ce n'est pas
+  de l'agrément : sans couleur, une chaîne jamais fermée ressemble à du code,
+  et on cherche l'erreur ailleurs pendant vingt minutes. Coût mesuré :
+  **un kilo-octet et six cents**, là où les bibliothèques du métier en
+  demandent deux cents.
 - **Les lignes se replient.** À l'inverse de tout éditeur de bureau : sur
   390 pixels, du texte sorti par la droite est du texte qu'on croit effacé.
 - **Hors ligne d'abord.** Les projets vivent dans IndexedDB. On travaille
@@ -94,6 +101,32 @@ d'origine, c'est **l'identité de sa fenêtre** qui est vérifiée, pas l'origin
 du message : n'importe quelle page ou extension peut poster ici, et sans cette
 vérification leur texte s'afficherait comme s'il venait du code de la personne.
 
+## La couleur, et le blocage qu'elle a failli coûter
+
+Trois balayeurs — un par langage — découpent le texte en jetons, qu'une couche
+posée sous la zone de saisie colore. La zone, elle, devient transparente : c'est
+le même texte, aux mêmes coordonnées. D'où une seule déclaration de police, de
+taille, d'interligne et de marge pour les deux couches : une divergence d'un
+pixel décale tout le bas du fichier.
+
+Un balayeur écrit naïvement peut ne pas avancer. `` `a${b}c` `` en mode CSS l'a
+fait : le caractère suivant passait le test d'entrée d'un mot mais pas celui de
+sa continuation, l'indice restait le même, et la boucle tournait sans fin — sur
+un téléphone, l'écran gèle et il faut tuer le navigateur. Aucun délai d'essai ne
+rattrape ça : la boucle ne rend jamais la main, donc vitest lui-même ne peut pas
+l'interrompre.
+
+`parcourir()` rend le blocage impossible : si un pas n'a pas avancé, le
+caractère est pris tel quel et l'indice avance d'un. Le garde-fou est vérifié
+par sabotage — on le retire, et la suite d'essais se fige au lieu de signaler
+une erreur.
+
+Le dernier saut de ligne, lui, demande une compensation : un `<pre>` ignore le
+sien, un `<textarea>` non. La mesure au navigateur a d'abord répondu « aligné »
+à tort — le fichier d'essai ne débordait pas, et les deux hauteurs valaient
+simplement celle de la boîte. Avec un fichier assez long : 4104 contre 4080,
+soit une ligne d'écart. Une mesure qui ne peut pas échouer ne mesure rien.
+
 ## Ce qui n'y est pas encore
 
 - **Python.** Prévu via Pyodide, mais c'est six mégaoctets à télécharger. Ça ne
@@ -103,9 +136,6 @@ vérification leur texte s'afficherait comme s'il venait du code de la personne.
   qu'il ne connaît pas mériterait un appel au modèle. Ce sera l'étape
   suivante, et elle demandera une clef sur ce projet-ci.
 - **Les leçons.** L'éditeur d'abord, sur une base qui marche.
-- **La coloration syntaxique.** Elle coûte au moins deux cents kilo-octets.
-  Le chiffre du budget est ce qu'il faudra mettre en face le jour où on la
-  voudra.
 
 ## Lancer
 

@@ -208,3 +208,77 @@ describe('les lignes longues', () => {
     expect(hote.querySelector('textarea')?.getAttribute('wrap')).toBe('soft')
   })
 })
+
+/**
+ * La couche colorée, derrière la zone de saisie.
+ *
+ * On garde la zone de texte — c'est elle qui porte la sélection, le curseur et
+ * le clavier que la personne connaît — et on dessine les mêmes caractères en
+ * dessous, en couleurs. Les deux doivent porter **exactement** le même texte :
+ * une différence d'un caractère et le curseur cesse d'être en face de ce qu'on
+ * lit.
+ */
+describe('la coloration', () => {
+  it('dessine le même texte que la zone, au caractère près', () => {
+    poser()
+    const zone = hote.querySelector('textarea') as HTMLTextAreaElement
+    const couche = hote.querySelector('.zone-couleur') as HTMLElement
+    // Le contenu d'essai ne finit pas par un saut de ligne : rien à compenser.
+    expect(couche.textContent).toBe(zone.value)
+  })
+
+  it('et le suit quand on tape', () => {
+    poser({ ...PROJET, fichiers: [{ nom: 'script.js', contenu: 'const a = 1' }] }, 'script.js')
+    const couche = hote.querySelector('.zone-couleur') as HTMLElement
+    expect(couche.textContent).toBe('const a = 1')
+    expect(couche.querySelector('.j-motcle')?.textContent).toBe('const')
+    expect(couche.querySelector('.j-nombre')?.textContent).toBe('1')
+  })
+
+  it('colore selon l’extension, pas selon le contenu', () => {
+    poser({ ...PROJET, fichiers: [{ nom: 'style.css', contenu: 'body { color: red }' }] }, 'style.css')
+    expect(hote.querySelector('.zone-couleur .j-attribut')?.textContent).toBe('color')
+  })
+
+  /*
+   * Un saut de ligne de plus, et c'est délibéré.
+   *
+   * Une zone de texte réserve une ligne au curseur après le dernier saut ; un
+   * `<pre>` n'en dessine pas. Mesuré dans un vrai navigateur, sur un fichier
+   * qui déborde : 4 104 pixels contre 4 080 — une ligne d'écart, qui décale les
+   * couleurs de plus en plus à mesure qu'on défile.
+   *
+   * Aucun essai unitaire ne peut voir ça : happy-dom ne fait pas de mise en
+   * page. Ce que celui-ci garde, c'est la compensation elle-même, pour que
+   * personne ne la retire en la prenant pour une faute de frappe.
+   */
+  it('compense la ligne que le « pre » ne dessine pas après un saut final', () => {
+    poser({ ...PROJET, fichiers: [{ nom: 'script.js', contenu: 'let a = 1\n' }] }, 'script.js')
+    expect((hote.querySelector('.zone-couleur') as HTMLElement).textContent).toBe('let a = 1\n\n')
+  })
+
+  it('mais pas quand le texte ne finit pas par un saut : la zone n’en réserve pas', () => {
+    poser({ ...PROJET, fichiers: [{ nom: 'script.js', contenu: 'let a = 1' }] }, 'script.js')
+    expect((hote.querySelector('.zone-couleur') as HTMLElement).textContent).toBe('let a = 1')
+  })
+
+  /*
+   * Le point qui compte le plus : on ne fabrique jamais de balisage à partir du
+   * code de quelqu'un. Les jetons sont affichés comme du texte, donc du code
+   * qui contient des chevrons reste du texte.
+   */
+  it('du code qui contient des balises reste du texte, jamais du balisage', () => {
+    poser({
+      ...PROJET,
+      fichiers: [{ nom: 'script.js', contenu: 'const x = "<img src=x onerror=alert(1)>"' }],
+    }, 'script.js')
+    const couche = hote.querySelector('.zone-couleur') as HTMLElement
+    expect(couche.querySelector('img')).toBe(null)
+    expect(couche.textContent).toContain('<img src=x onerror=alert(1)>')
+  })
+
+  it('la couche est cachée aux lecteurs d’écran : la zone dit déjà tout', () => {
+    poser()
+    expect(hote.querySelector('.zone-couleur')?.getAttribute('aria-hidden')).toBe('true')
+  })
+})

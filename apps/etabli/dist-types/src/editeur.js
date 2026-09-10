@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs } from "preact/jsx-runtime";
-import { MAX_FICHIERS, sorteDuFichier, verifierNomDeFichier } from '@a237/etabli';
+import { MAX_FICHIERS, colorer, sorteDuFichier, verifierNomDeFichier } from '@a237/etabli';
 import { useRef, useState } from 'preact/hooks';
 /**
  * Écrire du code sur un téléphone.
@@ -48,6 +48,7 @@ const SANS_CORRECTION = {
 const SYMBOLES = ['{', '}', '(', ')', '[', ']', '<', '>', ';', '=', '"', "'", ':', '.', '/', '_'];
 export function Editeur(props) {
     const zone = useRef(null);
+    const couche = useRef(null);
     const [nouveau, setNouveau] = useState(null);
     const [reproche, setReproche] = useState('');
     const fichier = props.projet.fichiers.find((f) => f.nom === props.ouvert);
@@ -97,19 +98,36 @@ export function Editeur(props) {
         setNouveau(null);
         setReproche('');
     }
-    return (_jsxs("div", { class: "editeur", children: [_jsxs("div", { class: "onglets", role: "tablist", children: [props.projet.fichiers.map((f) => (_jsx("button", { type: "button", role: "tab", "aria-selected": f.nom === props.ouvert, class: f.nom === props.ouvert ? 'onglet actif' : 'onglet', onClick: () => props.onOuvrir(f.nom), children: f.nom }, f.nom))), props.projet.fichiers.length < MAX_FICHIERS && (_jsx("button", { type: "button", class: "onglet ajout", onClick: () => setNouveau(''), children: "+" }))] }), nouveau !== null && (_jsxs("div", { class: "nouveau-fichier", children: [_jsx("input", { type: "text", value: nouveau, placeholder: props.t.nomDeFichier, ...SANS_CORRECTION, onInput: (e) => setNouveau(e.target.value) }), _jsx("button", { type: "button", onClick: ajouter, children: props.t.ajouter }), _jsx("button", { type: "button", class: "discret", onClick: () => { setNouveau(null); setReproche(''); }, children: props.t.annuler }), reproche !== '' && _jsx("p", { class: "reproche", children: reproche })] })), fichier === undefined ? (_jsx("p", { class: "vide", children: props.t.sansFichier })) : (_jsx("textarea", { ref: zone, class: "zone", value: fichier.contenu, onInput: (e) => props.onEcrire(fichier.nom, e.target.value), "aria-label": props.t.contenuDe(fichier.nom), "data-sorte": sorteDuFichier(fichier.nom), ...SANS_CORRECTION, 
-                /*
-                 * Le texte revient à la ligne, contrairement à tout éditeur de code.
-                 *
-                 * Un éditeur de bureau ne replie pas : la structure se lit mieux, et
-                 * il reste de la largeur pour aller voir la fin d'une ligne. Sur
-                 * trois cent quatre-vingt-dix pixels il n'en reste pas : une capture
-                 * d'écran de cet éditeur montrait `<button id="bouton">Appuie
-                 * ici</button>` coupé net au bord droit. Du texte qu'on ne voit pas
-                 * est pire qu'une indentation en escalier — surtout pour quelqu'un
-                 * qui apprend, et qui ne sait pas encore qu'il faut faire défiler.
-                 */
-                wrap: "soft" })), _jsx("div", { class: "symboles", "aria-label": props.t.rangeeSymboles, children: SYMBOLES.map((s) => (_jsx("button", { type: "button", class: "symbole", 
+    return (_jsxs("div", { class: "editeur", children: [_jsxs("div", { class: "onglets", role: "tablist", children: [props.projet.fichiers.map((f) => (_jsx("button", { type: "button", role: "tab", "aria-selected": f.nom === props.ouvert, class: f.nom === props.ouvert ? 'onglet actif' : 'onglet', onClick: () => props.onOuvrir(f.nom), children: f.nom }, f.nom))), props.projet.fichiers.length < MAX_FICHIERS && (_jsx("button", { type: "button", class: "onglet ajout", onClick: () => setNouveau(''), children: "+" }))] }), nouveau !== null && (_jsxs("div", { class: "nouveau-fichier", children: [_jsx("input", { type: "text", value: nouveau, placeholder: props.t.nomDeFichier, ...SANS_CORRECTION, onInput: (e) => setNouveau(e.target.value) }), _jsx("button", { type: "button", onClick: ajouter, children: props.t.ajouter }), _jsx("button", { type: "button", class: "discret", onClick: () => { setNouveau(null); setReproche(''); }, children: props.t.annuler }), reproche !== '' && _jsx("p", { class: "reproche", children: reproche })] })), fichier === undefined ? (_jsx("p", { class: "vide", children: props.t.sansFichier })) : (_jsxs("div", { class: "zone-enveloppe", children: [_jsxs("pre", { ref: couche, class: "zone-couleur", "aria-hidden": "true", children: [colorer(fichier.contenu, sorteDuFichier(fichier.nom)).map((j, n) => (_jsx("span", { class: `j-${j.sorte}`, children: j.texte }, n))), fichier.contenu.endsWith('\n') ? '\n' : ''] }), _jsx("textarea", { ref: zone, class: "zone", value: fichier.contenu, onInput: (e) => props.onEcrire(fichier.nom, e.target.value), onScroll: (e) => {
+                            /*
+                             * La couche colorée suit la zone : elles défilent ensemble ou pas
+                             * du tout.
+                             *
+                             * Par référence, et non par voisinage dans le DOM :
+                             * `previousElementSibling` marcherait aujourd'hui et cesserait
+                             * sans bruit le jour où quelqu'un glisserait un élément entre
+                             * les deux — les couleurs se figeraient pendant que le texte
+                             * défile, sans rien casser d'assez visible pour qu'un essai le
+                             * rattrape.
+                             */
+                            const dessous = couche.current;
+                            if (dessous === null)
+                                return;
+                            dessous.scrollTop = e.target.scrollTop;
+                            dessous.scrollLeft = e.target.scrollLeft;
+                        }, "aria-label": props.t.contenuDe(fichier.nom), "data-sorte": sorteDuFichier(fichier.nom), ...SANS_CORRECTION, 
+                        /*
+                         * Le texte revient à la ligne, contrairement à tout éditeur de code.
+                         *
+                         * Un éditeur de bureau ne replie pas : la structure se lit mieux, et
+                         * il reste de la largeur pour aller voir la fin d'une ligne. Sur
+                         * trois cent quatre-vingt-dix pixels il n'en reste pas : une capture
+                         * d'écran de cet éditeur montrait `<button id="bouton">Appuie
+                         * ici</button>` coupé net au bord droit. Du texte qu'on ne voit pas
+                         * est pire qu'une indentation en escalier — surtout pour quelqu'un
+                         * qui apprend, et qui ne sait pas encore qu'il faut faire défiler.
+                         */
+                        wrap: "soft" })] })), _jsx("div", { class: "symboles", "aria-label": props.t.rangeeSymboles, children: SYMBOLES.map((s) => (_jsx("button", { type: "button", class: "symbole", 
                     /* Empêche la zone de perdre le focus : le clavier resterait fermé. */
                     onMouseDown: (e) => e.preventDefault(), onClick: () => inserer(s), children: s }, s))) })] }));
 }

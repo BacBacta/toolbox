@@ -171,13 +171,31 @@ body {
 .nouveau-fichier .discret { background: none; color: var(--gris); }
 .reproche { flex: 1 0 100%; margin: 0; color: var(--rouge); font-size: 13px; }
 
-.zone {
+/*
+ * La zone de saisie et sa couche colorée, superposées au pixel près.
+ *
+ * Tout ce qui touche à la mise en page du texte est déclaré **une fois**, pour
+ * les deux à la fois. Une police, une taille, une hauteur de ligne ou une marge
+ * qui divergerait ferait glisser le curseur par rapport aux couleurs, de plus
+ * en plus à mesure qu'on descend — et ça ne se voit qu'en bas d'un long
+ * fichier.
+ */
+.zone-enveloppe {
+  position: relative;
   flex: 1;
   min-height: 0;
+  background: white;
+}
+
+.zone,
+.zone-couleur {
+  position: absolute;
+  inset: 0;
+  margin: 0;
   width: 100%;
+  height: 100%;
   padding: 12px;
   border: 0;
-  resize: none;
   font-family: var(--mono);
   /* Seize pixels : en dessous, iOS zoome à la mise au point et l'écran saute. */
   font-size: 16px;
@@ -186,8 +204,41 @@ body {
   /* Une ligne longue se replie plutôt que de sortir par la droite. */
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  background: white;
+  overflow: auto;
 }
+
+.zone {
+  resize: none;
+  background: transparent;
+  /*
+   * Le texte est transparent, le curseur ne l'est pas.
+   *
+   * C'est tout le tour de main : la zone garde la sélection, le curseur et le
+   * clavier que la personne connaît, et ce qu'on lit vient de la couche du
+   * dessous. `caret-color` n'a pas de repli utile — sans lui le curseur
+   * disparaîtrait avec le texte.
+   */
+  color: transparent;
+  caret-color: var(--encre, #111827);
+  -webkit-text-fill-color: transparent;
+}
+
+.zone-couleur {
+  pointer-events: none;
+  color: var(--encre, #111827);
+}
+
+/*
+ * Les couleurs. Sobres exprès : on colore pour **lire**, pas pour décorer, et
+ * six teintes qui se battent fatiguent plus qu'un texte noir.
+ */
+.j-commentaire { color: #6b7280; font-style: italic; }
+.j-chaine { color: #b45309; }
+.j-nombre { color: #b45309; }
+.j-motcle { color: #14532d; font-weight: 700; }
+.j-balise { color: #14532d; }
+.j-attribut { color: #1d4ed8; }
+.j-ponctuation { color: #6b7280; }
 .zone:focus { outline: 2px solid var(--vert); outline-offset: -2px; }
 .vide { padding: 24px; color: var(--gris); }
 

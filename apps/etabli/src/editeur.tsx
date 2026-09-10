@@ -1,5 +1,5 @@
 import type { Fichier, Langue, Projet, Textes } from '@a237/etabli'
-import { MAX_FICHIERS, sorteDuFichier, verifierNomDeFichier } from '@a237/etabli'
+import { MAX_FICHIERS, colorer, sorteDuFichier, verifierNomDeFichier } from '@a237/etabli'
 import type { JSX } from 'preact'
 import { useRef, useState } from 'preact/hooks'
 
@@ -61,6 +61,7 @@ export function Editeur(props: {
   readonly t: Textes
 }): JSX.Element {
   const zone = useRef<HTMLTextAreaElement | null>(null)
+  const couche = useRef<HTMLPreElement | null>(null)
   const [nouveau, setNouveau] = useState<string | null>(null)
   const [reproche, setReproche] = useState('')
 
@@ -156,27 +157,80 @@ export function Editeur(props: {
       {fichier === undefined ? (
         <p class="vide">{props.t.sansFichier}</p>
       ) : (
-        <textarea
-          ref={zone}
-          class="zone"
-          value={fichier.contenu}
-          onInput={(e) => props.onEcrire(fichier.nom, (e.target as HTMLTextAreaElement).value)}
-          aria-label={props.t.contenuDe(fichier.nom)}
-          data-sorte={sorteDuFichier(fichier.nom)}
-          {...SANS_CORRECTION}
-          /*
-           * Le texte revient à la ligne, contrairement à tout éditeur de code.
-           *
-           * Un éditeur de bureau ne replie pas : la structure se lit mieux, et
-           * il reste de la largeur pour aller voir la fin d'une ligne. Sur
-           * trois cent quatre-vingt-dix pixels il n'en reste pas : une capture
-           * d'écran de cet éditeur montrait `<button id="bouton">Appuie
-           * ici</button>` coupé net au bord droit. Du texte qu'on ne voit pas
-           * est pire qu'une indentation en escalier — surtout pour quelqu'un
-           * qui apprend, et qui ne sait pas encore qu'il faut faire défiler.
-           */
-          wrap="soft"
-        />
+        <div class="zone-enveloppe">
+          {/*
+            * La couche colorée est **derrière** la zone de saisie, pas à sa place.
+            *
+            * Une zone de texte ne sait pas afficher de couleurs, et la remplacer
+            * par un élément éditable coûterait la sélection, le curseur et le
+            * clavier que la personne connaît — tout ce qui rend l'écriture
+            * supportable sur un téléphone. On garde donc la zone, on rend son
+            * texte transparent, et on dessine les mêmes caractères en dessous.
+            *
+            * Les deux doivent se superposer au pixel près : même police, même
+            * taille, même hauteur de ligne, même marge, même repli. Une seule
+            * différence et le curseur se met à mentir de plus en plus à mesure
+            * qu'on descend.
+            */}
+          <pre ref={couche} class="zone-couleur" aria-hidden="true">
+            {colorer(fichier.contenu, sorteDuFichier(fichier.nom)).map((j, n) => (
+              // eslint-disable-next-line react/no-array-index-key
+              <span key={n} class={`j-${j.sorte}`}>{j.texte}</span>
+            ))}
+            {/*
+              * Un saut de ligne de plus quand le texte finit par un saut de ligne.
+              *
+              * Une zone de texte réserve une ligne au curseur après le dernier
+              * saut ; un `<pre>` n'en dessine pas. Mesuré dans un vrai
+              * navigateur : sur un fichier qui déborde, la zone faisait
+              * 4 104 pixels et la couche 4 080 — vingt-quatre pixels, soit
+              * exactement une ligne, et le décalage s'accumulait en défilant.
+              *
+              * Le premier relevé disait « alignées » parce que le fichier ne
+              * débordait pas : les deux `scrollHeight` valaient alors la hauteur
+              * de la boîte, et la mesure ne mesurait rien.
+              */}
+            {fichier.contenu.endsWith('\n') ? '\n' : ''}
+          </pre>
+          <textarea
+            ref={zone}
+            class="zone"
+            value={fichier.contenu}
+            onInput={(e) => props.onEcrire(fichier.nom, (e.target as HTMLTextAreaElement).value)}
+            onScroll={(e) => {
+              /*
+               * La couche colorée suit la zone : elles défilent ensemble ou pas
+               * du tout.
+               *
+               * Par référence, et non par voisinage dans le DOM :
+               * `previousElementSibling` marcherait aujourd'hui et cesserait
+               * sans bruit le jour où quelqu'un glisserait un élément entre
+               * les deux — les couleurs se figeraient pendant que le texte
+               * défile, sans rien casser d'assez visible pour qu'un essai le
+               * rattrape.
+               */
+              const dessous = couche.current
+              if (dessous === null) return
+              dessous.scrollTop = (e.target as HTMLTextAreaElement).scrollTop
+              dessous.scrollLeft = (e.target as HTMLTextAreaElement).scrollLeft
+            }}
+            aria-label={props.t.contenuDe(fichier.nom)}
+            data-sorte={sorteDuFichier(fichier.nom)}
+            {...SANS_CORRECTION}
+            /*
+             * Le texte revient à la ligne, contrairement à tout éditeur de code.
+             *
+             * Un éditeur de bureau ne replie pas : la structure se lit mieux, et
+             * il reste de la largeur pour aller voir la fin d'une ligne. Sur
+             * trois cent quatre-vingt-dix pixels il n'en reste pas : une capture
+             * d'écran de cet éditeur montrait `<button id="bouton">Appuie
+             * ici</button>` coupé net au bord droit. Du texte qu'on ne voit pas
+             * est pire qu'une indentation en escalier — surtout pour quelqu'un
+             * qui apprend, et qui ne sait pas encore qu'il faut faire défiler.
+             */
+            wrap="soft"
+          />
+        </div>
       )}
 
       <div class="symboles" aria-label={props.t.rangeeSymboles}>
