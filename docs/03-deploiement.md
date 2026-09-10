@@ -43,8 +43,61 @@ ce qu'il faut faire aussi, avant de lancer les vérifications de bout en bout.
 | Projet | `atelier237` |
 
 `wrangler.toml` est à la racine et nomme le projet ; `apps/web/public/_headers`
-porte les en-têtes, et Vite le copie tel quel dans `dist/`. Il n'y a rien à
-régler dans l'interface.
+porte les en-têtes, et Vite le copie tel quel dans `dist/`.
+
+### Deux chemins de mise en ligne, et un seul qui sert
+
+C'est la chose à savoir avant tout le reste, parce qu'elle a coûté une demi-
+journée à comprendre.
+
+| | Intégration Git | `wrangler pages deploy` |
+|---|---|---|
+| Déclenchement | chaque `git push` | une commande, à la main |
+| État observé | **échouait à chaque fois** | réussit |
+| Ce qui sert le site | rien | tout, depuis le début |
+
+Le projet Pages a une intégration Git attachée : chaque poussée déclenche une
+construction chez Cloudflare, et **toutes échouaient**. Le journal disait
+exactement pourquoi :
+
+```
+No build command specified. Skipping build step.
+Found Functions directory at /functions. Uploading.
+Error: Output directory "apps/web/dist" not found.
+```
+
+Aucune commande de construction n'est configurée. Cloudflare clone, ne
+construit rien, puis cherche `apps/web/dist` — qui n'est pas dans le dépôt,
+parce qu'une sortie de construction n'a rien à y faire. Ce n'était donc jamais
+une erreur de code : c'était un réglage absent, sur un chemin que personne ne
+regardait puisque l'autre marchait.
+
+Rien de tout cela n'a jamais cassé le site : une construction qui échoue ne
+produit aucun déploiement, et le dernier envoi direct continue de servir. Mais
+il n'y a **pas de mise en ligne automatique**, et le contrôle reste rouge sur
+chaque demande de fusion — un signal rouge qu'on apprend à ignorer est pire
+qu'un signal absent.
+
+**La commande de construction ne peut pas venir du dépôt.** `wrangler.toml`
+n'accepte qu'une seule clef pour Pages, `pages_build_output_dir` ; c'est le
+tableau de bord qui porte le reste. Deux issues, au choix :
+
+- **Configurer la construction** — Cloudflare → Pages → `atelier237` → Settings
+  → Builds & deployments → *Build command* : `pnpm build`, *Build output
+  directory* : `apps/web/dist`. Une poussée sur `main` met alors en ligne toute
+  seule. Vérifié : depuis un clone neuf, `pnpm install --frozen-lockfile &&
+  pnpm build` produit `apps/web/dist` complet et laisse le dépôt propre — les
+  `functions/` commises correspondent à ce que la construction régénère.
+  **Attention** : les migrations D1 ne partent pas avec, et une mise en ligne
+  automatique peut donc précéder la table dont elle a besoin. Voir plus haut.
+- **Détacher l'intégration Git** — même écran. La mise en ligne redevient un
+  geste délibéré, ce que ce document décrit depuis toujours, et le contrôle
+  rouge disparaît.
+
+`.node-version` à la racine fixe Node 22, la version de l'intégration continue.
+Sans lui, l'image de construction de Cloudflare prend la sienne, qui est plus
+ancienne que ce que `engines` réclame — et l'échec suivant aurait ressemblé au
+premier.
 
 ```bash
 pnpm build
@@ -82,6 +135,19 @@ Deux hébergeurs auraient voulu dire deux tableaux de bord, deux commandes de
 mise en ligne et un domaine à faire pointer aux deux. La page de lecture, le
 webhook de paiement et le proxy IA ont besoin des mêmes liaisons KV, R2 et D1 :
 ils vivent au même endroit.
+
+**Et l'ancien déploiement répond toujours.** `atelier237.vercel.app` sert un
+état d'avant le déménagement, et il n'a aucun côté serveur : `/api/chat`,
+`/api/publier` et `/api/compte` y rendent 404. Ni agent, ni publication, ni
+comptes, ni paiement — c'est normal, rien de tout cela n'existe chez Vercel.
+Le commit qui a déménagé a retiré la configuration du dépôt ; il n'a pas pu
+débrancher le service.
+
+Ça s'est payé une fois : quelqu'un a ouvert cette adresse-là, de mémoire, et a
+constaté que ses changements n'apparaissaient pas — ce qui était exact, et
+n'avait rien à voir avec le code. **L'adresse à ouvrir est
+`atelier237.pages.dev`.** Tant que l'autre répond, elle reprendra quelqu'un au
+piège ; la supprimer dans le tableau de bord Vercel est la seule vraie fin.
 
 ### Ce que le déménagement a coûté
 
