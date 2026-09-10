@@ -138,6 +138,19 @@ describe('le nom d’un fichier', () => {
     expect(verifierNomDeFichier('image.png', [])).toMatch(/html|css|js|py/i)
   })
 
+  /*
+   * « .js » passait toutes les autres règles : l'onglet paraissait vide, et
+   * personne n'a voulu créer un fichier sans nom. Trouvé en donnant au modèle
+   * le droit d'écrire — il a les mêmes noms permis que la personne.
+   */
+  it('refuse un fichier sans nom devant le point', () => {
+    expect(verifierNomDeFichier('.js', [])).toMatch(/nom/i)
+    expect(verifierNomDeFichier('.html', [])).toMatch(/nom/i)
+    expect(verifierNomDeFichier('a.js', [])).toBe(null)
+    // Plusieurs points restent permis : « mon.script.js » est un nom valable.
+    expect(verifierNomDeFichier('mon.script.js', [])).toBe(null)
+  })
+
   // Python est arrivé : ce nom-là était refusé, il ne l'est plus.
   it('accepte le Python', () => {
     expect(verifierNomDeFichier('script.py', [])).toBe(null)

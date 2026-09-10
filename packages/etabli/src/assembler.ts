@@ -34,6 +34,7 @@ const REPROCHES: Readonly<Record<Langue, Readonly<Record<string, (nom: string) =
     vide: () => 'Donne-lui un nom.',
     espace: () => 'Un nom ne commence ni ne finit par une espace.',
     dossier: () => 'Pas de dossiers ici : un nom simple, comme « page.html ».',
+    sansNom: () => 'Il manque le nom devant le point, comme « page.html ».',
     caracteres: () => 'Lettres, chiffres, points, tirets et soulignés seulement.',
     extension: () => 'Termine par .html, .css, .js ou .py — ce sont les quatre que je sais exécuter.',
     pris: (nom) => `« ${nom} » existe déjà dans ce projet.`,
@@ -42,6 +43,7 @@ const REPROCHES: Readonly<Record<Langue, Readonly<Record<string, (nom: string) =
     vide: () => 'Give it a name.',
     espace: () => 'A name cannot start or end with a space.',
     dossier: () => 'No folders here: a plain name, like "page.html".',
+    sansNom: () => 'The name before the dot is missing, as in "page.html".',
     caracteres: () => 'Letters, digits, dots, dashes and underscores only.',
     extension: () => 'End it with .html, .css, .js or .py — those are the four I can run.',
     pris: (nom) => `"${nom}" already exists in this project.`,
@@ -70,6 +72,16 @@ export function verifierNomDeFichier(
   if (nom !== nom.trim()) return dit['espace']!(nom)
   if (/[/\\]/.test(nom)) return dit['dossier']!(nom)
   if (!/^[A-Za-z0-9._-]+$/.test(nom)) return dit['caracteres']!(nom)
+  /*
+   * Un nom devant le point.
+   *
+   * « .js » passait toutes les autres règles : ce n'est pas dangereux — il
+   * s'exécute dans le même bac à sable que le reste — mais l'onglet paraît
+   * vide, et personne n'a voulu créer un fichier sans nom. Trouvé en donnant
+   * au modèle le droit d'écrire : il a exactement les mêmes noms permis que la
+   * personne, donc ce qui passait ici passait aussi pour lui.
+   */
+  if (nom.startsWith('.') || nom.slice(0, nom.lastIndexOf('.')) === '') return dit['sansNom']!(nom)
   if (sorteDuFichier(nom) === 'inconnu') return dit['extension']!(nom)
   if (pris.includes(nom)) return dit['pris']!(nom)
   return null
