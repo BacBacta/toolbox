@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs } from "preact/jsx-runtime";
-import { BAC_A_SABLE, enMegaoctets, estProjetPython, expliquer, lireMessageDApercu, pourApercu, pourApercuPython, } from '@a237/etabli';
+import { BAC_A_SABLE, correction, enMegaoctets, estProjetPython, expliquer, juger, lireMessageDApercu, lireResultat, pourApercu, pourApercuPython, } from '@a237/etabli';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { dejaDescendu, manifestePython, moteurPython, posterMoteur } from './python-moteur.js';
 /**
@@ -18,12 +18,13 @@ import { dejaDescendu, manifestePython, moteurPython, posterMoteur } from './pyt
 export function Apercu(props) {
     const cadre = useRef(null);
     const [journal, setJournal] = useState([]);
+    const [resultats, setResultats] = useState([]);
     const [ouverte, setOuverte] = useState(false);
     const python = estProjetPython(props.projet);
     const moteur = useMoteurPython(python);
     // Chaque lancement repart d'une console vide : mélanger deux exécutions fait
     // chercher une erreur qu'on vient déjà de corriger.
-    useEffect(() => setJournal([]), [props.tour]);
+    useEffect(() => { setJournal([]); setResultats([]); }, [props.tour]);
     useEffect(() => {
         function recevoir(e) {
             /*
@@ -40,12 +41,43 @@ export function Apercu(props) {
             const message = lireMessageDApercu(e.data);
             if (message === null)
                 return;
+            /*
+             * La correction ne s'affiche pas dans la console.
+             *
+             * Elle y écrit une ligne par épreuve. Les laisser passer noierait la
+             * sortie de la personne sous la nôtre — et c'est sa sortie à elle qu'elle
+             * regarde pour comprendre ce que son code fait.
+             */
+            const resultat = lireResultat(message.texte);
+            if (resultat !== null) {
+                setResultats((r) => [...r, resultat]);
+                return;
+            }
             setJournal((j) => [...j, message].slice(-MAX_LIGNES));
         }
         addEventListener('message', recevoir);
         return () => removeEventListener('message', recevoir);
     }, []);
     const erreurs = journal.filter((m) => m.sorte === 'erreur').length;
+    const verdict = props.lecon === undefined ? null : juger(props.lecon.epreuves, resultats);
+    /*
+     * La correction est un fichier de plus, ajouté au moment de l'aperçu et
+     * jamais rangé dans le projet.
+     *
+     * `assembler` met les scripts bout à bout dans l'ordre : ajouté en dernier,
+     * le nôtre s'exécute après celui de la personne, donc ses fonctions existent
+     * quand on les appelle. Et comme il ne touche pas au projet, il n'apparaît
+     * pas dans les onglets et ne part pas dans l'export.
+     */
+    const aExecuter = props.lecon === undefined ? props.projet : {
+        ...props.projet,
+        fichiers: [...props.projet.fichiers,
+            { nom: 'correction.js', contenu: correction(props.lecon.epreuves) }],
+    };
+    useEffect(() => {
+        if (verdict?.reussi === true && props.lecon !== undefined)
+            props.onReussie(props.lecon.id);
+    }, [verdict?.reussi]);
     /*
      * Un projet Python n'affiche rien tant que le moteur n'est pas là.
      *
@@ -57,8 +89,8 @@ export function Apercu(props) {
         return (_jsx("div", { class: "apercu", children: _jsx(Python, { moteur: moteur, langue: props.langue, t: props.t }) }));
     }
     return (_jsxs("div", { class: "apercu", children: [_jsx("iframe", { ref: cadre, class: "apercu-cadre", title: props.t.cadreTitre, sandbox: BAC_A_SABLE, srcdoc: python
-                    ? pourApercuPython(props.projet, props.langue)
-                    : pourApercu(props.projet, props.langue), onLoad: () => {
+                    ? pourApercuPython(aExecuter, props.langue)
+                    : pourApercu(aExecuter, props.langue), onLoad: () => {
                     /*
                      * Le moteur part **après** que le cadre est là, jamais avant.
                      *
@@ -71,7 +103,7 @@ export function Apercu(props) {
                     const fenetre = cadre.current.contentWindow;
                     if (fenetre !== null)
                         posterMoteur(fenetre, moteur.envoi);
-                } }, props.tour), _jsxs("button", { type: "button", class: erreurs > 0 ? 'console-titre a-des-erreurs' : 'console-titre', onClick: () => setOuverte((o) => !o), children: [_jsxs("span", { children: [ouverte ? '▾' : '▸', " ", props.t.console] }), _jsx("span", { class: "console-compte", children: erreurs > 0 ? props.t.erreurs(erreurs) : `${journal.length}` })] }), ouverte && (_jsx("div", { class: "console", role: "log", children: journal.length === 0 ? (_jsxs("p", { class: "console-vide", children: [props.t.consoleVide, ' ', _jsx("code", { children: python ? 'print("hello")' : 'console.log("hello")' }), ' ', props.t.consoleVideExemple] })) : (journal.map((m, i) => (_jsx(Ligne, { message: m, langue: props.langue }, i)))) }))] }));
+                } }, props.tour), verdict !== null && props.lecon !== undefined && (_jsx(Copie, { verdict: verdict, lecon: props.lecon, t: props.t })), _jsxs("button", { type: "button", class: erreurs > 0 ? 'console-titre a-des-erreurs' : 'console-titre', onClick: () => setOuverte((o) => !o), children: [_jsxs("span", { children: [ouverte ? '▾' : '▸', " ", props.t.console] }), _jsx("span", { class: "console-compte", children: erreurs > 0 ? props.t.erreurs(erreurs) : `${journal.length}` })] }), ouverte && (_jsx("div", { class: "console", role: "log", children: journal.length === 0 ? (_jsxs("p", { class: "console-vide", children: [props.t.consoleVide, ' ', _jsx("code", { children: python ? 'print("hello")' : 'console.log("hello")' }), ' ', props.t.consoleVideExemple] })) : (journal.map((m, i) => (_jsx(Ligne, { message: m, langue: props.langue }, i)))) }))] }));
 }
 /**
  * Une ligne de console, et sa traduction quand on la connaît.
@@ -173,4 +205,18 @@ function Python(props) {
         return (_jsxs("div", { class: "python", children: [_jsx("p", { class: "python-etat", children: props.t.pythonEnCours(fait) }), _jsx("div", { class: "python-jauge", role: "progressbar", "aria-valuenow": fait, "aria-valuemin": 0, "aria-valuemax": 100, "aria-label": props.t.pythonEnCours(fait), children: _jsx("div", { class: "python-jauge-faite", style: `width: ${fait}%` }) })] }));
     }
     return (_jsxs("div", { class: "python", children: [_jsx("h2", { class: "python-titre", children: props.t.pythonTitre }), _jsx("p", { class: "python-pourquoi", children: props.t.pythonPourquoi(taille) }), _jsx("p", { class: "python-fois", children: props.t.pythonUneSeuleFois }), echoue && _jsx("p", { class: "python-echoue", children: props.t.pythonEchoue }), _jsx("button", { type: "button", class: "python-oui", onClick: props.moteur.descendre, children: echoue ? props.t.pythonReessayer : props.t.pythonTelecharger(taille) })] }));
+}
+/**
+ * La copie rendue : réussi, ou bien où regarder.
+ *
+ * Jamais « faux ». Quelqu'un qui apprend seul n'a personne pour relativiser un
+ * refus, et « faux » sans rien d'autre est ce qui fait fermer l'application.
+ * On montre donc ce qui a été demandé, ce que son code a rendu, et une piste —
+ * les trois choses qu'un professeur dirait en se penchant sur le cahier.
+ */
+function Copie(props) {
+    if (props.verdict.reussi) {
+        return (_jsxs("div", { class: "copie reussie", role: "status", children: [_jsx("b", { children: props.t.leconReussie }), _jsx("span", { children: props.t.leconSuivante })] }));
+    }
+    return (_jsxs("div", { class: "copie", role: "status", children: [_jsx("b", { children: props.t.leconPasEncore }), _jsx("ul", { class: "copie-manque", children: props.verdict.manque.map((m) => (_jsxs("li", { children: [_jsx("code", { children: m.appel }), _jsx("span", { children: props.t.leconAttendu(m.attendu, m.obtenu) })] }, m.appel))) }), _jsx("p", { class: "copie-indice", children: props.lecon.indice })] }));
 }

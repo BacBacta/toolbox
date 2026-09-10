@@ -1,6 +1,6 @@
-import type { Fichier, Projet, Textes } from '@a237/etabli'
+import type { Fichier, Lecon, Projet, Textes } from '@a237/etabli'
 import type { Langue } from '@a237/etabli'
-import { fichierAExporter, langueDuNavigateur, modeles, textes } from '@a237/etabli'
+import { fichierAExporter, langueDuNavigateur, lecons, modeles, textes } from '@a237/etabli'
 import { lienDemande, recuperer } from './partage.js'
 import type { JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
@@ -39,6 +39,24 @@ type Ecran =
  * partout.
  */
 const CLEF_LANGUE = 'etabli:langue'
+const CLEF_LECONS = 'etabli:lecons'
+
+/**
+ * Les leçons déjà réussies, relues du stockage.
+ *
+ * Ce qui en sort a été écrit par une version d'avant, ou par personne. Une
+ * valeur mal formée ne doit pas faire tomber l'écran d'accueil : on repart
+ * d'une liste vide, et la personne refait une leçon — ce qui est ennuyeux, pas
+ * grave, contrairement à un écran blanc.
+ */
+function leconsRetenues(): readonly string[] {
+  try {
+    const brut: unknown = JSON.parse(localStorage.getItem(CLEF_LECONS) ?? '[]')
+    return Array.isArray(brut) ? brut.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
 
 function langueRetenue(): Langue {
   try {
@@ -54,6 +72,7 @@ export function App(): JSX.Element {
   const [langue, setLangue] = useState<Langue>(langueRetenue())
   const t = textes(langue)
   const [projets, setProjets] = useState<readonly Projet[] | null>(null)
+  const [faites, setFaites] = useState<readonly string[]>(leconsRetenues)
   const [ecran, setEcran] = useState<Ecran>({ quoi: 'liste' })
   const [ouverture, setOuverture] = useState<'non'|'en-cours'|'faite'|'introuvable'|'echouee'>('non')
 
@@ -91,6 +110,45 @@ export function App(): JSX.Element {
       history.replaceState(null, '', location.pathname)
     })
   }, [])
+
+  /*
+   * Les leçons réussies, gardées sur l'appareil.
+   *
+   * Pas de compte, donc pas de progression qui suit la personne d'un téléphone
+   * à l'autre — c'est le prix de ne rien demander, et il est assumé. Ce que ça
+   * garde est ce qui compte le jour même : rouvrir l'Établi et voir où on en
+   * était.
+   */
+  function marquerReussie(id: string): void {
+    setFaites((f) => {
+      if (f.includes(id)) return f
+      const suite = [...f, id]
+      try {
+        localStorage.setItem(CLEF_LECONS, JSON.stringify(suite))
+      } catch { /* stockage refusé : ça tient pour cette visite */ }
+      return suite
+    })
+  }
+
+  function commencerLecon(leconId: string): void {
+    const lecon = lecons(langue).find((l) => l.id === leconId)
+    if (lecon === undefined) return
+    // Un devoir déjà commencé se rouvre : le recréer effacerait ce qui a été
+    // écrit, et c'est justement le travail de la personne.
+    const deja = (projets ?? []).find((p) => p.lecon === leconId)
+    if (deja !== undefined) { setEcran({ quoi: 'projet', id: deja.id }); return }
+
+    const projet: Projet = {
+      id: `p${Date.now().toString(36)}`,
+      nom: lecon.titre,
+      fichiers: lecon.fichiers.map((f) => ({ ...f })),
+      maj: Date.now(),
+      lecon: lecon.id,
+    }
+    setProjets((p) => [projet, ...(p ?? [])])
+    setEcran({ quoi: 'projet', id: projet.id })
+    void enregistrer(projet)
+  }
 
   function creer(modeleId: string): void {
     const modele = modeles(langue).find((m) => m.id === modeleId)
@@ -135,6 +193,8 @@ export function App(): JSX.Element {
         projet={projet}
         langue={langue}
         t={t}
+        lecon={lecons(langue).find((l) => l.id === projet.lecon)}
+        onReussie={marquerReussie}
         onChanger={remplacer}
         onFermer={() => setEcran({ quoi: 'liste' })}
       />
@@ -170,6 +230,19 @@ export function App(): JSX.Element {
           </button>
         ))}
       </div>
+
+      <h2>{t.lecons}</h2>
+      <ul class="lecons">
+        {lecons(langue).map((l) => (
+          <li key={l.id}>
+            <button type="button" class="lecon" onClick={() => commencerLecon(l.id)}>
+              <b>{l.titre}</b>
+              <span>{l.enonce}</span>
+            </button>
+            {faites.includes(l.id) && <span class="lecon-faite">{t.leconFaite}</span>}
+          </li>
+        ))}
+      </ul>
 
       {projets.length > 0 && (
         <>
@@ -218,6 +291,8 @@ function EcranProjet(props: {
   readonly projet: Projet
   readonly langue: Langue
   readonly t: Textes
+  readonly lecon: Lecon | undefined
+  readonly onReussie: (id: string) => void
   readonly onChanger: (projet: Projet) => void
   readonly onFermer: () => void
 }): JSX.Element {
@@ -271,7 +346,14 @@ function EcranProjet(props: {
         />
       ) : (
         <>
-          <Apercu projet={props.projet} tour={tour} langue={props.langue} t={props.t} />
+          <Apercu
+            projet={props.projet}
+            tour={tour}
+            langue={props.langue}
+            t={props.t}
+            lecon={props.lecon}
+            onReussie={props.onReussie}
+          />
           <div class="actions">
             <button type="button" onClick={() => setTour((n) => n + 1)}>{props.t.relancer}</button>
             <button type="button" onClick={() => telecharger(props.projet)}>

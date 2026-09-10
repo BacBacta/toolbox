@@ -24,3 +24,5 @@ export {
 } from './python.js'
 export type { EnvoiPython } from './apercu-python.js'
 export { lireEnvoiPython, pourApercuPython } from './apercu-python.js'
+export type { Epreuve, Lecon, Resultat, Verdict } from './lecons.js'
+export { MARQUE, correction, juger, lecons, lireResultat } from './lecons.js'

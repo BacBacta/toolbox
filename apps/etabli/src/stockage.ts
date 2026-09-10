@@ -46,7 +46,7 @@ function lireProjet(valeur: unknown): Projet | null {
    * sauvegarde sur un lien neuf : celui déjà envoyé à quelqu'un cesserait de
    * recevoir les modifications, sans que personne ne s'en aperçoive.
    */
-  const q = valeur as { lien?: unknown; clef?: unknown }
+  const q = valeur as { lien?: unknown; clef?: unknown; lecon?: unknown }
   return {
     id: p.id,
     nom: p.nom,
@@ -54,6 +54,9 @@ function lireProjet(valeur: unknown): Projet | null {
     maj: typeof p.maj === 'number' ? p.maj : 0,
     ...(typeof q.lien === 'string' ? { lien: q.lien } : {}),
     ...(typeof q.clef === 'string' ? { clef: q.clef } : {}),
+    // La leçon suit le projet : sans elle, rouvrir son devoir le transformerait
+    // en projet ordinaire et « Lancer » cesserait de corriger.
+    ...(typeof q.lecon === 'string' ? { lecon: q.lecon } : {}),
   }
 }
 

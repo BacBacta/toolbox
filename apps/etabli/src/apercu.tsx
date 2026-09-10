@@ -1,7 +1,10 @@
-import type { EnvoiPython, Langue, ManifestePython, MessageApercu, Projet, Textes } from '@a237/etabli'
+import type {
+  EnvoiPython, Langue, Lecon, ManifestePython, MessageApercu, Projet, Resultat, Textes,
+  Verdict as VerdictLecon,
+} from '@a237/etabli'
 import {
-  BAC_A_SABLE, enMegaoctets, estProjetPython, expliquer, lireMessageDApercu,
-  pourApercu, pourApercuPython,
+  BAC_A_SABLE, correction, enMegaoctets, estProjetPython, expliquer, juger,
+  lireMessageDApercu, lireResultat, pourApercu, pourApercuPython,
 } from '@a237/etabli'
 import type { JSX } from 'preact'
 import { useEffect, useRef, useState } from 'preact/hooks'
@@ -28,16 +31,20 @@ export function Apercu(props: {
   readonly tour: number
   readonly langue: Langue
   readonly t: Textes
+  /** La leçon dont ce projet est le devoir, s'il en vient d'une. */
+  readonly lecon: Lecon | undefined
+  readonly onReussie: (id: string) => void
 }): JSX.Element {
   const cadre = useRef<HTMLIFrameElement | null>(null)
   const [journal, setJournal] = useState<readonly MessageApercu[]>([])
+  const [resultats, setResultats] = useState<readonly Resultat[]>([])
   const [ouverte, setOuverte] = useState(false)
   const python = estProjetPython(props.projet)
   const moteur = useMoteurPython(python)
 
   // Chaque lancement repart d'une console vide : mélanger deux exécutions fait
   // chercher une erreur qu'on vient déjà de corriger.
-  useEffect(() => setJournal([]), [props.tour])
+  useEffect(() => { setJournal([]); setResultats([]) }, [props.tour])
 
   useEffect(() => {
     function recevoir(e: MessageEvent): void {
@@ -53,6 +60,18 @@ export function Apercu(props: {
       if (cadre.current === null || e.source !== cadre.current.contentWindow) return
       const message = lireMessageDApercu(e.data)
       if (message === null) return
+      /*
+       * La correction ne s'affiche pas dans la console.
+       *
+       * Elle y écrit une ligne par épreuve. Les laisser passer noierait la
+       * sortie de la personne sous la nôtre — et c'est sa sortie à elle qu'elle
+       * regarde pour comprendre ce que son code fait.
+       */
+      const resultat = lireResultat(message.texte)
+      if (resultat !== null) {
+        setResultats((r) => [...r, resultat])
+        return
+      }
       setJournal((j) => [...j, message].slice(-MAX_LIGNES))
     }
     addEventListener('message', recevoir)
@@ -60,6 +79,26 @@ export function Apercu(props: {
   }, [])
 
   const erreurs = journal.filter((m) => m.sorte === 'erreur').length
+  const verdict = props.lecon === undefined ? null : juger(props.lecon.epreuves, resultats)
+
+  /*
+   * La correction est un fichier de plus, ajouté au moment de l'aperçu et
+   * jamais rangé dans le projet.
+   *
+   * `assembler` met les scripts bout à bout dans l'ordre : ajouté en dernier,
+   * le nôtre s'exécute après celui de la personne, donc ses fonctions existent
+   * quand on les appelle. Et comme il ne touche pas au projet, il n'apparaît
+   * pas dans les onglets et ne part pas dans l'export.
+   */
+  const aExecuter = props.lecon === undefined ? props.projet : {
+    ...props.projet,
+    fichiers: [...props.projet.fichiers,
+      { nom: 'correction.js', contenu: correction(props.lecon.epreuves) }],
+  }
+
+  useEffect(() => {
+    if (verdict?.reussi === true && props.lecon !== undefined) props.onReussie(props.lecon.id)
+  }, [verdict?.reussi])
 
   /*
    * Un projet Python n'affiche rien tant que le moteur n'est pas là.
@@ -96,8 +135,8 @@ export function Apercu(props: {
         title={props.t.cadreTitre}
         sandbox={BAC_A_SABLE}
         srcdoc={python
-          ? pourApercuPython(props.projet, props.langue)
-          : pourApercu(props.projet, props.langue)}
+          ? pourApercuPython(aExecuter, props.langue)
+          : pourApercu(aExecuter, props.langue)}
         onLoad={() => {
           /*
            * Le moteur part **après** que le cadre est là, jamais avant.
@@ -111,6 +150,10 @@ export function Apercu(props: {
           if (fenetre !== null) posterMoteur(fenetre, moteur.envoi)
         }}
       />
+
+      {verdict !== null && props.lecon !== undefined && (
+        <Copie verdict={verdict} lecon={props.lecon} t={props.t} />
+      )}
 
       <button
         type="button"
@@ -290,6 +333,43 @@ function Python(props: {
       <button type="button" class="python-oui" onClick={props.moteur.descendre}>
         {echoue ? props.t.pythonReessayer : props.t.pythonTelecharger(taille)}
       </button>
+    </div>
+  )
+}
+
+/**
+ * La copie rendue : réussi, ou bien où regarder.
+ *
+ * Jamais « faux ». Quelqu'un qui apprend seul n'a personne pour relativiser un
+ * refus, et « faux » sans rien d'autre est ce qui fait fermer l'application.
+ * On montre donc ce qui a été demandé, ce que son code a rendu, et une piste —
+ * les trois choses qu'un professeur dirait en se penchant sur le cahier.
+ */
+function Copie(props: {
+  readonly verdict: VerdictLecon
+  readonly lecon: Lecon
+  readonly t: Textes
+}): JSX.Element {
+  if (props.verdict.reussi) {
+    return (
+      <div class="copie reussie" role="status">
+        <b>{props.t.leconReussie}</b>
+        <span>{props.t.leconSuivante}</span>
+      </div>
+    )
+  }
+  return (
+    <div class="copie" role="status">
+      <b>{props.t.leconPasEncore}</b>
+      <ul class="copie-manque">
+        {props.verdict.manque.map((m) => (
+          <li key={m.appel}>
+            <code>{m.appel}</code>
+            <span>{props.t.leconAttendu(m.attendu, m.obtenu)}</span>
+          </li>
+        ))}
+      </ul>
+      <p class="copie-indice">{props.lecon.indice}</p>
     </div>
   )
 }

@@ -15,11 +15,11 @@ navigateur** : le code s'exécute sur l'appareil, dans un cadre isolé, et rien
 ne part sur le réseau — ni pour ouvrir un projet, ni pour le lancer, ni pour
 le partager.
 
-**Vingt-deux kilo-octets et trois cents**, tout compris : éditeur, exécution,
-console, couleur, modèles, dépôt, export, et Python. C'est l'argument, et il
-est mesuré à chaque construction par `scripts/budget.mjs`. Les éditeurs qu'on
-installe ailleurs pèsent de deux cents kilo-octets à cinq mégaoctets pour la
-seule zone de saisie.
+**Vingt-cinq kilo-octets et deux cents**, tout compris : éditeur, exécution,
+console, couleur, modèles, leçons, dépôt, export, et Python. C'est l'argument,
+et il est mesuré à chaque construction par `scripts/budget.mjs`. Les éditeurs
+qu'on installe ailleurs pèsent de deux cents kilo-octets à cinq mégaoctets pour
+la seule zone de saisie.
 
 ## Ce qui est adapté, concrètement
 
@@ -45,6 +45,10 @@ seule zone de saisie.
   donc **avant** — dans le bouton lui-même, pour qu'on ne puisse pas appuyer
   sans l'avoir eu sous les yeux. Une seule fois : ensuite Python tourne sans
   réseau du tout.
+- **Des leçons corrigées toutes seules.** Cinq exercices courts, en français
+  et en anglais, sur des prix de quartier. La correction **appelle** ce que la
+  personne a écrit, avec des valeurs qu'elle n'a pas vues — voir plus bas
+  pourquoi c'est toute la question.
 - **Les lignes se replient.** À l'inverse de tout éditeur de bureau : sur
   390 pixels, du texte sorti par la droite est du texte qu'on croit effacé.
 - **Hors ligne d'abord.** Les projets vivent dans IndexedDB. On travaille
@@ -185,12 +189,49 @@ Les douze mégaoctets ne sont pas versionnés : `pnpm pyodide` les récupère. U
 installation qui ne l'a pas fait marche exactement comme avant, sans proposer
 Python — plutôt qu'avec un bouton qui échoue.
 
+## Les leçons, et pourquoi on ne peut pas les réussir par accident
+
+La correction **appelle** la fonction écrite, avec des valeurs qui ne sont ni
+dans l'énoncé ni dans le fichier de départ. C'est toute la décision.
+
+Vérifier que « la console affiche 17400 » apprendrait à écrire
+`console.log(17400)`. Quelqu'un qui apprend seul n'a personne pour lui dire
+que ce n'est pas ça : il le ferait de bonne foi, croirait avoir compris la
+multiplication, et découvrirait le contraire bien plus tard sans savoir où
+c'était parti de travers. Comparer le code à une solution modèle serait pire
+encore — ça apprend à recopier, et ça refuse une bonne réponse écrite
+autrement.
+
+Éprouvé dans un vrai navigateur, sur la première leçon :
+
+```
+triche  « console.log(17400) »       → ✗  total is not defined
+oubli   « sans return »              → ✗  a rendu undefined
+juste   « return prix * nombre »     → ✓  réussi
+```
+
+Le deuxième cas est celui qui compte le plus : l'indice affiché est
+« vérifie que tu écris return devant le calcul », c'est-à-dire exactement ce
+qui manquait. Une correction qui dirait seulement « faux » laisserait
+quelqu'un devant un écran sans savoir quoi changer — et c'est là qu'on ferme
+l'application.
+
+La correction s'ajoute comme un fichier de plus au moment de l'aperçu, jamais
+dans le projet : elle ne s'affiche pas dans les onglets et ne part pas dans
+l'export. Ses lignes ne s'affichent pas non plus dans la console — sinon la
+sortie de la personne, celle qu'elle regarde pour comprendre, se noierait sous
+la nôtre.
+
 ## Ce qui n'y est pas encore
 
 - **Le modèle en renfort.** Le dictionnaire couvre les erreurs courantes ; ce
   qu'il ne connaît pas mériterait un appel au modèle. Ce sera l'étape
   suivante, et elle demandera une clef sur ce projet-ci.
-- **Les leçons.** L'éditeur d'abord, sur une base qui marche.
+- **Des leçons en Python.** Les cinq premières sont en JavaScript, qui ne coûte
+  rien à télécharger. Une leçon qu'on ne peut pas commencer sans dépenser cinq
+  mégaoctets de forfait n'est pas une leçon d'entrée.
+- **Plus de cinq leçons.** Cinq suffisent pour savoir si la forme tient. En
+  écrire trente avant de l'avoir vérifié aurait été trente à réécrire.
 
 ## Lancer
 
