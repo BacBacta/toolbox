@@ -38,7 +38,14 @@ const PAGE: PageDemande = {
   horaires: 'Lundi à samedi, 7 h – 19 h',
 }
 
-const html = (page: PageDemande): string => enChaine(<PageVitrine page={page} />)
+/**
+ * L'instant est passé au composant et jamais lu à l'horloge : c'est ce qui
+ * rend « dans 3 jours » reproductible, ici comme sur le serveur.
+ */
+const LE_9_SEPT = new Date('2026-09-09T08:00:00.000Z')
+
+const html = (page: PageDemande, maintenant = LE_9_SEPT): string =>
+  enChaine(<PageVitrine page={page} maintenant={maintenant} />)
 
 describe('ce que la page montre', () => {
   it('le nom, le sur-titre et l’accroche', () => {

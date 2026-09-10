@@ -1,4 +1,6 @@
-import { arreteLe } from './format.js'
+import {
+  arreteLe, dateLongue, heureCourte, instantWAT, jourDeLaSemaineWAT, joursEntre,
+} from './format.js'
 import type { CardItem, CardSpec, ErreurValidation, JsonSchema, RenderContext, ShareSpec } from './types.js'
 import { valider } from './valider.js'
 import { numeroInternational, numeroLisible } from './whatsapp.js'
@@ -59,6 +61,19 @@ export interface PageDemande {
    * trois sections, sinon il double le titre qu'on voit déjà.
    */
   readonly sommaire?: boolean
+  /**
+   * Le jour d'un événement, quand la page en annonce un.
+   *
+   * C'est tout ce qui sépare **une page** d'**un événement**, et c'est
+   * suffisant : une annonce de mariage, une réunion de tontine, une vente de
+   * fin d'année ont un nom, un lieu, un programme et une phrase — tout ce
+   * qu'une vitrine porte déjà. Ce qu'elles ont en plus est une date, et une
+   * date que la machine comprend permet à la page de dire « dans trois jours »
+   * ou « c'est passé ». Une date écrite dans `horaires` ne sait rien dire.
+   *
+   * `AAAA-MM-JJ`, avec l'heure si elle est connue.
+   */
+  readonly date?: string
   /** Le numéro se transforme en lien `wa.me` : c'est le bouton qui rapporte. */
   readonly telephone?: string
   readonly adresse?: string
@@ -169,6 +184,11 @@ export const schemaPage: JsonSchema = {
       type: 'string', maxLength: 60, title: 'Quand',
       description: 'Ex. « Lundi à samedi, 7 h – 19 h ».',
     },
+    date: {
+      type: 'string', maxLength: 20, title: 'Jour de l’événement',
+      description:
+        'Seulement si la demande annonce un événement daté. « AAAA-MM-JJ », ou « AAAA-MM-JJTHH:MM » si l’heure est dite. N’invente jamais une date.',
+    },
     sommaire: {
       type: 'boolean', title: 'Menu en haut',
       description:
@@ -190,6 +210,23 @@ export function verifierPage(valeur: unknown): readonly ErreurValidation[] {
   if (erreurs.length > 0) return erreurs
 
   const page = valeur as PageDemande
+
+  /*
+   * Une date que personne ne sait lire n'est pas une date.
+   *
+   * Le schéma ne tient que la longueur : « samedi prochain » y passe. La page
+   * l'ignorerait alors en silence, et l'affiche annoncerait un événement sans
+   * jour — c'est-à-dire exactement ce que le modèle croyait avoir écrit. Le
+   * reproche nomme la forme attendue, pour que la reprise ait de quoi
+   * corriger.
+   */
+  if (page.date !== undefined && page.date !== '' && Number.isNaN(new Date(page.date).getTime())) {
+    erreurs.push({
+      chemin: '$.date',
+      message: `« ${page.date} » ne se lit pas : écris le jour en « AAAA-MM-JJ », ou « AAAA-MM-JJTHH:MM » avec l’heure`,
+    })
+  }
+
   for (const [i, section] of page.sections.entries()) {
     const chemin = `$.sections[${i}]`
     if (section.sorte === 'texte') {
@@ -261,7 +298,7 @@ export function avecSommaire(page: PageDemande): boolean {
  * comme un outil vide ; on préfère alors le sur-titre au blanc.
  */
 export function carteDePage(page: PageDemande, ctx: RenderContext): CardSpec {
-  const grand = grandDeLaPage(page)
+  const grand = grandDeLaPage(page, ctx.maintenant)
   const vitrine = sectionListee(page)
 
   return {
@@ -273,7 +310,9 @@ export function carteDePage(page: PageDemande, ctx: RenderContext): CardSpec {
     big: grand.valeur,
     // Une vitrine ne mesure aucune avance : la barre n'aurait rien à remplir.
     pct: null,
-    subline: [page.adresse, page.horaires].filter((x) => x !== undefined && x !== '').join(' · '),
+    subline: [page.adresse, page.horaires, sousLigneTelephone(page)]
+      .filter((x) => x !== undefined && x !== '')
+      .join(' · '),
     listTitle: vitrine === null ? '' : vitrine.titre.toUpperCase(),
     items: vitrine === null ? [] : itemsDeSection(vitrine),
     link: ctx.lien,
@@ -281,7 +320,22 @@ export function carteDePage(page: PageDemande, ctx: RenderContext): CardSpec {
   }
 }
 
-function grandDeLaPage(page: PageDemande): { readonly libelle: string; readonly valeur: string } {
+function grandDeLaPage(
+  page: PageDemande,
+  maintenant: Date,
+): { readonly libelle: string; readonly valeur: string } {
+  /*
+   * Un événement met son jour en grand, avant le numéro.
+   *
+   * Sur une carte qui passe dans un groupe WhatsApp, la question n'est pas
+   * « comment les joindre » mais « c'est quand ». Le numéro reste dessous, sur
+   * la ligne du lieu.
+   */
+  const jour = page.date === undefined ? null : direLeJour(page.date, maintenant)
+  if (jour !== null) {
+    return { libelle: jour.delai.toUpperCase(), valeur: `${jour.quand}${jour.heure === '' ? '' : ` ${jour.heure}`}` }
+  }
+
   const tel = page.telephone === undefined ? null : numeroInternational(page.telephone)
   if (tel !== null) return { libelle: 'WHATSAPP', valeur: numeroLisible(page.telephone ?? '') }
 
@@ -292,6 +346,15 @@ function grandDeLaPage(page: PageDemande): { readonly libelle: string; readonly 
   }
 
   return { libelle: '', valeur: page.kicker }
+}
+
+/**
+ * Le numéro descend sur la ligne du lieu quand le grand caractère est pris par
+ * la date : une affiche d'événement doit encore dire à qui écrire.
+ */
+function sousLigneTelephone(page: PageDemande): string {
+  if (page.date === undefined || page.telephone === undefined || page.telephone === '') return ''
+  return numeroInternational(page.telephone) === null ? '' : numeroLisible(page.telephone)
 }
 
 /** La section qu'on montre sur la carte : des prix de préférence, une liste sinon. */
@@ -322,9 +385,13 @@ function itemsDeSection(section: SectionDemandee): readonly CardItem[] {
  */
 export function partageDePage(page: PageDemande, ctx: RenderContext): ShareSpec {
   const vitrine = sectionListee(page)
+  const jour = page.date === undefined ? null : direLeJour(page.date, ctx.maintenant)
   const lignes = [
     `${page.titre.toUpperCase()} — ${page.kicker.toLowerCase()}`,
     page.accroche,
+    // Le jour vient tout de suite : dans une discussion qui défile, c'est la
+    // seule ligne qui décide si on lit la suite.
+    jour === null ? '' : `${jour.quand}${jour.heure === '' ? '' : ` ${jour.heure}`} — ${jour.delai}`,
     ...(vitrine === null
       ? []
       : (vitrine.lignes ?? [])
@@ -353,4 +420,74 @@ export function partageDePage(page: PageDemande, ctx: RenderContext): ShareSpec 
      */
     relancesVides: 'Une vitrine se partage, elle ne relance personne.',
   }
+}
+
+/**
+ * Le jour d'un événement, dit comme on le dirait de vive voix.
+ *
+ * Une date sur une affiche n'est jamais lue pour elle-même : ce qu'on cherche,
+ * c'est de savoir si on a le temps. « Samedi 12 septembre 2026 » oblige à
+ * compter ; « dans 3 jours » répond. Les deux, donc, et la seconde d'abord
+ * dans le regard.
+ *
+ * Rend `null` sur ce qui n'est pas une date : le modèle a pour consigne de ne
+ * pas en inventer, et une page qui affiche « Invalid Date » sous le nom de
+ * quelqu'un est pire qu'une page sans date.
+ */
+export interface JourDit {
+  /** « Samedi 12 septembre 2026 ». */
+  readonly quand: string
+  /** « à 15 h », ou une chaîne vide quand l'heure n'est pas dite. */
+  readonly heure: string
+  /** « dans 3 jours », « aujourd’hui », « c’est passé ». */
+  readonly delai: string
+  /** Vrai quand le jour est derrière nous : la page se dit alors au passé. */
+  readonly passe: boolean
+}
+
+const JOURS = [
+  'Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi',
+] as const
+
+export function direLeJour(iso: string, maintenant: Date): JourDit | null {
+  const quand = instantWAT(iso)
+  if (quand === null) return null
+
+  const jours = joursEntre(maintenant, quand)
+  /*
+   * L'heure ne s'affiche que si elle a été dite. Une date nue se lit comme
+   * minuit, et « à 00 h » sur une affiche de mariage est une erreur qui se
+   * voit — celle de la machine, pas celle de qui a écrit.
+   */
+  const avecHeure = /[T ]\d{2}:\d{2}/.test(iso)
+
+  return {
+    quand: `${JOURS[jourDeLaSemaineWAT(quand)] ?? ''} ${dateLongue(quand)}`.trim(),
+    heure: avecHeure ? heureDite(quand) : '',
+    delai: delaiDit(jours),
+    passe: jours < 0,
+  }
+}
+
+/**
+ * « à 15 h », « à 9 h 30 ».
+ *
+ * Pas « à 15 h 00 » : en français, une heure ronde n'écrit pas ses minutes, et
+ * les deux zéros donnent à une invitation l'air d'un horaire de train. Pas de
+ * zéro devant non plus — personne ne dit « zéro neuf heures ».
+ */
+function heureDite(quand: Date): string {
+  const [heures = '', minutes = ''] = heureCourte(quand).split('h')
+  return minutes === '00' ? `à ${Number(heures)} h` : `à ${Number(heures)} h ${minutes}`
+}
+
+function delaiDit(jours: number): string {
+  if (jours < -1) return 'c’est passé'
+  if (jours === -1) return 'c’était hier'
+  if (jours === 0) return 'c’est aujourd’hui'
+  if (jours === 1) return 'c’est demain'
+  if (jours < 7) return `dans ${jours} jours`
+  if (jours < 14) return 'dans une semaine'
+  if (jours < 31) return `dans ${Math.round(jours / 7)} semaines`
+  return `dans ${Math.round(jours / 30)} mois`
 }

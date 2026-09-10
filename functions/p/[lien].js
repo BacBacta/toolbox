@@ -164,6 +164,9 @@ function nom(mois) {
 	if (m === void 0) throw new RangeError(`mois hors table : ${mois}`);
 	return m;
 }
+function pad2(n) {
+	return n < 10 ? `0${n}` : String(n);
+}
 /**
 * Nombre groupé par milliers : `nf(353000)` → `353 000` (espaces insécables).
 * Le montant est arrondi au franc.
@@ -202,6 +205,57 @@ function dateLongueSiValide(iso) {
 	const d = new Date(iso);
 	if (Number.isNaN(d.getTime())) return null;
 	return dateLongue(d);
+}
+/** `heureCourte()` → `08h45`. */
+function heureCourte(d) {
+	const p = partsWAT(d);
+	return `${pad2(p.heures)}h${pad2(p.minutes)}`;
+}
+/**
+* Lit une date écrite à l'heure de Douala.
+*
+* `new Date('2026-09-12T15:00')` lit l'heure **de la machine**, et un Worker
+* vit en UTC : un mariage annoncé à 15 h se serait affiché à 16 h sur la page
+* publiée, et à 15 h dans l'aperçu du téléphone de qui l'a écrite. Personne
+* n'aurait su lequel des deux croire.
+*
+* Ce qui est écrit sans fuseau est donc lu à Douala, parce que c'est là qu'on
+* écrit et là qu'on lit. Un fuseau explicite — `Z` ou `+02:00` — est respecté :
+* qui l'écrit sait ce qu'il fait.
+*
+* Rend `null` sur ce qui n'est pas une date, y compris un 31 février, que
+* `Date.UTC` replierait silencieusement sur le 3 mars.
+*/
+function instantWAT(iso) {
+	const brut = iso.trim();
+	if (brut === "") return null;
+	if (/(?:Z|[+-]\d{2}:?\d{2})$/.test(brut)) {
+		const avecFuseau = new Date(brut);
+		return Number.isNaN(avecFuseau.getTime()) ? null : avecFuseau;
+	}
+	const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(brut);
+	if (m === null) return null;
+	const [, a = "", mo = "", j = "", h = "0", mi = "0", se = "0"] = m;
+	const annee = Number(a);
+	const mois = Number(mo) - 1;
+	const jour = Number(j);
+	const t = Date.UTC(annee, mois, jour, Number(h), Number(mi), Number(se)) - DECALAGE_WAT_MS;
+	const d = new Date(t);
+	if (Number.isNaN(t)) return null;
+	const relu = partsWAT(d);
+	return relu.annee === annee && relu.mois === mois && relu.jour === jour ? d : null;
+}
+/**
+* Le jour de la semaine à Douala, 0 pour dimanche.
+*
+* Une affiche annonce « samedi 12 septembre » et non « le 12 septembre » : le
+* jour de la semaine est ce qui permet de savoir tout de suite si on est
+* disponible, avant même de compter.
+*/
+function jourDeLaSemaineWAT(d) {
+	const t = d.getTime();
+	if (!Number.isFinite(t)) throw new RangeError("date invalide");
+	return new Date(t + DECALAGE_WAT_MS).getUTCDay();
 }
 /** Minuit du jour civil de Douala qui contient `d`, en millisecondes. */
 function minuitWAT(d) {
@@ -686,6 +740,12 @@ var schemaPage = {
 			title: "Quand",
 			description: "Ex. « Lundi à samedi, 7 h – 19 h »."
 		},
+		date: {
+			type: "string",
+			maxLength: 20,
+			title: "Jour de l’événement",
+			description: "Seulement si la demande annonce un événement daté. « AAAA-MM-JJ », ou « AAAA-MM-JJTHH:MM » si l’heure est dite. N’invente jamais une date."
+		},
 		sommaire: {
 			type: "boolean",
 			title: "Menu en haut",
@@ -705,6 +765,10 @@ function verifierPage(valeur) {
 	const erreurs = [...valider(schemaPage, valeur)];
 	if (erreurs.length > 0) return erreurs;
 	const page = valeur;
+	if (page.date !== void 0 && page.date !== "" && Number.isNaN(new Date(page.date).getTime())) erreurs.push({
+		chemin: "$.date",
+		message: `« ${page.date} » ne se lit pas : écris le jour en « AAAA-MM-JJ », ou « AAAA-MM-JJTHH:MM » avec l’heure`
+	});
 	for (const [i, section] of page.sections.entries()) {
 		const chemin = `$.sections[${i}]`;
 		if (section.sorte === "texte") {
@@ -751,6 +815,48 @@ function sectionsAncrees(sections) {
 /** Le menu a-t-il lieu d'être ? */
 function avecSommaire(page) {
 	return page.sommaire === true && page.sections.length >= 3;
+}
+var JOURS = [
+	"Dimanche",
+	"Lundi",
+	"Mardi",
+	"Mercredi",
+	"Jeudi",
+	"Vendredi",
+	"Samedi"
+];
+function direLeJour(iso, maintenant) {
+	const quand = instantWAT(iso);
+	if (quand === null) return null;
+	const jours = joursEntre(maintenant, quand);
+	const avecHeure = /[T ]\d{2}:\d{2}/.test(iso);
+	return {
+		quand: `${JOURS[jourDeLaSemaineWAT(quand)] ?? ""} ${dateLongue(quand)}`.trim(),
+		heure: avecHeure ? heureDite(quand) : "",
+		delai: delaiDit(jours),
+		passe: jours < 0
+	};
+}
+/**
+* « à 15 h », « à 9 h 30 ».
+*
+* Pas « à 15 h 00 » : en français, une heure ronde n'écrit pas ses minutes, et
+* les deux zéros donnent à une invitation l'air d'un horaire de train. Pas de
+* zéro devant non plus — personne ne dit « zéro neuf heures ».
+*/
+function heureDite(quand) {
+	const [heures = "", minutes = ""] = heureCourte(quand).split("h");
+	return minutes === "00" ? `à ${Number(heures)} h` : `à ${Number(heures)} h ${minutes}`;
+}
+function delaiDit(jours) {
+	if (jours < -1) return "c’est passé";
+	if (jours === -1) return "c’était hier";
+	if (jours === 0) return "c’est aujourd’hui";
+	if (jours === 1) return "c’est demain";
+	if (jours < 7) return `dans ${jours} jours`;
+	if (jours < 14) return "dans une semaine";
+	if (jours < 31) return `dans ${Math.round(jours / 7)} semaines`;
+	return `dans ${Math.round(jours / 30)} mois`;
 }
 //#endregion
 //#region ../../node_modules/.pnpm/preact@10.29.8_preact-render-to-string@6.7.0/node_modules/preact/dist/preact.module.js
@@ -1455,6 +1561,7 @@ function Lignes$1(props) {
 }
 function PageVitrine(props) {
 	const p = props.page;
+	const jour = p.date === void 0 ? null : direLeJour(p.date, props.maintenant);
 	const sections = sectionsAncrees(p.sections);
 	const sommaire = avecSommaire(p);
 	const message = `Bonjour ${p.titre}, j’ai vu votre page.`;
@@ -1475,6 +1582,10 @@ function PageVitrine(props) {
 						children: p.accroche
 					})
 				]
+			}),
+			jour !== null && /* @__PURE__ */ u("p", {
+				class: jour.passe ? "vitrine-jour passe" : "vitrine-jour",
+				children: [/* @__PURE__ */ u("b", { children: jour.delai }), /* @__PURE__ */ u("span", { children: [jour.quand, jour.heure === "" ? "" : ` ${jour.heure}`] })]
 			}),
 			sommaire && /* @__PURE__ */ u("nav", {
 				class: "vitrine-sommaire",
@@ -2509,7 +2620,10 @@ function estFacture(skeleton) {
 }
 function documentDe(instantane, ctx) {
 	const page = pageDe(instantane);
-	if (page !== null) return /* @__PURE__ */ u(PageVitrine, { page });
+	if (page !== null) return /* @__PURE__ */ u(PageVitrine, {
+		page,
+		maintenant: ctx.maintenant
+	});
 	const Composant = Object.hasOwn(DOCUMENTS, instantane.skeleton) ? DOCUMENTS[instantane.skeleton] : void 0;
 	if (Composant === void 0) return null;
 	const etat = instantane.etat;

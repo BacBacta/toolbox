@@ -83,7 +83,7 @@ export function Outil(props: ProprietesOutil): JSX.Element {
       {onglet === 'Aperçu' ? (
         <>
           <div class="page-apercu">
-            <PageVitrine page={page} />
+            <PageVitrine page={page} maintenant={props.ctx.maintenant} />
           </div>
           <Actions>
             <Action principale onClick={() => props.onDiffuser((c) => partageDePage(page, c))}>

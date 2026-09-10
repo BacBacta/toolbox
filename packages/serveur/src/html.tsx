@@ -176,7 +176,7 @@ function dessiner(
     return envelopper(
       meta,
       CSS_CADRE + CSS_VITRINE,
-      `<main class="lecture">${enChaine(<PageVitrine page={vitrine} />)}</main>` +
+      `<main class="lecture">${enChaine(<PageVitrine page={vitrine} maintenant={ctx.maintenant} />)}</main>` +
         enChaine(<PiedLecture instantane={instantane} />),
     )
   }

@@ -875,6 +875,12 @@ var schemaPage = {
 			title: "Quand",
 			description: "Ex. « Lundi à samedi, 7 h – 19 h »."
 		},
+		date: {
+			type: "string",
+			maxLength: 20,
+			title: "Jour de l’événement",
+			description: "Seulement si la demande annonce un événement daté. « AAAA-MM-JJ », ou « AAAA-MM-JJTHH:MM » si l’heure est dite. N’invente jamais une date."
+		},
 		sommaire: {
 			type: "boolean",
 			title: "Menu en haut",
@@ -894,6 +900,10 @@ function verifierPage(valeur) {
 	const erreurs = [...valider(schemaPage, valeur)];
 	if (erreurs.length > 0) return erreurs;
 	const page = valeur;
+	if (page.date !== void 0 && page.date !== "" && Number.isNaN(new Date(page.date).getTime())) erreurs.push({
+		chemin: "$.date",
+		message: `« ${page.date} » ne se lit pas : écris le jour en « AAAA-MM-JJ », ou « AAAA-MM-JJTHH:MM » avec l’heure`
+	});
 	for (const [i, section] of page.sections.entries()) {
 		const chemin = `$.sections[${i}]`;
 		if (section.sorte === "texte") {
@@ -1489,12 +1499,19 @@ Sa formule se déclare en arbre, jamais en code.
 
 Une **page** se publie derrière un lien qu'on envoie sur WhatsApp. Elle répond
 à « comment je me montre ? » — une vitrine de boutique, un menu de restaurant,
-une liste de prix, une annonce, un profil d'artisan. C'est ce que demande
-« je veux un site internet » : ici, un site et une page sont la même chose, et
-le champ « sommaire » met un menu en haut quand il y a plusieurs sujets.
-N'invente jamais un numéro de téléphone, une adresse ni un prix : laisse le
-champ vide si la demande ne le donne pas — un prix inventé se lit comme un
-engagement.
+une liste de prix, un profil d'artisan. C'est ce que demande « je veux un site
+internet » : ici, un site et une page sont la même chose, et le champ
+« sommaire » met un menu en haut quand il y a plusieurs sujets.
+
+**Un événement est une page datée.** Une annonce de mariage, une réunion de
+tontine, une vente de fin d'année ont un nom, un lieu, un programme et une
+phrase — tout ce qu'une page porte déjà. Remplis « date » et la page dira
+d'elle-même dans combien de jours c'est. Mets le programme en section
+« liste », l'heure de chaque moment dans « valeur ».
+
+N'invente jamais un numéro de téléphone, une adresse, une date ni un prix :
+laisse le champ vide si la demande ne le donne pas — un prix inventé se lit
+comme un engagement, et une date inventée fait déplacer des gens.
 
 Réponds par un objet JSON seul, sans texte autour, sans bloc de code.
 

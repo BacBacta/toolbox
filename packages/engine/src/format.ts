@@ -152,6 +152,58 @@ export function arreteLe(d: Date): string {
   return `Arrêté le ${dateLongue(d)} à ${heureCourte(d)}`
 }
 
+/**
+ * Lit une date écrite à l'heure de Douala.
+ *
+ * `new Date('2026-09-12T15:00')` lit l'heure **de la machine**, et un Worker
+ * vit en UTC : un mariage annoncé à 15 h se serait affiché à 16 h sur la page
+ * publiée, et à 15 h dans l'aperçu du téléphone de qui l'a écrite. Personne
+ * n'aurait su lequel des deux croire.
+ *
+ * Ce qui est écrit sans fuseau est donc lu à Douala, parce que c'est là qu'on
+ * écrit et là qu'on lit. Un fuseau explicite — `Z` ou `+02:00` — est respecté :
+ * qui l'écrit sait ce qu'il fait.
+ *
+ * Rend `null` sur ce qui n'est pas une date, y compris un 31 février, que
+ * `Date.UTC` replierait silencieusement sur le 3 mars.
+ */
+export function instantWAT(iso: string): Date | null {
+  const brut = iso.trim()
+  if (brut === '') return null
+
+  if (/(?:Z|[+-]\d{2}:?\d{2})$/.test(brut)) {
+    const avecFuseau = new Date(brut)
+    return Number.isNaN(avecFuseau.getTime()) ? null : avecFuseau
+  }
+
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(brut)
+  if (m === null) return null
+  const [, a = '', mo = '', j = '', h = '0', mi = '0', se = '0'] = m
+  const annee = Number(a)
+  const mois = Number(mo) - 1
+  const jour = Number(j)
+  const t = Date.UTC(annee, mois, jour, Number(h), Number(mi), Number(se)) - DECALAGE_WAT_MS
+  const d = new Date(t)
+  if (Number.isNaN(t)) return null
+
+  // Un 31 février se replie sur le 3 mars : on le relit pour le voir.
+  const relu = partsWAT(d)
+  return relu.annee === annee && relu.mois === mois && relu.jour === jour ? d : null
+}
+
+/**
+ * Le jour de la semaine à Douala, 0 pour dimanche.
+ *
+ * Une affiche annonce « samedi 12 septembre » et non « le 12 septembre » : le
+ * jour de la semaine est ce qui permet de savoir tout de suite si on est
+ * disponible, avant même de compter.
+ */
+export function jourDeLaSemaineWAT(d: Date): number {
+  const t = d.getTime()
+  if (!Number.isFinite(t)) throw new RangeError('date invalide')
+  return new Date(t + DECALAGE_WAT_MS).getUTCDay()
+}
+
 /** L'année civile, dans le fuseau de Douala — celle qui numérote les documents. */
 export function anneeDe(d: Date): number {
   return partsWAT(d).annee

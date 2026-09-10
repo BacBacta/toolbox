@@ -1,5 +1,5 @@
 import type { PageDemande, SectionDemandee } from '@a237/engine'
-import { avecSommaire, lienWhatsApp, numeroLisible, sectionsAncrees } from '@a237/engine'
+import { avecSommaire, direLeJour, lienWhatsApp, numeroLisible, sectionsAncrees } from '@a237/engine'
 import type { JSX } from 'preact'
 
 /**
@@ -34,8 +34,21 @@ function Lignes(props: { readonly section: SectionDemandee }): JSX.Element {
   )
 }
 
-export function PageVitrine(props: { readonly page: PageDemande }): JSX.Element {
+export function PageVitrine(props: {
+  readonly page: PageDemande
+  /**
+   * L'instant de lecture, **passé** et jamais lu à l'horloge.
+   *
+   * Il sert au seul endroit où la page ne dit pas la même chose selon le
+   * jour : « dans 3 jours » sous la date d'un événement. Un composant qui lit
+   * l'heure lui-même ne se teste pas, et sur le serveur il dirait celle du
+   * Worker plutôt que celle du contexte de rendu. La page publiée est mise en
+   * cache une minute, ce qui est assez fin pour une phrase comptée en jours.
+   */
+  readonly maintenant: Date
+}): JSX.Element {
   const p = props.page
+  const jour = p.date === undefined ? null : direLeJour(p.date, props.maintenant)
   /*
    * Le sommaire : c'est tout ce que « un site » ajoute à « une page ».
    *
@@ -61,6 +74,23 @@ export function PageVitrine(props: { readonly page: PageDemande }): JSX.Element 
         <h1>{p.titre}</h1>
         <p class="accroche">{p.accroche}</p>
       </header>
+
+      {/*
+        * Le jour, quand la page annonce un événement.
+        *
+        * Le délai passe devant la date : une affiche n'est jamais lue pour sa
+        * date elle-même, on cherche à savoir si on a le temps. « Samedi 12
+        * septembre 2026 » oblige à compter ; « dans 3 jours » répond.
+        */}
+      {jour !== null && (
+        <p class={jour.passe ? 'vitrine-jour passe' : 'vitrine-jour'}>
+          <b>{jour.delai}</b>
+          <span>
+            {jour.quand}
+            {jour.heure === '' ? '' : ` ${jour.heure}`}
+          </span>
+        </p>
+      )}
 
       {sommaire && (
         <nav class="vitrine-sommaire" aria-label="Sections">

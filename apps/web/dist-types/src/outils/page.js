@@ -63,7 +63,7 @@ export function Outil(props) {
          * Aucun indicateur : une vitrine ne totalise rien, et un compteur de
          * sections dirait ce que l'aperçu montre déjà mieux.
          */
-        kpis: [], onglets: ONGLETS, ongletCourant: onglet, onOnglet: setOnglet, children: onglet === 'Aperçu' ? (_jsxs(_Fragment, { children: [_jsx("div", { class: "page-apercu", children: _jsx(PageVitrine, { page: page }) }), _jsx(Actions, { children: _jsx(Action, { principale: true, onClick: () => props.onDiffuser((c) => partageDePage(page, c)), children: "Publier et partager" }) })] })) : (_jsx(ChampsSchema, { schema: schemaPage, valeur: page, onChange: (v) => props.onChange(v), 
+        kpis: [], onglets: ONGLETS, ongletCourant: onglet, onOnglet: setOnglet, children: onglet === 'Aperçu' ? (_jsxs(_Fragment, { children: [_jsx("div", { class: "page-apercu", children: _jsx(PageVitrine, { page: page, maintenant: props.ctx.maintenant }) }), _jsx(Actions, { children: _jsx(Action, { principale: true, onClick: () => props.onDiffuser((c) => partageDePage(page, c)), children: "Publier et partager" }) })] })) : (_jsx(ChampsSchema, { schema: schemaPage, valeur: page, onChange: (v) => props.onChange(v), 
             /*
              * Le sommaire ne se règle pas à la main : il n'a de sens qu'à partir
              * de trois sections, et une case à cocher qui ne change rien à

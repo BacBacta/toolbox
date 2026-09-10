@@ -203,3 +203,38 @@
 .vitrine-section {
   scroll-margin-top: 12px;
 }
+
+/*
+ * Le jour d'un événement.
+ *
+ * Le délai est le gros caractère, pas la date : on ne lit pas une affiche pour
+ * sa date, on la lit pour savoir si on a le temps. Quand le jour est passé, le
+ * bloc s'éteint — une affiche qui garde son air d'urgence après coup fait
+ * traverser la ville pour rien.
+ */
+.vitrine-jour {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+}
+
+.vitrine-jour b {
+  font-size: 19px;
+  line-height: 1.2;
+}
+
+.vitrine-jour span {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.vitrine-jour.passe {
+  background: var(--surface);
+  border: 1px solid var(--trait);
+  color: var(--encre-3);
+}

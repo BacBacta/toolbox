@@ -372,6 +372,52 @@ function jourWAT(d) {
 function arreteLe(d) {
 	return `Arrêté le ${dateLongue(d)} à ${heureCourte(d)}`;
 }
+/**
+* Lit une date écrite à l'heure de Douala.
+*
+* `new Date('2026-09-12T15:00')` lit l'heure **de la machine**, et un Worker
+* vit en UTC : un mariage annoncé à 15 h se serait affiché à 16 h sur la page
+* publiée, et à 15 h dans l'aperçu du téléphone de qui l'a écrite. Personne
+* n'aurait su lequel des deux croire.
+*
+* Ce qui est écrit sans fuseau est donc lu à Douala, parce que c'est là qu'on
+* écrit et là qu'on lit. Un fuseau explicite — `Z` ou `+02:00` — est respecté :
+* qui l'écrit sait ce qu'il fait.
+*
+* Rend `null` sur ce qui n'est pas une date, y compris un 31 février, que
+* `Date.UTC` replierait silencieusement sur le 3 mars.
+*/
+function instantWAT(iso) {
+	const brut = iso.trim();
+	if (brut === "") return null;
+	if (/(?:Z|[+-]\d{2}:?\d{2})$/.test(brut)) {
+		const avecFuseau = new Date(brut);
+		return Number.isNaN(avecFuseau.getTime()) ? null : avecFuseau;
+	}
+	const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(brut);
+	if (m === null) return null;
+	const [, a = "", mo = "", j = "", h = "0", mi = "0", se = "0"] = m;
+	const annee = Number(a);
+	const mois = Number(mo) - 1;
+	const jour = Number(j);
+	const t = Date.UTC(annee, mois, jour, Number(h), Number(mi), Number(se)) - DECALAGE_WAT_MS;
+	const d = new Date(t);
+	if (Number.isNaN(t)) return null;
+	const relu = partsWAT(d);
+	return relu.annee === annee && relu.mois === mois && relu.jour === jour ? d : null;
+}
+/**
+* Le jour de la semaine à Douala, 0 pour dimanche.
+*
+* Une affiche annonce « samedi 12 septembre » et non « le 12 septembre » : le
+* jour de la semaine est ce qui permet de savoir tout de suite si on est
+* disponible, avant même de compter.
+*/
+function jourDeLaSemaineWAT(d) {
+	const t = d.getTime();
+	if (!Number.isFinite(t)) throw new RangeError("date invalide");
+	return new Date(t + DECALAGE_WAT_MS).getUTCDay();
+}
 /** L'année civile, dans le fuseau de Douala — celle qui numérote les documents. */
 function anneeDe(d) {
 	return partsWAT(d).annee;
@@ -3081,6 +3127,12 @@ var schemaPage = {
 			title: "Quand",
 			description: "Ex. « Lundi à samedi, 7 h – 19 h »."
 		},
+		date: {
+			type: "string",
+			maxLength: 20,
+			title: "Jour de l’événement",
+			description: "Seulement si la demande annonce un événement daté. « AAAA-MM-JJ », ou « AAAA-MM-JJTHH:MM » si l’heure est dite. N’invente jamais une date."
+		},
 		sommaire: {
 			type: "boolean",
 			title: "Menu en haut",
@@ -3100,6 +3152,10 @@ function verifierPage(valeur) {
 	const erreurs = [...valider(schemaPage, valeur)];
 	if (erreurs.length > 0) return erreurs;
 	const page = valeur;
+	if (page.date !== void 0 && page.date !== "" && Number.isNaN(new Date(page.date).getTime())) erreurs.push({
+		chemin: "$.date",
+		message: `« ${page.date} » ne se lit pas : écris le jour en « AAAA-MM-JJ », ou « AAAA-MM-JJTHH:MM » avec l’heure`
+	});
 	for (const [i, section] of page.sections.entries()) {
 		const chemin = `$.sections[${i}]`;
 		if (section.sorte === "texte") {
@@ -3156,7 +3212,7 @@ function avecSommaire(page) {
 * comme un outil vide ; on préfère alors le sur-titre au blanc.
 */
 function carteDePage(page, ctx) {
-	const grand = grandDeLaPage(page);
+	const grand = grandDeLaPage(page, ctx.maintenant);
 	const vitrine = sectionListee(page);
 	return {
 		kicker: page.kicker,
@@ -3166,14 +3222,23 @@ function carteDePage(page, ctx) {
 		bigLabel: grand.libelle,
 		big: grand.valeur,
 		pct: null,
-		subline: [page.adresse, page.horaires].filter((x) => x !== void 0 && x !== "").join(" · "),
+		subline: [
+			page.adresse,
+			page.horaires,
+			sousLigneTelephone(page)
+		].filter((x) => x !== void 0 && x !== "").join(" · "),
 		listTitle: vitrine === null ? "" : vitrine.titre.toUpperCase(),
 		items: vitrine === null ? [] : itemsDeSection(vitrine),
 		link: ctx.lien,
 		stamp: arreteLe(ctx.maintenant)
 	};
 }
-function grandDeLaPage(page) {
+function grandDeLaPage(page, maintenant) {
+	const jour = page.date === void 0 ? null : direLeJour(page.date, maintenant);
+	if (jour !== null) return {
+		libelle: jour.delai.toUpperCase(),
+		valeur: `${jour.quand}${jour.heure === "" ? "" : ` ${jour.heure}`}`
+	};
 	if ((page.telephone === void 0 ? null : numeroInternational(page.telephone)) !== null) return {
 		libelle: "WHATSAPP",
 		valeur: numeroLisible(page.telephone ?? "")
@@ -3188,6 +3253,14 @@ function grandDeLaPage(page) {
 		valeur: page.kicker
 	};
 }
+/**
+* Le numéro descend sur la ligne du lieu quand le grand caractère est pris par
+* la date : une affiche d'événement doit encore dire à qui écrire.
+*/
+function sousLigneTelephone(page) {
+	if (page.date === void 0 || page.telephone === void 0 || page.telephone === "") return "";
+	return numeroInternational(page.telephone) === null ? "" : numeroLisible(page.telephone);
+}
 /** La section qu'on montre sur la carte : des prix de préférence, une liste sinon. */
 function sectionListee(page) {
 	return page.sections.find((s) => s.sorte === "prix") ?? page.sections.find((s) => s.sorte === "liste") ?? null;
@@ -3199,6 +3272,48 @@ function itemsDeSection(section) {
 		warn: false,
 		val: l.valeur !== void 0 && l.valeur !== "" ? l.valeur : null
 	}));
+}
+var JOURS = [
+	"Dimanche",
+	"Lundi",
+	"Mardi",
+	"Mercredi",
+	"Jeudi",
+	"Vendredi",
+	"Samedi"
+];
+function direLeJour(iso, maintenant) {
+	const quand = instantWAT(iso);
+	if (quand === null) return null;
+	const jours = joursEntre(maintenant, quand);
+	const avecHeure = /[T ]\d{2}:\d{2}/.test(iso);
+	return {
+		quand: `${JOURS[jourDeLaSemaineWAT(quand)] ?? ""} ${dateLongue(quand)}`.trim(),
+		heure: avecHeure ? heureDite(quand) : "",
+		delai: delaiDit(jours),
+		passe: jours < 0
+	};
+}
+/**
+* « à 15 h », « à 9 h 30 ».
+*
+* Pas « à 15 h 00 » : en français, une heure ronde n'écrit pas ses minutes, et
+* les deux zéros donnent à une invitation l'air d'un horaire de train. Pas de
+* zéro devant non plus — personne ne dit « zéro neuf heures ».
+*/
+function heureDite(quand) {
+	const [heures = "", minutes = ""] = heureCourte(quand).split("h");
+	return minutes === "00" ? `à ${Number(heures)} h` : `à ${Number(heures)} h ${minutes}`;
+}
+function delaiDit(jours) {
+	if (jours < -1) return "c’est passé";
+	if (jours === -1) return "c’était hier";
+	if (jours === 0) return "c’est aujourd’hui";
+	if (jours === 1) return "c’est demain";
+	if (jours < 7) return `dans ${jours} jours`;
+	if (jours < 14) return "dans une semaine";
+	if (jours < 31) return `dans ${Math.round(jours / 7)} semaines`;
+	return `dans ${Math.round(jours / 30)} mois`;
 }
 //#endregion
 //#region ../engine/src/registre.ts
@@ -5200,7 +5315,7 @@ function J(e) {
 var a4_default$1 = "/*\n * Feuille A4 réelle, en millimètres.\n *\n * Le prototype dessinait un aperçu à l'échelle, en pixels minuscules (7,4 px\n * pour le corps de texte). Ça se voit à l'écran et ça s'imprime n'importe\n * comment. Ici la page fait ses 210 × 297 mm et le texte ses points : on rend à\n * la taille vraie, et c'est l'aperçu qui est mis à l'échelle par --echelle.\n *\n * **Cette feuille ignore le thème sombre, et c'est voulu** : un devis part à\n * l'impression et chez un client. Il est blanc chez tout le monde. Elle ne lit\n * donc aucun jeton de l'interface et se suffit à elle-même.\n *\n * Aucune police web : on prend ce que le téléphone a déjà (invariant § 2.6).\n */\n\n.a4-cadre {\n  --echelle: 1;\n  width: calc(210mm * var(--echelle));\n  overflow: hidden;\n}\n\n.a4-cadre > .a4 {\n  transform: scale(var(--echelle));\n  transform-origin: top left;\n  margin-bottom: calc((297mm * var(--echelle)) - 297mm);\n  box-shadow: 0 2px 18px rgb(18 23 16 / 12%);\n}\n\n.a4 {\n  --pa: #1f2a44;\n  --trait: #d7dce1;\n  --trait-fort: #aeb6bd;\n  --gris: #4e575e;\n  --gris-clair: #7b848b;\n\n  box-sizing: border-box;\n  position: relative;\n  width: 210mm;\n  min-height: 297mm;\n  padding: 15mm 16mm 20mm;\n  background: #fff;\n  color: #16191c;\n  font: 9.5pt/1.5 system-ui, -apple-system, \"Segoe UI\", Roboto, sans-serif;\n  font-variant-numeric: tabular-nums lining-nums;\n  /* Les aplats d'accent doivent sortir de l'imprimante, pas être « économisés ». */\n  print-color-adjust: exact;\n  -webkit-print-color-adjust: exact;\n}\n\n.a4 * {\n  box-sizing: border-box;\n}\n\n/* ─────────────────────────────── entête ─────────────────────────────── */\n\n.a4-entete {\n  display: flex;\n  justify-content: space-between;\n  align-items: flex-start;\n  gap: 10mm;\n  padding-bottom: 3.5mm;\n  border-bottom: 0.7mm solid var(--pa);\n}\n\n.a4-entete .raison {\n  font-size: 14pt;\n  font-weight: 700;\n  line-height: 1.15;\n  letter-spacing: -0.01em;\n  color: var(--pa);\n}\n\n.a4-entete .coordonnees,\n.a4-entete .immat {\n  margin-top: 1.5mm;\n  font-size: 8pt;\n  line-height: 1.55;\n  color: var(--gris);\n}\n\n.a4-entete .immat {\n  text-align: right;\n  white-space: nowrap;\n}\n\n/* ─────────────────────────────── titre ─────────────────────────────── */\n\n.a4-titre {\n  margin: 9mm 0 0;\n  font-size: 22pt;\n  font-weight: 700;\n  line-height: 1;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  color: var(--pa);\n}\n\n.a4-sous-titre {\n  margin-top: 2mm;\n  font-size: 9pt;\n  color: var(--gris);\n}\n\n.a4-bloc-client {\n  margin-top: 7mm;\n  padding: 3.5mm 4mm;\n  border: 0.25mm solid var(--trait);\n  border-left: 1.2mm solid var(--pa);\n  border-radius: 0 1mm 1mm 0;\n  background: #fbfcfd;\n  font-size: 9pt;\n  line-height: 1.55;\n}\n\n.a4-bloc-client .etiquette {\n  margin-bottom: 0.8mm;\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.14em;\n  text-transform: uppercase;\n  color: var(--gris-clair);\n}\n\n/* ─────────────────────────────── tableau ─────────────────────────────── */\n\n.a4-tableau {\n  width: 100%;\n  margin-top: 7mm;\n  border-collapse: collapse;\n  font-size: 8.5pt;\n}\n\n.a4-tableau th {\n  padding: 2.4mm 2mm;\n  border-bottom: 0.6mm solid var(--pa);\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  text-align: left;\n  color: var(--pa);\n  white-space: nowrap;\n}\n\n.a4-tableau td {\n  padding: 2.4mm 2mm;\n  border-bottom: 0.2mm solid var(--trait);\n  vertical-align: top;\n}\n\n/* Une ligne de facture ne se coupe pas au milieu par un saut de page. */\n.a4-tableau tr {\n  break-inside: avoid;\n}\n\n.a4-tableau .nombre {\n  text-align: right;\n  white-space: nowrap;\n}\n\n.a4-tableau tbody tr:last-child td {\n  border-bottom: 0.4mm solid var(--trait-fort);\n}\n\n.a4-vide {\n  padding: 8mm 0;\n  color: var(--gris-clair);\n  font-style: italic;\n  text-align: center;\n}\n\n/* ─────────────────────────────── totaux ─────────────────────────────── */\n\n.a4-totaux {\n  margin-top: 5mm;\n  margin-left: auto;\n  width: 88mm;\n  font-size: 9pt;\n  break-inside: avoid;\n}\n\n.a4-totaux .ligne {\n  display: flex;\n  justify-content: space-between;\n  gap: 6mm;\n  padding: 1.6mm 1mm;\n}\n\n.a4-totaux .ligne + .ligne {\n  border-top: 0.2mm solid var(--trait);\n}\n\n.a4-totaux .fort {\n  margin-top: 1.5mm;\n  padding: 2.6mm 3mm;\n  border: 0;\n  border-radius: 1mm;\n  background: var(--pa);\n  color: #fff;\n  font-size: 11.5pt;\n  font-weight: 700;\n  letter-spacing: 0.01em;\n}\n\n.a4-en-lettres {\n  margin-top: 4mm;\n  font-size: 8.5pt;\n  font-style: italic;\n  line-height: 1.55;\n  color: var(--gris);\n  break-inside: avoid;\n}\n\n/* ─────────────────────── mentions, signatures, pied ─────────────────────── */\n\n.a4-mentions {\n  margin-top: 7mm;\n  font-size: 8pt;\n  line-height: 1.6;\n  color: var(--gris);\n  orphans: 2;\n  widows: 2;\n}\n\n.a4-mentions p {\n  margin: 0 0 2mm;\n}\n\n.a4-signatures {\n  display: flex;\n  gap: 10mm;\n  margin-top: 12mm;\n  break-inside: avoid;\n}\n\n.a4-signatures .zone {\n  flex: 1;\n}\n\n.a4-signatures .libelle {\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  color: var(--pa);\n}\n\n.a4-signatures .mention {\n  margin-top: 0.8mm;\n  font-size: 7.5pt;\n  color: var(--gris-clair);\n}\n\n.a4-signatures .cadre {\n  margin-top: 2.5mm;\n  height: 24mm;\n  border: 0.25mm dashed var(--trait-fort);\n  border-radius: 1mm;\n}\n\n.a4-pied {\n  position: absolute;\n  left: 16mm;\n  right: 16mm;\n  bottom: 11mm;\n  padding-top: 2.5mm;\n  border-top: 0.2mm solid var(--trait);\n  font-size: 7pt;\n  line-height: 1.6;\n  color: var(--gris-clair);\n}\n\n.a4-numero-page {\n  position: absolute;\n  right: 16mm;\n  bottom: 6mm;\n  font-size: 7pt;\n  color: var(--gris-clair);\n}\n\n/* ─────────────────────────────── impression ─────────────────────────── */\n\n@page {\n  size: A4;\n  margin: 0;\n}\n\n@media print {\n  .a4-cadre {\n    --echelle: 1;\n    width: auto;\n    overflow: visible;\n  }\n\n  .a4-cadre > .a4 {\n    transform: none;\n    margin-bottom: 0;\n    box-shadow: none;\n  }\n}\n\n/* ────────────────────── actes et lettres ────────────────────── */\n/*\n * Ces quatre documents ne portent pas de tableau taxé. Ce qui les distingue,\n * c'est la disposition : un acte pose ses parties avant son corps, une lettre\n * française met l'expéditeur à gauche et le destinataire à droite. Le reste —\n * papier, titre, signatures, pied — vient des mêmes pièces que le devis.\n */\n\n/* Un corps de texte long : la mesure compte plus que la taille. */\n.a4-corps {\n  margin-top: 6mm;\n  font-size: 9.5pt;\n  line-height: 1.7;\n  color: var(--encre);\n  text-align: justify;\n}\n\n.a4-corps p {\n  margin: 0 0 3.5mm;\n}\n\n/* Les deux parties d'un acte, nommées avant le corps. */\n.a4-parties {\n  margin-top: 6mm;\n  font-size: 9.5pt;\n  line-height: 1.9;\n}\n\n.a4-parties .qui {\n  font-weight: 700;\n  color: var(--pa);\n}\n\n/* Le montant encadré : ce que l'œil doit trouver en premier sur l'acte. */\n.a4-encadre {\n  margin-top: 6mm;\n  padding: 4mm 5mm;\n  border: 0.5mm solid var(--pa);\n  border-radius: 1mm;\n  break-inside: avoid;\n}\n\n.a4-encadre .etiquette {\n  font-size: 7.5pt;\n  font-weight: 700;\n  letter-spacing: 0.12em;\n  text-transform: uppercase;\n  color: var(--pa);\n}\n\n.a4-encadre .chiffre {\n  margin-top: 1mm;\n  font-size: 16pt;\n  font-weight: 800;\n  letter-spacing: -0.01em;\n}\n\n.a4-encadre .lettres {\n  margin-top: 0.8mm;\n  font-size: 9pt;\n  font-style: italic;\n  color: var(--gris);\n}\n\n.a4-encadre .echeance {\n  margin-top: 2.5mm;\n  font-size: 9pt;\n}\n\n/* La disposition d'une lettre française. */\n.a4-lettre-tete {\n  display: flex;\n  justify-content: space-between;\n  gap: 10mm;\n  font-size: 9pt;\n  line-height: 1.5;\n}\n\n.a4-lettre-tete .expediteur {\n  max-width: 70mm;\n}\n\n.a4-lettre-tete .destinataire {\n  max-width: 80mm;\n  text-align: right;\n  color: var(--gris);\n}\n\n.a4-lettre-date {\n  margin-top: 8mm;\n  font-size: 9pt;\n  text-align: right;\n  color: var(--gris);\n}\n\n.a4-lettre-objet {\n  display: inline-block;\n  margin-top: 6mm;\n  padding-bottom: 1mm;\n  border-bottom: 0.3mm solid var(--pa);\n  font-size: 10pt;\n  font-weight: 600;\n}\n\n.a4-lettre-signature {\n  margin-top: 10mm;\n  font-size: 10pt;\n  text-align: right;\n}\n\n/* ───────────────────────────── curriculum vitæ ─────────────────────────────\n *\n * Quatre gabarits pour une même feuille. Ils ne diffèrent que par la police,\n * la façon d'annoncer une section et la présence d'une colonne : la structure\n * du contenu est la même pour les quatre, et c'est ce qui permet de changer de\n * gabarit sans rien ressaisir.\n *\n * Aucune police web ici non plus (invariant § 2.6). « Serif » et « grotesque »\n * se jouent avec les familles génériques que tout téléphone possède.\n */\n\n.a4-cv {\n  --cv-inter: 1.5;\n  --cv-saut: 5mm;\n}\n\n.a4-cv.dense {\n  --cv-inter: 1.28;\n  --cv-saut: 3mm;\n  font-size: 9pt;\n}\n\n.a4-cv .cv-nom {\n  font-size: 20pt;\n  font-weight: 700;\n  letter-spacing: 0.02em;\n  line-height: 1.15;\n}\n\n.a4-cv .cv-titre {\n  margin-top: 1mm;\n  color: var(--pa);\n  font-size: 11pt;\n  font-weight: 600;\n}\n\n.a4-cv .cv-contact {\n  margin-top: 2mm;\n  color: var(--gris);\n  font-size: 9pt;\n}\n\n.a4-cv .cv-section {\n  margin: var(--cv-saut) 0 2mm;\n  color: var(--pa);\n  font-size: 9pt;\n  font-weight: 700;\n  letter-spacing: 0.08em;\n  text-transform: uppercase;\n}\n\n.a4-cv .cv-profil {\n  line-height: var(--cv-inter);\n  text-align: justify;\n}\n\n.a4-cv .cv-profil p {\n  margin: 0 0 2mm;\n}\n\n.a4-cv .cv-item {\n  margin-bottom: 3mm;\n  line-height: var(--cv-inter);\n}\n\n.a4-cv .cv-quoi {\n  font-size: 10pt;\n  font-weight: 600;\n}\n\n.a4-cv .cv-ou {\n  color: var(--gris);\n  font-size: 9pt;\n}\n\n/* La puce est dessinée, pas listée : un <ul> imprime des marges que le\n * gabarit ne contrôle pas d'un navigateur à l'autre. */\n.a4-cv .cv-fait {\n  position: relative;\n  margin-top: 1mm;\n  padding-left: 4mm;\n  font-size: 9.5pt;\n}\n\n.a4-cv .cv-fait::before {\n  content: \"\";\n  position: absolute;\n  top: 1.7mm;\n  left: 0.8mm;\n  width: 1.2mm;\n  height: 1.2mm;\n  background: var(--pa);\n}\n\n.a4-cv .cv-serie {\n  font-size: 9.5pt;\n  line-height: var(--cv-inter);\n}\n\n/* — Notaire : sérif, tout centré, pour une administration. — */\n.a4-cv.notaire {\n  font-family: Georgia, \"Times New Roman\", serif;\n}\n\n.a4-cv.notaire .cv-tete {\n  padding-bottom: 3mm;\n  border-bottom: 0.4mm solid var(--pa);\n  text-align: center;\n}\n\n.a4-cv.notaire .cv-section {\n  border-bottom: 0.2mm solid var(--trait);\n  padding-bottom: 1mm;\n  text-align: center;\n  letter-spacing: 0.14em;\n}\n\n.a4-cv.notaire .cv-serie {\n  text-align: center;\n}\n\n/* — Exécutif : grotesque, un filet de couleur, pour le privé. — */\n\n/*\n * Le filet sort dans la marge : posé dans la colonne de texte, il décalait le\n * nom de quatre millimètres vers la droite et l'entête ne s'alignait plus sur\n * les titres de section en dessous.\n */\n.a4-cv.executif .cv-tete {\n  /* 5 mm de retrait plus l'épaisseur du filet : sans elle, le nom reste décalé\n   * du filet lui-même et rate l'alignement d'un millimètre et demi. */\n  margin-left: -6.5mm;\n  border-left: 1.5mm solid var(--pa);\n  padding-left: 5mm;\n}\n\n.a4-cv.executif .cv-section {\n  border-bottom: 0.2mm solid var(--trait);\n  padding-bottom: 1mm;\n}\n\n/* — Éditorial : le nom en display, la date en marge, pour un métier créatif. — */\n.a4-cv.editorial .cv-nom {\n  font-size: 28pt;\n  font-weight: 300;\n  letter-spacing: -0.01em;\n}\n\n.a4-cv.editorial .cv-tete {\n  padding-bottom: 4mm;\n  border-bottom: 0.8mm solid var(--pa);\n}\n\n.a4-cv.editorial .cv-section {\n  color: var(--gris-clair);\n  letter-spacing: 0.18em;\n}\n\n/*\n * `column-gap`, pas `gap` : chaque fait occupe sa propre rangée de la grille,\n * et un `gap` de quatre millimètres les écartait tous les uns des autres —\n * trois puces séparées comme trois paragraphes.\n */\n.a4-cv.editorial .cv-item {\n  display: grid;\n  grid-template-columns: 28mm 1fr;\n  column-gap: 4mm;\n}\n\n.a4-cv.editorial .cv-marge {\n  grid-column: 1;\n  grid-row: 1;\n  color: var(--gris);\n  font-size: 9pt;\n  text-align: right;\n}\n\n.a4-cv.editorial .cv-quoi,\n.a4-cv.editorial .cv-ou,\n.a4-cv.editorial .cv-fait {\n  grid-column: 2;\n}\n\n/* — Bloc : une bande latérale porte le contact et les listes. — */\n\n/*\n * La hauteur est celle de la zone de texte de la feuille : 297 mm moins les\n * marges haute et basse. Sans elle, le filet de la bande s'arrête où le\n * contenu s'arrête, et un CV court montre un trait qui meurt au milieu de la\n * page — ce qui se lit comme un défaut de rendu, pas comme un parti pris.\n */\n.a4-cv.bloc {\n  display: grid;\n  grid-template-columns: 58mm 1fr;\n  gap: 8mm;\n  min-height: calc(297mm - 15mm - 20mm);\n}\n\n/* Justifier une colonne de cent millimètres ouvre des rivières entre les mots. */\n.a4-cv.bloc .cv-profil {\n  text-align: left;\n}\n\n.a4-cv.bloc .cv-bande {\n  padding-right: 6mm;\n  border-right: 0.3mm solid var(--trait);\n}\n\n.a4-cv.bloc .cv-bande .cv-nom {\n  font-size: 16pt;\n}\n\n.a4-cv.bloc .cv-bande .cv-titre {\n  font-size: 10pt;\n}\n\n.a4-cv.bloc .cv-ligne {\n  margin-top: 1mm;\n  font-size: 9pt;\n  line-height: 1.35;\n  overflow-wrap: anywhere;\n}\n\n.a4-cv.bloc .cv-principal .cv-section:first-child {\n  margin-top: 0;\n}\n";
 //#endregion
 //#region ../render/src/styles/vitrine.css?raw
-var vitrine_default = "/*\n * La page composée par le modèle.\n *\n * Elle vit à deux endroits : en aperçu dans l'application, et publiée sur le\n * serveur pour qui reçoit le lien. Une seule feuille, pour que les deux\n * montrent la même chose — celle que le client voit ne doit pas être la\n * surprise.\n *\n * Elle se lit d'un pouce, sur un téléphone d'entrée de gamme, souvent dans le\n * navigateur intégré de WhatsApp. Aucune animation, aucune police à charger :\n * ce qui arrive est fini quand il arrive.\n */\n\n.vitrine {\n  max-width: 560px;\n  margin: 0 auto;\n  padding: 4px 0 8px;\n}\n\n.vitrine-tete {\n  padding-bottom: 18px;\n  border-bottom: 2px solid var(--accent);\n}\n\n.vitrine-tete .kicker {\n  margin: 0 0 6px;\n  color: var(--accent);\n  font-size: 12px;\n  font-weight: 700;\n  letter-spacing: 0.14em;\n  text-transform: uppercase;\n}\n\n.vitrine-tete h1 {\n  margin: 0;\n  font-size: 27px;\n  line-height: 1.15;\n  letter-spacing: -0.02em;\n}\n\n.vitrine-tete .accroche {\n  margin: 8px 0 0;\n  color: var(--encre-2);\n  font-size: 15px;\n  line-height: 1.45;\n}\n\n.vitrine-section {\n  margin-top: 24px;\n}\n\n.vitrine-section h2 {\n  margin: 0 0 10px;\n  font-size: 12px;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  color: var(--encre-3);\n}\n\n.vitrine-section p {\n  margin: 0 0 8px;\n  font-size: 15px;\n  line-height: 1.55;\n  color: var(--encre-2);\n}\n\n.vitrine-liste,\n.vitrine-prix {\n  margin: 0;\n  padding: 0;\n  list-style: none;\n}\n\n.vitrine-liste li,\n.vitrine-prix li {\n  display: flex;\n  align-items: baseline;\n  justify-content: space-between;\n  gap: 14px;\n  padding: 9px 0;\n  border-top: 1px solid var(--trait);\n  font-size: 15px;\n}\n\n.vitrine-liste li:first-child,\n.vitrine-prix li:first-child {\n  border-top: 0;\n}\n\n.vitrine-liste .quoi,\n.vitrine-prix .quoi {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  min-width: 0;\n}\n\n.vitrine-liste .detail,\n.vitrine-prix .detail {\n  color: var(--encre-3);\n  font-size: 13px;\n}\n\n/* Le prix ne se coupe jamais : c'est le chiffre qu'on cherche du regard. */\n.vitrine-prix .combien {\n  flex: none;\n  color: var(--accent);\n  font-weight: 700;\n  white-space: nowrap;\n}\n\n.vitrine-liste .combien {\n  flex: none;\n  color: var(--encre-3);\n  white-space: nowrap;\n}\n\n.vitrine-pied {\n  margin-top: 26px;\n  padding-top: 18px;\n  border-top: 1px solid var(--trait);\n}\n\n/*\n * Le bouton qui rapporte.\n *\n * Quelqu'un qui lit la page et veut acheter ne doit pas avoir à recopier dix\n * chiffres : `wa.me` ouvre WhatsApp avec le message déjà écrit, gratuitement\n * et sans compte (§ 6).\n */\n.vitrine-appel {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  padding: 13px 16px;\n  border-radius: 12px;\n  background: var(--accent);\n  color: #fff;\n  font-weight: 700;\n  text-decoration: none;\n}\n\n.vitrine-appel span {\n  font-weight: 400;\n  font-size: 13px;\n  opacity: 0.85;\n}\n\n.vitrine-ou {\n  display: flex;\n  gap: 10px;\n  margin: 12px 0 0;\n  color: var(--encre-2);\n  font-size: 14px;\n}\n\n.vitrine-ou .etiquette {\n  /*\n   * Assez large pour « QUAND », le plus long des libellés. À 46 px il touchait\n   * le texte alors que « OÙ » gardait sa gouttière : la colonne était taillée\n   * pour le mot le plus court.\n   */\n  flex: none;\n  width: 58px;\n  color: var(--encre-3);\n  font-size: 11px;\n  font-weight: 700;\n  letter-spacing: 0.08em;\n  text-transform: uppercase;\n  line-height: 1.6;\n}\n\n/*\n * Le sommaire d'un « site ».\n *\n * Des ancres et non des adresses : sur une connexion qui hoquette, un menu qui\n * recharge est un menu qu'on n'ose plus toucher. Il défile horizontalement\n * plutôt que de passer à la ligne — six titres empilés repousseraient la\n * première section sous le pli, et on cacherait le contenu pour montrer son\n * plan.\n */\n.vitrine-sommaire {\n  display: flex;\n  gap: 8px;\n  margin-top: 14px;\n  overflow-x: auto;\n  scrollbar-width: none;\n}\n\n.vitrine-sommaire a {\n  flex: none;\n  padding: 7px 12px;\n  border: 1px solid var(--trait);\n  border-radius: 999px;\n  color: var(--encre-2);\n  font-size: 13px;\n  text-decoration: none;\n  white-space: nowrap;\n}\n\n/* Une section visée par le sommaire ne doit pas coller au bord de l'écran. */\n.vitrine-section {\n  scroll-margin-top: 12px;\n}\n";
+var vitrine_default = "/*\n * La page composée par le modèle.\n *\n * Elle vit à deux endroits : en aperçu dans l'application, et publiée sur le\n * serveur pour qui reçoit le lien. Une seule feuille, pour que les deux\n * montrent la même chose — celle que le client voit ne doit pas être la\n * surprise.\n *\n * Elle se lit d'un pouce, sur un téléphone d'entrée de gamme, souvent dans le\n * navigateur intégré de WhatsApp. Aucune animation, aucune police à charger :\n * ce qui arrive est fini quand il arrive.\n */\n\n.vitrine {\n  max-width: 560px;\n  margin: 0 auto;\n  padding: 4px 0 8px;\n}\n\n.vitrine-tete {\n  padding-bottom: 18px;\n  border-bottom: 2px solid var(--accent);\n}\n\n.vitrine-tete .kicker {\n  margin: 0 0 6px;\n  color: var(--accent);\n  font-size: 12px;\n  font-weight: 700;\n  letter-spacing: 0.14em;\n  text-transform: uppercase;\n}\n\n.vitrine-tete h1 {\n  margin: 0;\n  font-size: 27px;\n  line-height: 1.15;\n  letter-spacing: -0.02em;\n}\n\n.vitrine-tete .accroche {\n  margin: 8px 0 0;\n  color: var(--encre-2);\n  font-size: 15px;\n  line-height: 1.45;\n}\n\n.vitrine-section {\n  margin-top: 24px;\n}\n\n.vitrine-section h2 {\n  margin: 0 0 10px;\n  font-size: 12px;\n  font-weight: 700;\n  letter-spacing: 0.1em;\n  text-transform: uppercase;\n  color: var(--encre-3);\n}\n\n.vitrine-section p {\n  margin: 0 0 8px;\n  font-size: 15px;\n  line-height: 1.55;\n  color: var(--encre-2);\n}\n\n.vitrine-liste,\n.vitrine-prix {\n  margin: 0;\n  padding: 0;\n  list-style: none;\n}\n\n.vitrine-liste li,\n.vitrine-prix li {\n  display: flex;\n  align-items: baseline;\n  justify-content: space-between;\n  gap: 14px;\n  padding: 9px 0;\n  border-top: 1px solid var(--trait);\n  font-size: 15px;\n}\n\n.vitrine-liste li:first-child,\n.vitrine-prix li:first-child {\n  border-top: 0;\n}\n\n.vitrine-liste .quoi,\n.vitrine-prix .quoi {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  min-width: 0;\n}\n\n.vitrine-liste .detail,\n.vitrine-prix .detail {\n  color: var(--encre-3);\n  font-size: 13px;\n}\n\n/* Le prix ne se coupe jamais : c'est le chiffre qu'on cherche du regard. */\n.vitrine-prix .combien {\n  flex: none;\n  color: var(--accent);\n  font-weight: 700;\n  white-space: nowrap;\n}\n\n.vitrine-liste .combien {\n  flex: none;\n  color: var(--encre-3);\n  white-space: nowrap;\n}\n\n.vitrine-pied {\n  margin-top: 26px;\n  padding-top: 18px;\n  border-top: 1px solid var(--trait);\n}\n\n/*\n * Le bouton qui rapporte.\n *\n * Quelqu'un qui lit la page et veut acheter ne doit pas avoir à recopier dix\n * chiffres : `wa.me` ouvre WhatsApp avec le message déjà écrit, gratuitement\n * et sans compte (§ 6).\n */\n.vitrine-appel {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  padding: 13px 16px;\n  border-radius: 12px;\n  background: var(--accent);\n  color: #fff;\n  font-weight: 700;\n  text-decoration: none;\n}\n\n.vitrine-appel span {\n  font-weight: 400;\n  font-size: 13px;\n  opacity: 0.85;\n}\n\n.vitrine-ou {\n  display: flex;\n  gap: 10px;\n  margin: 12px 0 0;\n  color: var(--encre-2);\n  font-size: 14px;\n}\n\n.vitrine-ou .etiquette {\n  /*\n   * Assez large pour « QUAND », le plus long des libellés. À 46 px il touchait\n   * le texte alors que « OÙ » gardait sa gouttière : la colonne était taillée\n   * pour le mot le plus court.\n   */\n  flex: none;\n  width: 58px;\n  color: var(--encre-3);\n  font-size: 11px;\n  font-weight: 700;\n  letter-spacing: 0.08em;\n  text-transform: uppercase;\n  line-height: 1.6;\n}\n\n/*\n * Le sommaire d'un « site ».\n *\n * Des ancres et non des adresses : sur une connexion qui hoquette, un menu qui\n * recharge est un menu qu'on n'ose plus toucher. Il défile horizontalement\n * plutôt que de passer à la ligne — six titres empilés repousseraient la\n * première section sous le pli, et on cacherait le contenu pour montrer son\n * plan.\n */\n.vitrine-sommaire {\n  display: flex;\n  gap: 8px;\n  margin-top: 14px;\n  overflow-x: auto;\n  scrollbar-width: none;\n}\n\n.vitrine-sommaire a {\n  flex: none;\n  padding: 7px 12px;\n  border: 1px solid var(--trait);\n  border-radius: 999px;\n  color: var(--encre-2);\n  font-size: 13px;\n  text-decoration: none;\n  white-space: nowrap;\n}\n\n/* Une section visée par le sommaire ne doit pas coller au bord de l'écran. */\n.vitrine-section {\n  scroll-margin-top: 12px;\n}\n\n/*\n * Le jour d'un événement.\n *\n * Le délai est le gros caractère, pas la date : on ne lit pas une affiche pour\n * sa date, on la lit pour savoir si on a le temps. Quand le jour est passé, le\n * bloc s'éteint — une affiche qui garde son air d'urgence après coup fait\n * traverser la ville pour rien.\n */\n.vitrine-jour {\n  display: flex;\n  flex-direction: column;\n  gap: 2px;\n  margin: 14px 0 0;\n  padding: 12px 14px;\n  border-radius: 12px;\n  background: var(--accent);\n  color: #fff;\n}\n\n.vitrine-jour b {\n  font-size: 19px;\n  line-height: 1.2;\n}\n\n.vitrine-jour span {\n  font-size: 14px;\n  opacity: 0.9;\n}\n\n.vitrine-jour.passe {\n  background: var(--surface);\n  border: 1px solid var(--trait);\n  color: var(--encre-3);\n}\n";
 //#endregion
 //#region src/a4.css?raw
 var a4_default = "/*\n * Ce que seuls les écrits A4 emportent : la mise à l'échelle de la feuille et\n * le lien d'impression. Une vitrine ne se met pas dans une chemise, et une\n * carte ne s'imprime pas — leur donner ces règles serait du poids sans dessin.\n */\n/*\n * La feuille A4 occupe exactement la largeur disponible.\n *\n * Par paliers — 0,44 puis 0,66 puis 0,86 — elle ne la remplissait presque\n * jamais : sur un écran de 500 px elle restait dessinée pour 390, et son texte\n * finissait plus petit que celui du pied de page. Or c'est le document qu'on\n * vient lire. Le calcul le met à la largeur juste à chaque taille d'écran, et\n * s'arrête à 1 : un devis agrandi au-delà de sa taille réelle n'apprend rien de\n * plus et se met à baver.\n *\n * 210 mm valent 793,7 px à 96 ppp ; les 32 px sont les marges du corps. Le\n * diviseur porte son unité : diviser une longueur par un nombre rend une\n * longueur, et `min(1, 0.41px)` mélange un nombre et une longueur — déclaration\n * invalide, silencieusement ignorée. L'échelle retombait alors à 1 et le\n * document sortait à sa taille réelle, coupé par le cadre sur un téléphone.\n */\n.a4-cadre {\n  --echelle: min(1, calc((100vw - 32px) / 793.7px));\n  margin: 0 auto;\n}\n@media print {\n  body { padding: 0; background: #fff; }\n  .lecture-pied { display: none; }\n}\n\n/*\n * « Enregistrer en PDF » : un lien, pas un bouton.\n *\n * La page n'a aucun script, et c'est ce qui la rend fiable dans le navigateur\n * intégré de WhatsApp, sur un téléphone d'entrée de gamme. Un lien de\n * téléchargement n'en demande pas.\n */\n.lecture-pdf { margin: 10px 0 0; }\n.lecture-pdf a {\n  color: var(--accent);\n  font-weight: 600;\n  text-decoration: none;\n  border-bottom: 1px solid currentColor;\n}\n";
@@ -5401,6 +5516,7 @@ function Lignes$1(props) {
 }
 function PageVitrine(props) {
 	const p = props.page;
+	const jour = p.date === void 0 ? null : direLeJour(p.date, props.maintenant);
 	const sections = sectionsAncrees(p.sections);
 	const sommaire = avecSommaire(p);
 	const message = `Bonjour ${p.titre}, j’ai vu votre page.`;
@@ -5421,6 +5537,10 @@ function PageVitrine(props) {
 						children: p.accroche
 					})
 				]
+			}),
+			jour !== null && /* @__PURE__ */ u("p", {
+				class: jour.passe ? "vitrine-jour passe" : "vitrine-jour",
+				children: [/* @__PURE__ */ u("b", { children: jour.delai }), /* @__PURE__ */ u("span", { children: [jour.quand, jour.heure === "" ? "" : ` ${jour.heure}`] })]
 			}),
 			sommaire && /* @__PURE__ */ u("nav", {
 				class: "vitrine-sommaire",
@@ -6455,7 +6575,10 @@ function estFacture(skeleton) {
 }
 function documentDe(instantane, ctx) {
 	const page = pageDe(instantane);
-	if (page !== null) return /* @__PURE__ */ u(PageVitrine, { page });
+	if (page !== null) return /* @__PURE__ */ u(PageVitrine, {
+		page,
+		maintenant: ctx.maintenant
+	});
 	const Composant = Object.hasOwn(DOCUMENTS, instantane.skeleton) ? DOCUMENTS[instantane.skeleton] : void 0;
 	if (Composant === void 0) return null;
 	const etat = instantane.etat;
@@ -6665,7 +6788,10 @@ function pageDeLecture(instantane, ctx, lien, image) {
 function dessiner(instantane, ctx, lien, image) {
 	const meta = metaDe(instantane, ctx, lien, image);
 	const vitrine = pageDe(instantane);
-	if (vitrine !== null) return envelopper(meta, CSS_CADRE + CSS_VITRINE, `<main class="lecture">${K(/* @__PURE__ */ u(PageVitrine, { page: vitrine }))}</main>` + K(/* @__PURE__ */ u(PiedLecture, { instantane })));
+	if (vitrine !== null) return envelopper(meta, CSS_CADRE + CSS_VITRINE, `<main class="lecture">${K(/* @__PURE__ */ u(PageVitrine, {
+		page: vitrine,
+		maintenant: ctx.maintenant
+	}))}</main>` + K(/* @__PURE__ */ u(PiedLecture, { instantane })));
 	const document = documentDe(instantane, ctx);
 	if (document !== null) return envelopper(meta, CSS_CADRE + CSS_A4, `<main class="lecture">${K(document)}</main>` + K(/* @__PURE__ */ u(PiedLecture, {
 		instantane,

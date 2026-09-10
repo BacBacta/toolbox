@@ -88,6 +88,9 @@ describe('le poids de la page publiée', () => {
       kicker: 'QUINCAILLERIE ET MATÉRIAUX',
       accroche: 'Tôles, ciment, fers à béton et outillage de chantier, à Bépanda depuis 2012.',
       sommaire: true,
+      // Datée aussi : un événement est une page, et c'est la plus lourde des
+      // deux puisqu'elle porte un bloc de plus.
+      date: '2026-12-24T18:30',
       sections: Array.from({ length: MAX_SECTIONS }, (_, i) => ({
         titre: `Section numéro ${i + 1} au titre long`,
         sorte: 'prix' as const,

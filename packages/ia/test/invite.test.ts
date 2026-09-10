@@ -104,7 +104,21 @@ describe('l’invite dit ce qu’elle doit dire', () => {
   it('dit qu’un site est une page, parce que c’est la demande qu’on refusait', () => {
     // Le défaut d'origine, rapporté depuis un téléphone : « je veux un site
     // internet » n'avait aucune issue sinon le refus.
-    expect(batirInvite('un site')).toContain('je veux un site internet')
+    expect(batirInvite('un site').replace(/\s+/g, ' ')).toContain('« je veux un site internet »')
+  })
+
+  it('dit qu’un événement est une page datée', () => {
+    // Une annonce de mariage a un nom, un lieu, un programme et une phrase :
+    // tout ce qu'une page porte déjà. Ce qu'elle a en plus est une date.
+    expect(batirInvite('mon mariage')).toContain('Un événement est une page datée')
+  })
+
+  it('interdit d’inventer une date, comme un prix ou un numéro', () => {
+    // Un prix inventé se lit comme un engagement ; une date inventée fait
+    // déplacer des gens.
+    expect(batirInvite('mon mariage').replace(/\s+/g, ' ')).toContain(
+      'une date inventée fait déplacer des gens',
+    )
   })
 
   it('décrit la formule sans la déplier', () => {

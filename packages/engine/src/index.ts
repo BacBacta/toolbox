@@ -32,7 +32,8 @@ export { calculerLignes, montantAcompte } from './compute/tva.js'
 
 export {
   anneeDe, arreteLe, coutF, dateCourte, dateLongue, dateLongueSiValide, ESPACE_INSECABLE,
-  heureCourte, initiales, joursEntre, jourWAT, montantF, nf, normaliser,
+  heureCourte, initiales, instantWAT, jourDeLaSemaineWAT, joursEntre, jourWAT, montantF, nf,
+  normaliser,
 } from './format.js'
 
 export { lettres, montantEnLettres } from './lettres.js'
@@ -102,10 +103,11 @@ export type { Expression, Operation } from './expression.js'
 export { DESCRIPTION_FORMULE, PROFONDEUR_MAX, evaluer, verifierExpression } from './expression.js'
 export {
   ID_COMPOSE_PAGE, MAX_LIGNES_SECTION, MAX_SECTIONS, SECTIONS_POUR_SOMMAIRE,
-  avecSommaire, carteDePage, partageDePage, schemaPage, sectionsAncrees, verifierPage,
+  avecSommaire, carteDePage, direLeJour, partageDePage, schemaPage, sectionsAncrees,
+  verifierPage,
 } from './page.js'
 export type {
-  LigneSection, PageDemande, SectionAncree, SectionDemandee, SorteSection,
+  JourDit, LigneSection, PageDemande, SectionAncree, SectionDemandee, SorteSection,
 } from './page.js'
 export { ID_COMPOSE } from './registre.js'
 /*

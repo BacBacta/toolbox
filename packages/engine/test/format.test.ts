@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   anneeDe, arreteLe, coutF, dateCourte, dateLongue, ESPACE_INSECABLE, heureCourte,
-  initiales, montantF, nf, normaliser,
+  initiales, instantWAT, jourDeLaSemaineWAT, jourWAT, montantF, nf, normaliser,
 } from '../src/format.js'
 
 const E = ESPACE_INSECABLE
@@ -119,5 +119,52 @@ describe('ce qu’une génération a coûté', () => {
 
   it('refuse un nombre qui n’en est pas un', () => {
     expect(() => coutF(Number.NaN)).toThrow(RangeError)
+  })
+})
+
+describe('une date écrite à l’heure de Douala', () => {
+  /*
+   * `new Date('2026-09-12T15:00')` lit l'heure **de la machine**, et un Worker
+   * vit en UTC : un mariage annoncé à 15 h s'affichait à 16 h sur la page
+   * publiée, et à 15 h dans l'aperçu du téléphone de qui l'avait écrite.
+   */
+  it('lit une heure nue à Douala, quelle que soit la machine', () => {
+    const d = instantWAT('2026-09-12T15:00')
+    expect(d?.toISOString()).toBe('2026-09-12T14:00:00.000Z')
+    expect(heureCourte(d as Date)).toBe('15h00')
+  })
+
+  it('accepte les secondes et l’espace à la place du T', () => {
+    expect(instantWAT('2026-09-12 15:00:30')?.toISOString()).toBe('2026-09-12T14:00:30.000Z')
+  })
+
+  it('respecte un fuseau écrit : qui l’écrit sait ce qu’il fait', () => {
+    expect(instantWAT('2026-09-12T15:00:00Z')?.toISOString()).toBe('2026-09-12T15:00:00.000Z')
+    expect(instantWAT('2026-09-12T15:00:00+02:00')?.toISOString()).toBe('2026-09-12T13:00:00.000Z')
+  })
+
+  it('place une date nue au début du jour de Douala', () => {
+    expect(instantWAT('2026-09-12')?.toISOString()).toBe('2026-09-11T23:00:00.000Z')
+    expect(jourWAT(instantWAT('2026-09-12') as Date)).toBe('2026-09-12')
+  })
+
+  it('refuse un 31 février, que Date.UTC replierait sur le 3 mars', () => {
+    expect(instantWAT('2026-02-31')).toBeNull()
+    expect(instantWAT('2026-13-01')).toBeNull()
+  })
+
+  it('refuse ce qui n’est pas une date', () => {
+    expect(instantWAT('samedi prochain')).toBeNull()
+    expect(instantWAT('')).toBeNull()
+    expect(instantWAT('12/09/2026')).toBeNull()
+  })
+})
+
+describe('le jour de la semaine, à Douala', () => {
+  it('nomme le bon jour même à une heure qui bascule', () => {
+    // 23 h 30 le 9 à Douala, c'est encore mercredi — 22 h 30 UTC.
+    expect(jourDeLaSemaineWAT(new Date('2026-09-09T22:30:00.000Z'))).toBe(3)
+    // Une heure plus tard, jeudi.
+    expect(jourDeLaSemaineWAT(new Date('2026-09-09T23:30:00.000Z'))).toBe(4)
   })
 })

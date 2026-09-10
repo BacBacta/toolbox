@@ -57,7 +57,7 @@ function estFacture(skeleton: string): boolean {
 
 export function documentDe(instantane: Instantane, ctx: RenderContext): JSX.Element | null {
   const page = pageDe(instantane)
-  if (page !== null) return <PageVitrine page={page} />
+  if (page !== null) return <PageVitrine page={page} maintenant={ctx.maintenant} />
 
   const Composant = Object.hasOwn(DOCUMENTS, instantane.skeleton)
     ? DOCUMENTS[instantane.skeleton]

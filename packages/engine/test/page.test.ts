@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  MAX_LIGNES_SECTION, MAX_SECTIONS, avecSommaire, carteDePage, partageDePage, sectionsAncrees,
+  MAX_LIGNES_SECTION, MAX_SECTIONS, avecSommaire, carteDePage, direLeJour, partageDePage,
+  sectionsAncrees,
   verifierPage,
 } from '../src/page.js'
 import type { PageDemande } from '../src/page.js'
@@ -266,5 +267,129 @@ describe('ce qui part dans une discussion', () => {
     // Une vitrine ne connaît pas ses lecteurs, et c'est voulu : rien de ce
     // qu'elle publie n'identifie qui l'a ouverte.
     expect(partageDePage(BONNE, CTX).relances).toEqual([])
+  })
+})
+
+/**
+ * Un événement est une page datée, et c'est tout ce qui l'en sépare.
+ *
+ * Une annonce de mariage, une réunion de tontine, une vente de fin d'année ont
+ * un nom, un lieu, un programme et une phrase — tout ce qu'une vitrine porte
+ * déjà. Ce qu'elles ont en plus est une date, et une date que la machine
+ * comprend permet à la page de dire elle-même dans combien de jours c'est.
+ */
+describe('le jour d’un événement, dit comme on le dirait', () => {
+  const LE_9_SEPT = new Date('2026-09-09T08:00:00.000Z')
+
+  it('nomme le jour de la semaine : c’est ce qui dit si on est libre', () => {
+    const jour = direLeJour('2026-09-12', LE_9_SEPT)
+    expect(jour?.quand).toBe('Samedi 12 septembre 2026')
+  })
+
+  it.each([
+    ['2026-09-09', 'c’est aujourd’hui'],
+    ['2026-09-10', 'c’est demain'],
+    ['2026-09-12', 'dans 3 jours'],
+    ['2026-09-18', 'dans une semaine'],
+    ['2026-09-30', 'dans 3 semaines'],
+    ['2026-12-09', 'dans 3 mois'],
+    ['2026-09-08', 'c’était hier'],
+    ['2026-08-30', 'c’est passé'],
+  ])('%s se dit « %s »', (iso, attendu) => {
+    expect(direLeJour(iso, LE_9_SEPT)?.delai).toBe(attendu)
+  })
+
+  it('n’écrit l’heure que si elle a été dite', () => {
+    // Une date nue se lit comme minuit, et « à 00 h » sur une affiche de
+    // mariage est une erreur qui se voit — celle de la machine.
+    expect(direLeJour('2026-09-12', LE_9_SEPT)?.heure).toBe('')
+    expect(direLeJour('2026-09-12T15:30', LE_9_SEPT)?.heure).toBe('à 15 h 30')
+    // Ni « à 15 h 00 » : en français une heure ronde n'écrit pas ses minutes,
+    // et les deux zéros donnent à une invitation l'air d'un horaire de train.
+    expect(direLeJour('2026-09-12T15:00', LE_9_SEPT)?.heure).toBe('à 15 h')
+    // Ni « à 09 h 30 » : personne ne dit « zéro neuf heures ».
+    expect(direLeJour('2026-09-12T09:30', LE_9_SEPT)?.heure).toBe('à 9 h 30')
+  })
+
+  it('dit que c’est passé, pour que la page s’éteigne', () => {
+    // Une affiche qui garde son air d'urgence après coup fait traverser la
+    // ville pour rien.
+    expect(direLeJour('2026-08-30', LE_9_SEPT)?.passe).toBe(true)
+    expect(direLeJour('2026-09-09', LE_9_SEPT)?.passe).toBe(false)
+  })
+
+  it('rend rien plutôt qu’« Invalid Date » sous le nom de quelqu’un', () => {
+    expect(direLeJour('samedi prochain', LE_9_SEPT)).toBeNull()
+    expect(direLeJour('', LE_9_SEPT)).toBeNull()
+  })
+
+  it('compte en jours civils de Douala, et non en heures', () => {
+    /*
+     * Il est 23 h 30 à Douala le 9. Un événement du 10 est « demain », même
+     * s'il commence dans une demi-heure : c'est le jour du calendrier qui
+     * compte, comme sur une affiche.
+     *
+     * Un Worker qui vit en UTC est encore le 9 à 22 h 30 pour lui — et compte
+     * pourtant les mêmes jours civils, parce que `joursEntre` ramène les deux
+     * bouts à minuit à Douala.
+     */
+    const tard = new Date('2026-09-09T22:30:00.000Z')
+    expect(direLeJour('2026-09-10', tard)?.delai).toBe('c’est demain')
+    expect(direLeJour('2026-09-09', tard)?.delai).toBe('c’est aujourd’hui')
+  })
+
+  it('lit l’heure à Douala, et non à celle de la machine', () => {
+    /*
+     * Le défaut : `new Date('2026-09-12T15:00')` lit l'heure de la machine, et
+     * un Worker vit en UTC. Un mariage annoncé à 15 h s'affichait à 16 h sur
+     * la page publiée et à 15 h dans l'aperçu du téléphone qui l'avait écrite.
+     * Personne n'aurait su lequel des deux croire.
+     */
+    expect(direLeJour('2026-09-12T15:00', LE_9_SEPT)?.heure).toBe('à 15 h')
+  })
+
+  it('respecte un fuseau quand il est écrit : qui l’écrit sait ce qu’il fait', () => {
+    expect(direLeJour('2026-09-12T15:00:00Z', LE_9_SEPT)?.heure).toBe('à 16 h')
+  })
+
+  it('refuse un 31 février, que Date.UTC replierait sur le 3 mars', () => {
+    expect(direLeJour('2026-02-31', LE_9_SEPT)).toBeNull()
+  })
+})
+
+describe('une date que personne ne sait lire', () => {
+  it('est refusée, avec la forme attendue dans le reproche', () => {
+    // Sans ça, la page l'ignore en silence : l'affiche annonce un événement
+    // sans jour, c'est-à-dire exactement ce que le modèle croyait avoir écrit.
+    const erreurs = verifierPage({ ...BONNE, date: 'samedi prochain' })
+    expect(erreurs.map((e) => e.chemin)).toContain('$.date')
+    expect(erreurs[0]?.message).toContain('AAAA-MM-JJ')
+  })
+
+  it('laisse passer une page sans date : la plupart n’en ont pas', () => {
+    expect(verifierPage(BONNE)).toEqual([])
+  })
+})
+
+describe('la carte d’un événement', () => {
+  const CTX = { lien: 'a237.pages.dev/d/K7M2XQ4BN9PZ', maintenant: new Date('2026-09-09T08:00:00Z') }
+  const FETE: PageDemande = { ...BONNE, date: '2026-09-12T15:00', titre: 'Mariage d’Awa et Paul' }
+
+  it('met le jour en grand, avant le numéro', () => {
+    // Dans un groupe qui défile, la question n'est pas « comment les
+    // joindre » mais « c'est quand ».
+    const carte = carteDePage(FETE, CTX)
+    expect(carte.bigLabel).toBe('DANS 3 JOURS')
+    expect(carte.big).toBe('Samedi 12 septembre 2026 à 15 h')
+  })
+
+  it('garde le numéro sur la ligne du lieu', () => {
+    // Une affiche d'événement doit encore dire à qui écrire.
+    expect(carteDePage(FETE, CTX).subline).toContain('+237 6 99 41 27 08')
+  })
+
+  it('met le jour en tête de ce qui part dans une discussion', () => {
+    const lignes = partageDePage(FETE, CTX).txt.split('\n')
+    expect(lignes[2]).toBe('Samedi 12 septembre 2026 à 15 h — dans 3 jours')
   })
 })
