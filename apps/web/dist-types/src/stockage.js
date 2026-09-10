@@ -48,6 +48,18 @@ export async function majEtat(outil, etat, maintenant) {
     return suivant;
 }
 /**
+ * Note qu'un dépôt a été accepté.
+ *
+ * Le lien et la version publiée sont écrits **après** la réponse du serveur, et
+ * jamais avant : un lien inscrit d'avance serait une adresse morte, envoyée
+ * sous le nom de celui qui la partage.
+ */
+export async function noterPublication(outil, lien, version) {
+    const suivant = { ...outil, lien, versionPubliee: version };
+    await enregistrerOutil(suivant);
+    return suivant;
+}
+/**
  * Range un outil neuf.
  *
  * L'état initial est fourni par le fragment de l'outil, pas construit ici : le

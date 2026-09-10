@@ -11,9 +11,11 @@
     ".": "./src/index.ts",
     "./doc": "./src/doc/index.ts",
     "./registre": "./src/registre/index.ts",
+    "./page": "./src/page/index.ts",
     "./carte": "./src/carte/index.ts",
     "./styles/a4.css": "./src/styles/a4.css",
-    "./styles/outil.css": "./src/styles/outil.css"
+    "./styles/outil.css": "./src/styles/outil.css",
+    "./styles/vitrine.css": "./src/styles/vitrine.css"
   },
   "dependencies": {
     "@a237/engine": "workspace:*",

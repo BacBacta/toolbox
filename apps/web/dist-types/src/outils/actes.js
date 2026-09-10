@@ -63,7 +63,7 @@ export function Outil(props) {
     if (erreurs.length > 0)
         return _jsx(EtatInvalide, { erreurs: erreurs });
     const etat = props.outil.etat;
-    return (_jsx(CadreDocument, { titre: props.outil.nom, glyphe: props.glyphe, sousTitre: acte.sousTitre(etat), onglet: onglet, onOnglet: setOnglet, onDiffuser: () => props.onDiffuser(acte.squelette.share(etat, props.ctx)), children: onglet === 'Document' ? (_jsxs(_Fragment, { children: [_jsx(Manquements, { manquements: acte.manques(etat).map((m) => ({
+    return (_jsx(CadreDocument, { titre: props.outil.nom, glyphe: props.glyphe, sousTitre: acte.sousTitre(etat), onglet: onglet, onOnglet: setOnglet, onDiffuser: () => props.onDiffuser((c) => acte.squelette.share(etat, c)), children: onglet === 'Document' ? (_jsxs(_Fragment, { children: [_jsx(Manquements, { manquements: acte.manques(etat).map((m) => ({
                         champ: m.champ,
                         libelle: m.libelle,
                         gravite: (m.gravite ?? 'bloquant'),

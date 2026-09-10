@@ -111,6 +111,18 @@ const MARQUEURS_SERVEUR = [
   ['x-goog-api-key', 'entête d’authentification du modèle'],
   ['A237_CLEF_IA', 'nom de la variable qui porte la clef'],
   ['Tu configures un registre', 'invite envoyée au modèle'],
+  /*
+   * Et rien de la base des comptes non plus.
+   *
+   * `apps/web` importe `@a237/comptes` pour une seule fonction — tirer le jeton
+   * de l'appareil. Le même paquet porte les requêtes D1, la vérification de
+   * signature des rappels et le calcul des abonnements. L'arbre les secoue
+   * aujourd'hui ; le jour où un import mal placé les retient, le client
+   * embarquerait la règle économique entière, et qui l'embarque peut la lire.
+   */
+  ['INSERT OR IGNORE INTO comptes', 'requête d’ouverture de compte'],
+  ['appels_ia', 'table du journal des coûts'],
+  ['A237_PAIEMENT_SECRET', 'nom du secret qui signe les rappels'],
 ]
 
 /*
@@ -169,13 +181,14 @@ for (const requis of ['precache.json', 'sw.js']) {
  * passe par l'objet `env` reçu à chaque requête, et `process.env` ne doit pas
  * y figurer du tout.
  */
-const FONCTION = 'functions/api/ai.js'
+const FONCTION = 'functions/api/chat.js'
 try {
   const fonction = readFileSync(FONCTION, 'utf8')
   const exigences = [
     ['export { onRequest }', 'l’export nommé, sans quoi Pages ne voit aucune fonction'],
     ['env.A237_CLEF_IA', 'la lecture de la clef dans l’environnement du Worker'],
     ['generativelanguage.googleapis.com', 'l’appel au fournisseur, preuve que tout est inclus'],
+    ['text/event-stream', 'le flux, sans quoi l’agent n’écrit plus sous les yeux'],
   ]
   for (const [marqueur, quoi] of exigences) {
     if (!fonction.includes(marqueur)) {
@@ -187,6 +200,72 @@ try {
   }
 } catch {
   echecs.push(`${FONCTION} manquant : le proxy IA ne serait pas déployé`)
+}
+
+/*
+ * Les deux fonctions de publication, et surtout **leur nom**.
+ *
+ * Pages tire ses routes du nom des fichiers : `d/[lien].js` répond à
+ * `/d/n'importe quoi`. Rollup assainit les crochets d'un nom de sortie, et le
+ * fichier sortait `_lien_.js` — qui ne répond qu'à `/d/_lien_`. Toutes les
+ * pages de lecture auraient rendu 404, et la construction aurait réussi.
+ */
+// `onRequest` peut voisiner avec ce que les tests importent : on cherche le nom
+// dans la liste d'exports, pas une liste d'exports précise.
+const EXPORTE_ONREQUEST = /export \{[^}]*\bonRequest\b[^}]*\}/
+for (const [chemin, marqueur, quoi] of [
+  ['functions/api/publier.js', EXPORTE_ONREQUEST, 'l’export nommé que Pages appelle'],
+  ['functions/d/[lien].js', EXPORTE_ONREQUEST, 'l’export nommé que Pages appelle'],
+  ['functions/d/[lien].js', '<!doctype html>', 'la page de lecture, preuve que le rendu est inclus'],
+  ['functions/c/[lien].js', EXPORTE_ONREQUEST, 'l’export nommé que Pages appelle'],
+  ['functions/c/[lien].js', 'image/png', 'le service des cartes'],
+  ['functions/api/compte/[[chemin]].js', EXPORTE_ONREQUEST, 'l’export nommé que Pages appelle'],
+  ['functions/api/pay/[[chemin]].js', EXPORTE_ONREQUEST, 'l’export nommé que Pages appelle'],
+  // Sans la vérification de signature, n'importe qui s'offre un abonnement
+  // avec `curl` : c'est la seule ligne de ce fichier qui protège de l'argent.
+  ['functions/api/pay/[[chemin]].js', 'memeSignature', 'la vérification de signature du rappel'],
+  ['functions/p/[lien].js', EXPORTE_ONREQUEST, 'l’export nommé que Pages appelle'],
+  ['functions/p/[lien].js', 'application/pdf', 'le service des PDF'],
+]) {
+  try {
+    const source = readFileSync(chemin, 'utf8')
+    const present = marqueur instanceof RegExp ? marqueur.test(source) : source.includes(marqueur)
+    if (!present) echecs.push(`${chemin} n'a pas ${quoi}`)
+  } catch {
+    echecs.push(`${chemin} manquant : la publication ne serait pas déployée`)
+  }
+}
+
+/*
+ * Rien d'autre que des routes dans `functions/`.
+ *
+ * Un fragment partagé déposé par Rollup dans `functions/assets/` devient une
+ * route `/assets/…` servie par Pages, qui masquerait les vrais fichiers de
+ * l'application. Chaque fonction porte donc tout ce dont elle a besoin.
+ */
+{
+  const attendus = new Set([
+    'functions/api/chat.js', 'functions/api/publier.js',
+    'functions/api/compte/[[chemin]].js', 'functions/api/pay/[[chemin]].js',
+    'functions/api/reponses/[lien].js',
+    'functions/d/[lien].js', 'functions/c/[lien].js', 'functions/p/[lien].js',
+  ])
+  const vus = []
+  const parcourir = (dossier) => {
+    for (const e of readdirSync(dossier, { withFileTypes: true })) {
+      const chemin = `${dossier}/${e.name}`
+      if (e.isDirectory()) parcourir(chemin)
+      else vus.push(chemin)
+    }
+  }
+  try {
+    parcourir('functions')
+    for (const f of vus) {
+      if (!attendus.has(f)) echecs.push(`${f} n'est pas une route attendue de functions/`)
+    }
+  } catch {
+    echecs.push('functions/ manquant : aucune fonction ne serait déployée')
+  }
 }
 
 /*
@@ -215,6 +294,38 @@ try {
   }
 } catch {
   echecs.push('impossible de vérifier l’empreinte du service worker')
+}
+
+/**
+ * L'Établi, et son plafond à lui.
+ *
+ * C'est un environnement de développement entier — éditeur, exécution isolée,
+ * console, modèles, export. Le tenir sous trente kilo-octets n'est pas une
+ * coquetterie : c'est **l'argument du produit**. Les éditeurs qu'on installe
+ * ailleurs pèsent de deux cents kilo-octets à cinq mégaoctets pour la seule
+ * zone de saisie, et sur un forfait compté à l'octet c'est le prix du repas de
+ * midi pour ouvrir un fichier.
+ *
+ * Le jour où quelqu'un voudra la coloration syntaxique, ce chiffre-ci est ce
+ * qu'il faudra mettre en face — pas une opinion.
+ */
+const ETABLI = 'apps/etabli/dist'
+const PLAFOND_ETABLI = 30 * 1024
+
+try {
+  const page = readFileSync(join(ETABLI, 'index.html'), 'utf8')
+  const parts = [...page.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1])
+  const chemins = [join(ETABLI, 'index.html'), ...parts.map((r) => join(ETABLI, r))]
+  const poids = chemins.reduce((a, c) => a + poidsGzip(c), 0)
+
+  console.log('\nL’Établi (tout l’environnement, avant le premier affichage)')
+  for (const c of chemins) console.log(`  ${c.replace(`${ETABLI}/`, '')} — ${ko(poidsGzip(c))}`)
+  console.log(`  total : ${ko(poids)} / ${ko(PLAFOND_ETABLI)}`)
+  if (poids > PLAFOND_ETABLI) {
+    echecs.push(`Établi : ${ko(poids)} au-delà de ${ko(PLAFOND_ETABLI)}`)
+  }
+} catch {
+  echecs.push('l’Établi n’est pas construit : impossible de mesurer son poids')
 }
 
 if (echecs.length > 0) {

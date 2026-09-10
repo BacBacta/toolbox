@@ -33,7 +33,7 @@ export function Outil(props) {
     if (erreurs.length > 0)
         return _jsx(EtatInvalide, { erreurs: erreurs });
     const etat = props.outil.etat;
-    return (_jsx(CadreDocument, { titre: props.outil.nom, glyphe: props.glyphe, sousTitre: etat.identite.titre === '' ? 'Curriculum vitæ' : etat.identite.titre, onglet: onglet, onOnglet: setOnglet, onDiffuser: () => props.onDiffuser(cv.share(etat, props.ctx)), children: onglet === 'Document' ? (_jsxs(_Fragment, { children: [_jsx(Manquements, { manquements: controleCv(etat).map((m) => ({
+    return (_jsx(CadreDocument, { titre: props.outil.nom, glyphe: props.glyphe, sousTitre: etat.identite.titre === '' ? 'Curriculum vitæ' : etat.identite.titre, onglet: onglet, onOnglet: setOnglet, onDiffuser: () => props.onDiffuser((c) => cv.share(etat, c)), children: onglet === 'Document' ? (_jsxs(_Fragment, { children: [_jsx(Manquements, { manquements: controleCv(etat).map((m) => ({
                         champ: m.champ,
                         libelle: m.libelle,
                         gravite: 'bloquant',

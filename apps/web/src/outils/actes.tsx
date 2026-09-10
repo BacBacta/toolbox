@@ -100,8 +100,8 @@ export function Outil(props: ProprietesOutil): JSX.Element {
       onglet={onglet}
       onOnglet={setOnglet}
       onDiffuser={() =>
-        props.onDiffuser(
-          (acte.squelette.share as (e: never, c: RenderContext) => ShareSpec)(etat, props.ctx),
+        props.onDiffuser((c) =>
+          (acte.squelette.share as (e: never, c: RenderContext) => ShareSpec)(etat, c),
         )
       }
     >

@@ -2,7 +2,7 @@
 import 'fake-indexeddb/auto'
 import { render as monter } from 'preact'
 import { act } from 'preact/test-utils'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../src/app.js'
 import { CHARGEURS } from '../src/outils.js'
 import { listerOutils, supprimerOutil } from '../src/stockage.js'
@@ -29,6 +29,10 @@ beforeEach(async () => {
   // les tests reste la même — clic, création, enregistrement, ouverture — seul
   // le premier chargement du fragment est déplacé hors du chemin mesuré.
   await Promise.all(Object.values(CHARGEURS).map((chargeur) => chargeur()))
+  // L'écran du compte se charge de la même façon, et se préchauffe pour la
+  // même raison. Celui de l'agent aussi.
+  await import('../src/ecran-compte.js')
+  await import('../src/ecran-agent.js')
 
   for (const o of await listerOutils()) await supprimerOutil(o.id)
   hote = document.createElement('div')
@@ -110,17 +114,136 @@ describe('l’atelier comprend la demande, sans appeler personne', () => {
     expect(hote.textContent).toContain('Lequel veux-tu ?')
   })
 
-  it('le dit quand c’est hors de sa portée, et propose de composer', () => {
+  it('le dit quand c’est hors de sa portée, et propose d’en parler', () => {
     demander('il me faut un contrat de bail')
     expect(hote.textContent).toContain('Aucun de mes outils ne correspond')
-    // La composition part sur un geste, jamais en tapant : chaque appel coûte.
-    expect(hote.textContent).toContain('Compose-le pour moi')
+    // La conversation part sur un geste, jamais en tapant : chaque tour coûte.
+    expect(hote.textContent).toContain('En parler à l’atelier')
+  })
+
+  /*
+   * L'agent n'était atteignable que quand rien ne correspondait.
+   *
+   * « Un menu pour mon restaurant » tombe sur « liste de prix » — un bon
+   * rapprochement, et un outil gratuit et immédiat, qui reste donc en tête.
+   * Mais quelqu'un qui voulait une vraie page de menu, avec ses rubriques,
+   * n'avait aucun moyen de le dire : il n'y avait qu'un bouton, et il menait
+   * ailleurs. La porte de l'atelier reste ouverte partout.
+   */
+  it('laisse parler à l’atelier même quand un outil correspond', () => {
+    demander('noter la tontine du quartier')
+    expect(hote.textContent).toContain('Ouvrir carnet de njangi')
+    expect(hote.textContent).toContain('En parler à l’atelier')
+  })
+
+  it('et même quand deux outils se disputent la demande', () => {
+    demander('je veux un devis puis une facture')
+    expect(hote.textContent).toContain('Lequel veux-tu ?')
+    expect(hote.textContent).toContain('En parler à l’atelier')
+  })
+
+  it('mais l’outil qui correspond garde la première place : il est gratuit', () => {
+    demander('noter la tontine du quartier')
+    const principale = hote.querySelector('.atelier-option.principale')
+    expect(principale?.textContent).toContain('Ouvrir carnet de njangi')
+  })
+
+  /*
+   * Le bouton dit ce qu'il coûte, et là il coûte.
+   *
+   * `etageDe` rend l'étage 1 — « gratuit, et ça marche hors ligne » — dès qu'un
+   * squelette se détache, et c'est vrai du squelette. Ce n'est pas vrai de la
+   * conversation posée juste en dessous : elle appelle le modèle et prend un
+   * crédit. Annoncer « gratuit » sur un bouton qui débite est le genre de
+   * détail qui fait désinstaller une application au Cameroun.
+   */
+  it('et la conversation annonce son prix, même quand un outil gratuit correspond', () => {
+    demander('noter la tontine du quartier')
+    const parler = [...hote.querySelectorAll('.atelier-option')].find((b) =>
+      b.textContent?.includes('En parler à l’atelier'),
+    )
+    expect(parler?.textContent).not.toContain('gratuit')
+    expect(parler?.textContent).toContain('centimes')
   })
 
   it('garde la grille complète sous la main', () => {
     // La demande ne cache pas les autres outils : on peut toujours parcourir.
     demander('devis')
     expect(hote.textContent).toContain('Carnet de njangi')
+  })
+})
+
+describe('l’atelier passe la main à l’agent', () => {
+  const vraiFetch = globalThis.fetch
+
+  afterEach(() => {
+    globalThis.fetch = vraiFetch
+  })
+
+  const REGISTRE = {
+    titre: 'Suivi des livraisons',
+    kicker: 'SUIVI DES LIVRAISONS',
+    titreNom: 'Nom du dépôt',
+    colonnes: [{ clef: 'client', titre: 'Client', type: 'texte' }],
+    libelleVide: 'Aucune livraison.',
+    libelleAjout: 'Ajouter',
+    relancesVides: 'Un suivi ne se relance pas.',
+  }
+
+  function agentRepond(): void {
+    const corps =
+      'data: {"sorte":"fin","tour":{"sorte":"outil","mot":"Voilà ton suivi.",' +
+      `"outil":{"sorte":"registre","registre":${JSON.stringify(REGISTRE)}}},` +
+      '"fcfa":0.31,"conversation":"c.1.9e15.s","plan":"essai","credits":4}\n\n'
+    const octets = new TextEncoder().encode(corps)
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: new ReadableStream({
+        start(f) {
+          f.enqueue(octets)
+          f.close()
+        },
+      }),
+      json: () => Promise.resolve({}),
+    }) as unknown as typeof fetch
+  }
+
+  it('ouvre la conversation avec la phrase déjà tapée', async () => {
+    agentRepond()
+    demander('il me faut un contrat de bail')
+    cliquerTexte('En parler à l’atelier')
+    await reposer(12)
+    expect(hote.textContent).toContain('il me faut un contrat de bail')
+    expect(hote.querySelector('.agent-fenetre')).not.toBeNull()
+  })
+
+  it('crée l’outil composé, et dit ce qu’il a coûté', async () => {
+    agentRepond()
+    demander('il me faut un contrat de bail')
+    cliquerTexte('En parler à l’atelier')
+    await reposer(16)
+
+    cliquerTexte('Ouvrir cet outil')
+    await reposer(16)
+
+    const [range] = await listerOutils()
+    expect(range?.skeleton).toBe('compose')
+    expect(range?.registre).toMatchObject({ titre: 'Suivi des livraisons' })
+    // « 0 F » sous une dépense de trente et un centimes est le début d'une
+    // facture qu'on découvre à la fin du mois.
+    expect(hote.textContent).toContain('0,31')
+  })
+
+  it('revient à l’accueil sans rien créer quand on referme', async () => {
+    agentRepond()
+    demander('il me faut un contrat de bail')
+    cliquerTexte('En parler à l’atelier')
+    await reposer(12)
+    cliquerTexte('Mes outils')
+    await reposer()
+    expect(await listerOutils()).toHaveLength(0)
+    expect(hote.textContent).toContain('Tous les outils')
   })
 })
 
@@ -182,5 +305,148 @@ describe('créer et rouvrir un outil', () => {
     const [range] = await listerOutils()
     expect(range?.version).toBe(1)
     expect((range?.etat as { membres: { nom: string }[] }).membres[0]?.nom).toBe('Adèle')
+  })
+})
+
+describe('diffuser, c’est d’abord publier', () => {
+  const vraiFetch = globalThis.fetch
+
+  afterEach(() => {
+    globalThis.fetch = vraiFetch
+  })
+
+  function serveur(statut: number, corps: unknown = {}): ReturnType<typeof vi.fn> {
+    const appel = vi.fn().mockResolvedValue({
+      ok: statut >= 200 && statut < 300,
+      status: statut,
+      json: () => Promise.resolve(corps),
+    })
+    globalThis.fetch = appel as unknown as typeof fetch
+    return appel
+  }
+
+  async function ouvrirEtDiffuser(outil: string): Promise<void> {
+    cliquerTexte(outil)
+    await reposer()
+    cliquer('.outil-action.principale')
+    await reposer()
+  }
+
+  it('dépose l’outil, puis met l’adresse sur la carte', async () => {
+    // L'ordre n'est pas indifférent : la carte porte le lien, donc il faut que
+    // le lien existe avant de la dessiner.
+    const appel = serveur(200)
+    await ouvrirEtDiffuser('Carnet de njangi')
+
+    expect(appel).toHaveBeenCalledOnce()
+    expect(appel.mock.calls[0]?.[0]).toBe('/api/publier')
+    const [outil] = await listerOutils()
+    expect(outil?.lien).toMatch(/^[23456789ABCDEFGHJKLMNPQRSTVWXYZ]{12}$/)
+    expect(outil?.versionPubliee).toBe(outil?.version)
+    // Le résumé partagé porte l'adresse.
+    expect(hote.querySelector('.resume')?.textContent).toContain(`/d/${outil?.lien}`)
+  })
+
+  it('ne redépose pas un outil qui n’a pas bougé', async () => {
+    const appel = serveur(200)
+    await ouvrirEtDiffuser('Carnet de njangi')
+    cliquer('.feuille-fermer')
+    await reposer()
+    cliquer('.outil-action.principale')
+    await reposer()
+
+    expect(appel).toHaveBeenCalledOnce()
+    expect(hote.querySelector('.resume')?.textContent).toContain('/d/')
+  })
+
+  it('partage sans adresse quand le réseau manque, et le dit', async () => {
+    // Un lien inscrit d'avance serait une adresse morte, envoyée sous le nom
+    // de celui qui la partage.
+    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError('hors ligne')) as unknown as typeof fetch
+    await ouvrirEtDiffuser('Carnet de njangi')
+
+    expect(hote.textContent).toContain('la publication attend son tour')
+    const [outil] = await listerOutils()
+    expect(outil?.lien).toBeUndefined()
+    expect(hote.querySelector('.resume')?.textContent).not.toContain('/d/')
+  })
+
+  it('dit pourquoi une ardoise ne se publie pas, sans appeler personne', async () => {
+    const appel = serveur(200)
+    await ouvrirEtDiffuser('Ardoise clients')
+
+    expect(appel).not.toHaveBeenCalled()
+    expect(hote.textContent).toContain('noms et des dettes')
+    // Elle se partage quand même : ce qu'on lui retire, c'est l'adresse.
+    expect(hote.querySelector('.carte-apercu')).not.toBeNull()
+  })
+
+  it('annonce le conflit de version avec le numéro du serveur', async () => {
+    serveur(409, { erreur: 'version-perimee', versionServeur: 7 })
+    await ouvrirEtDiffuser('Carnet de njangi')
+
+    expect(hote.textContent).toContain('version 7')
+    expect((await listerOutils())[0]?.lien).toBeUndefined()
+  })
+})
+
+describe('la ligne du compte', () => {
+  /*
+   * Elle est en bas, discrète, et n'apparaît qu'une fois qu'on a composé
+   * quelque chose. Avant, il n'y a rien à savoir — et une invitation à
+   * s'occuper de son abonnement serait la première chose que verrait
+   * quelqu'un venu faire un devis. L'atelier marche sans compte (§ 2).
+   */
+  /*
+   * On repose l'application après avoir écrit l'état.
+   *
+   * Le dernier état connu se lit une fois, au montage : le monter d'abord et
+   * l'écrire ensuite ferait lire une base vide, et l'essai ne dirait rien de
+   * ce qu'il croit vérifier.
+   */
+  async function poserEtat(etat: unknown): Promise<void> {
+    const { retenirEtat } = await import('../src/compte.js')
+    await retenirEtat(etat as never)
+    monter(null, hote)
+    act(() => monter(<App />, hote))
+    await reposer()
+  }
+
+  it('ne s’affiche pas tant qu’on n’a rien composé', async () => {
+    const { clear, createStore } = await import('idb-keyval')
+    await clear(createStore('atelier237-compte', 'compte'))
+    monter(null, hote)
+    act(() => monter(<App />, hote))
+    await reposer()
+    expect(hote.querySelector('.compte-ligne')).toBeNull()
+  })
+
+  it('dit ce qu’il reste en essai', async () => {
+    await poserEtat({ plan: 'essai', credits: 3, expire: null, aUnCode: false })
+    expect(hote.querySelector('.compte-ligne')?.textContent).toBe('Essai · 3 compositions')
+  })
+
+  it('et le dit au singulier quand il n’en reste qu’une', async () => {
+    await poserEtat({ plan: 'essai', credits: 1, expire: null, aUnCode: false })
+    expect(hote.querySelector('.compte-ligne')?.textContent).toBe('Essai · 1 composition')
+  })
+
+  it('à zéro, elle ne compte pas : elle le dit', async () => {
+    // « Essai · 0 composition » se lit mal. Ce qui compte est qu'il n'y en a
+    // plus, pas le nombre zéro.
+    await poserEtat({ plan: 'essai', credits: 0, expire: null, aUnCode: false })
+    expect(hote.querySelector('.compte-ligne')?.textContent).toBe('Essai · plus de composition')
+  })
+
+  it('et distingue un abonné', async () => {
+    await poserEtat({ plan: 'atelier', credits: 40, expire: Date.now() + 86_400_000, aUnCode: true })
+    expect(hote.querySelector('.compte-ligne')?.textContent).toBe('Atelier · 40 compositions')
+  })
+
+  it('elle ouvre l’écran du compte, qui n’est pas dans la coquille initiale', async () => {
+    await poserEtat({ plan: 'essai', credits: 3, expire: null, aUnCode: false })
+    cliquer('.compte-ligne')
+    await reposer()
+    expect(hote.textContent).toContain('Mon atelier')
   })
 })

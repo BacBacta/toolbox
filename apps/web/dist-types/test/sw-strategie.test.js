@@ -15,6 +15,20 @@ describe('strategiePour', () => {
         expect(strategiePour(requete({ mode: 'navigate', destination: 'document' }), ORIGINE))
             .toBe('coquille');
     });
+    it('laisse passer une page publiée : elle n’appartient pas à l’application', () => {
+        // `/d/…` est une page rendue par le serveur. Servir la coquille à sa place
+        // ferait voir l'accueil de l'application à qui ouvre le lien d'un devis —
+        // et seulement aux gens qui ont installé l'application, ce qui rend le
+        // défaut invisible pour celui qui l'a envoyé.
+        expect(strategiePour(requete({ mode: 'navigate', destination: 'document', url: `${ORIGINE}/d/K7M2XQ4BN9PZ` }), ORIGINE)).toBe('reseau');
+    });
+    it('laisse passer l’API, navigation ou non', () => {
+        expect(strategiePour(requete({ mode: 'navigate', destination: 'document', url: `${ORIGINE}/api/chat` }), ORIGINE)).toBe('reseau');
+    });
+    it('ne confond pas un chemin de l’application avec un chemin du serveur', () => {
+        // `/depart` commence par `/d` sans être `/d/`.
+        expect(strategiePour(requete({ mode: 'navigate', destination: 'document', url: `${ORIGINE}/depart` }), ORIGINE)).toBe('coquille');
+    });
     it('met en cache les fichiers de l’application', () => {
         for (const destination of ['script', 'style', 'font', 'image', 'manifest', '']) {
             expect(strategiePour(requete({ destination }), ORIGINE)).toBe('cache-puis-reseau');

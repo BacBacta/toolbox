@@ -178,3 +178,103 @@ describe('le modèle a le droit de dire non', () => {
     expect(lireReponseModele('<div>bonjour</div>').sorte).toBe('invalide')
   })
 })
+
+describe('un refus trop long se raccourcit au lieu de se perdre', () => {
+  /*
+   * Mesuré en production, sur dix générations réelles : « combien je gagne par
+   * jour au moulin » a reçu un refus de cent quatre-vingt-onze caractères. Le
+   * plafond en admet cent soixante, le refus a donc été jugé invalide, le
+   * modèle repris — donc payé deux fois — puis abandonné. La personne a dépensé
+   * un crédit pour lire « le modèle n'a pas produit un registre utilisable ».
+   *
+   * Le plafond est là pour que le modèle ne s'étale pas, pas pour jeter une
+   * réponse juste. On coupe, et on coupe à un mot.
+   */
+  const LONG =
+    'Je ne peux pas créer ce registre parce que ta demande ressemble davantage à un calcul ' +
+    'qu’à une liste de lignes, et je ne voudrais pas te fabriquer un carnet que tu n’utiliserais jamais.'
+
+  it('le refus arrive quand même', () => {
+    const lu = lireReponseModele({ impossible: LONG })
+    expect(lu.sorte).toBe('refus')
+  })
+
+  it('coupé au plafond, et à un mot', () => {
+    const lu = lireReponseModele({ impossible: LONG })
+    if (lu.sorte !== 'refus') throw new Error('impossible')
+    expect(lu.pourquoi.length).toBeLessThanOrEqual(160)
+    expect(lu.pourquoi).toMatch(/…$/)
+    /*
+     * Pas au milieu d'un mot : ce qui reste, suivi d'une espace, doit se
+     * retrouver tel quel dans l'original. « …ce regis… » échouerait ici.
+     */
+    const garde = lu.pourquoi.slice(0, -1)
+    expect(LONG.startsWith(`${garde} `)).toBe(true)
+  })
+
+  it('mais un refus vide reste un refus raté', () => {
+    // Le plafond haut se rattrape ; le plancher dit qu'il n'y a pas de phrase.
+    expect(lireReponseModele({ impossible: '' }).sorte).toBe('invalide')
+    expect(lireReponseModele({ impossible: 'no' }).sorte).toBe('invalide')
+  })
+
+  it('et un refus de la bonne longueur ne bouge pas', () => {
+    const court = 'Je ne peux pas créer un site internet.'
+    const lu = lireReponseModele({ impossible: court })
+    if (lu.sorte !== 'refus') throw new Error('impossible')
+    expect(lu.pourquoi).toBe(court)
+  })
+})
+
+describe('le modèle qui renvoie le schéma au lieu d’un objet', () => {
+  /*
+   * Mesuré en production, et c'est le défaut le plus cher des dix : une demande
+   * sur dix recevait `{"type":"object","required":[…],"properties":{…}}` —
+   * notre propre schéma, renvoyé tel quel. Long, coupé en route, donc illisible,
+   * donc repris, donc payé deux fois, puis abandonné avec « la réponse n'est
+   * pas du JSON » — un message qui ne disait rien de ce qui s'était passé.
+   *
+   * L'invite le demandait presque : « réponds par le schéma de refus ». Elle
+   * est corrigée. Mais une invite se réécrit et un modèle change : on reconnaît
+   * aussi la confusion, pour que la reprise dise quoi corriger au lieu de
+   * relancer au hasard.
+   */
+  const SCHEMA_RENVOYE = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['titre', 'kicker', 'colonnes'],
+    properties: { titre: { type: 'string', minLength: 2 } },
+  }
+
+  it('se reconnaît, au lieu de passer pour du JSON abîmé', () => {
+    const lu = lireReponseModele(SCHEMA_RENVOYE)
+    expect(lu.sorte).toBe('invalide')
+    if (lu.sorte !== 'invalide') throw new Error('impossible')
+    expect(lu.erreurs[0]?.message).toContain('le schéma')
+  })
+
+  it('et le reproche dit quoi faire', () => {
+    const lu = lireReponseModele(SCHEMA_RENVOYE)
+    if (lu.sorte !== 'invalide') throw new Error('impossible')
+    // Une reprise coûte un tour : elle doit porter.
+    expect(lu.erreurs[0]?.message).toMatch(/respecte|instance|exemple/i)
+  })
+
+  it('mais un registre qui parle de types ne se confond pas avec lui', () => {
+    // « type » est un nom de colonne parfaitement légitime — un registre de
+    // motos a un type de moto. Ce n'est pas la même chose qu'un schéma.
+    const registre = {
+      titre: 'Motos',
+      kicker: 'MOTOS',
+      titreNom: 'Plaque',
+      colonnes: [
+        { clef: 'plaque', titre: 'Plaque', type: 'texte' },
+        { clef: 'modele', titre: 'Type de moto', type: 'texte' },
+      ],
+      libelleVide: 'Aucune moto.',
+      libelleAjout: 'Ajouter une moto',
+      relancesVides: 'Ce registre ne se relance pas.',
+    }
+    expect(lireReponseModele(registre).sorte).toBe('registre')
+  })
+})

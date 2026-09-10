@@ -1,16 +1,39 @@
 # Déploiement
 
-## Ce qui se déploie, et ce qui ne se déploie pas encore
+## Ce qui se déploie
 
-Ce qui part sur l'hébergeur, c'est **la PWA** : des fichiers statiques, un
-service worker, rien d'autre. Pas de serveur, pas de base, pas de secret.
-L'état vit sur le téléphone.
+La PWA — fichiers statiques et service worker — et les fonctions de
+`functions/`, dans le même déploiement. L'état des outils vit sur le téléphone
+(§ 2.7) ; ce qui vit sur le serveur est ce qui doit être public ou partagé :
+l'instantané publié dans KV, la carte dans R2, les comptes et les réponses dans
+D1, la clef du modèle dans l'environnement.
 
-La publication — lien court, `og:image`, page de lecture sans script, carte dans
-R2, instantané dans KV — **n'existe pas encore**. C'est la phase 2. Tant qu'elle
-n'existe pas, le bouton « Diffuser » produit la carte et le résumé, et
-**n'écrit aucun lien** : ni sur l'image, ni dans les relances. Une adresse
-inventée serait un lien mort envoyé par le trésorier à ses membres, sous son nom.
+Les routes serveur, et ce qu'elles font :
+
+| Route | Ce qu'elle fait |
+|---|---|
+| `POST /api/publier` | dépose un instantané. Note le propriétaire s'il s'agit d'un formulaire |
+| `GET /d/:lien` | la page de lecture : un écrit A4, la carte d'un registre, une vitrine, ou un formulaire |
+| `POST /d/:lien` | **la seule écriture venue de l'extérieur** : une réponse à un formulaire |
+| `GET /api/reponses/:lien` | ce qu'un formulaire a reçu, pour qui l'a publié — et pour personne d'autre |
+| `PUT /c/:lien.png` · `GET /c/:lien.png` | la carte partagée, dans R2 |
+| `GET /p/:lien` | le PDF d'un écrit A4, rendu par Browser Run |
+| `POST /api/ai` | le proxy du modèle. La clef ne franchit jamais la frontière (§ 2.8) |
+| `/api/compte/*` · `/api/pay/*` | le compte, le quota, le rappel de paiement |
+
+### Les migrations D1, à jouer avant le déploiement qui en dépend
+
+Elles ne partent pas avec le code : `wrangler` ne les joue pas tout seul, et une
+route qui écrit dans une table absente échoue en production sans prévenir.
+Elles sont toutes en `CREATE TABLE IF NOT EXISTS`, donc rejouables.
+
+```bash
+npx wrangler d1 execute COMPTES --remote --file=packages/comptes/migrations/0001-comptes.sql
+npx wrangler d1 execute COMPTES --remote --file=packages/comptes/migrations/0002-reponses.sql
+```
+
+Sans `--remote`, elles s'appliquent à la base locale de `wrangler pages dev` —
+ce qu'il faut faire aussi, avant de lancer les vérifications de bout en bout.
 
 ## Cloudflare Pages — en ligne
 
@@ -96,12 +119,10 @@ C'est arrivé : `--production-branch main` à la création n'a pas tenu, la
 répondait « Deployment complete », le domaine servait bien l'application — mais
 c'était un déploiement plus ancien.
 
-La `production_branch` a été remise à `main`, et la mise en ligne se fait donc
-avec `--branch main`. **Attention** : `main` n'existe pas encore dans le dépôt
-— tout le travail vit sur une branche de session. Ça ne gêne pas l'envoi
-direct, où la branche n'est qu'une étiquette que `wrangler` transmet. Ça
-gênerait le jour où le dépôt serait relié à Pages pour un déploiement
-automatique : il faudra alors que `main` existe vraiment.
+La `production_branch` a été remise à `main`, `main` existe dans le dépôt, et
+la mise en ligne se fait avec `--branch main`. Les trois doivent rester
+d'accord : c'est leur désaccord qui envoie un déploiement en préversion sans
+le dire.
 
 À vérifier d'un coup d'œil quand quelque chose ne prend pas :
 
@@ -155,12 +176,131 @@ La vérification de bout en bout (`e2e/`) sert l'application avec **ces en-tête
 exactement** — elle les lit dans `_headers` — dans un vrai Chromium, et la
 chaîne complète passe, mode avion compris.
 
+## Les comptes, les crédits et le paiement
+
+| | |
+|---|---|
+| `GET /api/compte` | plan, crédits, échéance |
+| `POST /api/compte/code` | un code de récupération, montré **une fois** |
+| `POST /api/compte/reprendre` | rattache cet appareil au compte d'un code |
+| `POST /api/pay/demarrer` | ouvre un paiement, rend un identifiant de suivi |
+| `GET /api/pay/:id` | où il en est |
+| `POST /api/pay/rappel` | le fournisseur, **signature vérifiée** |
+| D1 | liaison `COMPTES`, base `atelier237-comptes` |
+
+Le schéma vit dans `packages/comptes/migrations/`. Il s'applique à la main —
+`wrangler d1 execute COMPTES --remote --file=…` — parce qu'une migration
+automatique au déploiement voudrait dire qu'un déploiement raté peut casser la
+base des comptes.
+
+**Personne ne s'inscrit.** L'appareil tire un jeton de cent vingt-huit bits au
+premier lancement et le garde ; le serveur ne le voit qu'au premier appel qui
+coûte quelque chose, et lui ouvre un compte à ce moment-là. Il ne range jamais
+le jeton, seulement son empreinte : une copie de la base ne distribue pas
+d'identités. Le numéro de téléphone n'apparaît qu'au premier paiement.
+
+**Deux plans.** Un essai de cinq compositions, puis **deux mille francs**
+— le prix du § 1 — pour trente jours et quarante compositions. Un abonnement échu ne fait rien perdre : les
+outils vivent sur le téléphone et les publications restent en ligne, seule
+s'arrête la composition. Payer en avance prolonge au lieu de remplacer.
+
+**Le crédit se réserve avant l'appel**, avec la condition dans la requête SQL
+et non autour d'elle : deux requêtes simultanées d'un compte à qui il en reste
+un passeraient toutes deux un contrôle fait en JavaScript. Un appel qui
+n'atteint jamais le modèle rend son crédit.
+
+**Le code de récupération fait seize lettres** dans l'alphabet des liens, se
+dit au téléphone et n'est montré qu'une fois. Le brief demandait argon2 ; cette
+exigence répond à un mot de passe choisi par quelqu'un, quelques dizaines de
+bits qu'un dérivateur lent rend coûteux à essayer. Un code tiré par la machine
+sur quatre-vingts bits n'a pas ce défaut, et un SHA-256 n'ajoute aucune
+dépendance au plafond du § 8.
+
+### Le fournisseur de paiement
+
+`A237_PAIEMENT_SECRET` signe les rappels, et **sans lui `/api/pay` ne s'ouvre
+pas** : on ne saurait pas distinguer le fournisseur de n'importe qui. Il se
+pose comme la clef du modèle, avec `wrangler pages secret put`, et n'entre
+jamais dans le dépôt.
+
+**Un secret posé ne rejoint pas le déploiement en cours.** Pages attache ses
+variables au projet et les applique **à la construction** : après un
+`secret put`, il faut redéployer, sinon les fonctions continuent de tourner
+avec l'environnement d'avant. Le symptôme est trompeur — `/api/pay` répond 503
+« le paiement n'est pas encore ouvert » exactement comme si le secret manquait.
+C'est le même piège que celui de la branche de production, et il se
+diagnostique de la même façon : par le comportement du déploiement, pas par
+l'état de la configuration.
+
+Le seul fournisseur d'aujourd'hui n'encaisse rien. Ouvrir un compte marchand
+CamPay ou Fapshi demande des pièces et du délai (§ 7, phase 0), et rien de ce
+qui s'écrit autour du paiement n'avait besoin d'attendre ça. Il **signe
+vraiment** ses rappels, en HMAC-SHA256 du corps exact : un faux qui répondrait
+« oui » à tout n'éprouverait pas la seule chose qui compte ici.
+
+Ce qu'il reste à faire le jour où un vrai fournisseur arrive : écrire un
+`Fournisseur` de plus — `demarrer` et `lireRappel` —, poser son secret, et le
+choisir dans `fournisseurChoisi`. Rien d'autre ne bouge : le rejeu, le montant
+partiel, la transaction et l'idempotence sont déjà éprouvés.
+
+### Deux verrous contre le rejeu
+
+`UNIQUE(fournisseur, reference)` dans la base, et un paiement qui n'est plus en
+attente ne se retranche pas. Il en faut deux : les fournisseurs réessaient
+quand ils n'ont pas vu notre 200, et sans le second, trois rappels identiques
+donneraient quatre-vingt-dix jours. Le montant se revérifie même signé — un
+fournisseur peut accepter un versement partiel.
+
+Un rappel qu'on ne reconnaît pas reçoit **200 et non 404** : un fournisseur qui
+reçoit une erreur réessaie en boucle.
+
+## Le PDF
+
+| | |
+|---|---|
+| `GET /p/:lien` | le document, en PDF |
+| Browser Run | liaison `NAVIGATEUR` |
+
+Le brief prévoyait un service Playwright sur un petit VPS (§ 7, phase 5).
+Cloudflare rend le même service par une liaison — `quickAction('pdf', …)` —
+sans second hébergeur à tenir, à mettre à jour et à surveiller, et **sans aucun
+paquet** : ni `puppeteer`, ni jeton d'API. Le support sur Pages n'est pas
+documenté ; il a été éprouvé en production plutôt que supposé.
+
+Le rendu se fait **une fois, sur le serveur**, et c'est tout l'intérêt : le
+fichier porte ses glyphes, et la machine qui l'ouvre n'a plus rien à décider.
+Un `window.print()` sur le téléphone du client donnerait autant de PDF
+différents que de navigateurs. Mesuré sur les sept écrits A4 : une page,
+210 × 297 mm, trois polices embarquées.
+
+La police est **nommée** et non devinée. À l'écran, `system-ui` est le bon
+choix — c'est la police que le téléphone a déjà. Sur le serveur, `system-ui`
+est ce que l'image du jour contient, et le jour où elle change, tous les devis
+changeraient d'allure sans que personne ait rien demandé.
+
+### Le débit, qui décide du plan
+
+Le plan gratuit admet **une impression toutes les dix secondes pour tout le
+compte**, et dix minutes de navigateur par jour — deux à trois cents feuilles.
+C'est assez pour commencer, et ce n'est pas assez pour deux clients qui
+impriment en même temps : le second reçoit « L'impression est occupée ».
+
+Le plan payant (5 $/mois) monte à trente par seconde et dix heures par mois
+incluses, puis 0,09 $ l'heure — environ **0,05 F CFA la feuille**.
+
+`quickAction` **avale le 429** : il rend une poignée d'octets qui ne sont pas
+un PDF, sans lever d'exception. C'est la vérification de la signature `%PDF-`,
+et elle seule, qui distingue une limitation d'un fichier valable. Sans elle, le
+Worker renvoyait ces octets étiquetés `application/pdf`.
+
 ## Ce qui reste à vérifier à la main
 
 Le navigateur de l'environnement de développement ne peut pas atteindre
-l'internet public : le proxy de session coupe toutes ses connexions, pour
-n'importe quel hôte. La production a donc été vérifiée par ses en-têtes et par
-le contenu de son paquet, pas en la pilotant depuis un navigateur d'ici.
+l'internet public : le proxy de session coupe ses connexions, pour n'importe
+quel hôte. Les scénarios de `e2e/` tournent donc contre un serveur local — le
+vrai Worker et son KV, mais servi ici. La production, elle, se vérifie par
+requêtes : ses en-têtes, le contenu de son paquet, et la chaîne de publication
+jouée de bout en bout par `fetch` — dépôt, lecture, refus.
 
 Ce qui reste, et qui compte plus que tout le reste :
 
@@ -170,8 +310,148 @@ Ce qui reste, et qui compte plus que tout le reste :
 2. **Vérifier que `navigator.share({files})` ouvre bien WhatsApp** — la
    section 6 du brief insiste : sur les téléphones que les utilisateurs ont
    vraiment, pas seulement sur le tien.
-3. Se rappeler que **la publication n'existe pas encore** : la carte se partage,
-   mais le lien viendra avec la phase 2.
+3. **Recevoir un lien dans WhatsApp et l'ouvrir**, dans le navigateur intégré
+   de WhatsApp et non dans Chrome : c'est là que la page publiée sera lue, et
+   c'est le seul endroit qui dira si l'aperçu s'affiche vraiment.
+4. **Faire imprimer un devis chez un imprimeur de quartier.** C'est la seconde
+   moitié du critère de la phase 5, et elle ne se vérifie pas d'ici : le PDF
+   est identique partout — une page, A4, polices embarquées, tout se mesure —
+   mais qu'il sorte sans surprise d'une machine de Douala demande du papier.
+
+## La publication
+
+| | |
+|---|---|
+| `POST /api/publier` | dépose `{ lien, instantane }` dans KV |
+| `GET /d/:lien` | rend la page de lecture, sans un script |
+| `PUT /c/:lien.png` | dépose la carte, dessinée sur le téléphone |
+| `GET /c/:lien.png` | la sert, immuable pour un an |
+| KV | liaison `INSTANTANES` |
+| R2 | liaison `CARTES`, seau `atelier237-cartes` |
+
+Le lien fait **douze caractères** en base32 sans `I`, `1`, `O`, `0` ni `U` :
+il se lit à voix haute au téléphone et se recopie sur un cahier. Le prototype
+en proposait quatre — un million de combinaisons, énumérable en une soirée, sur
+des documents qui portent un nom de client et des montants.
+
+**Deux outils ne se publient pas** : l'ardoise, qui porte des noms et des
+dettes (§ 2.5), et le call-box, qui dit la recette du jour. Le refus est dans
+le serveur et non seulement dans l'écran : un bouton grisé se contourne, une
+adresse publique ne se reprend pas.
+
+La page de lecture rend **le vrai document** pour les sept écrits A4 — c'est
+tout l'intérêt du lien, ouvrir un devis plutôt que recevoir une image qu'on ne
+peut ni chercher ni copier. Les registres rendent leur carte : on ne rejoue pas
+un écran à boutons en lecture seule.
+
+Un **outil composé par le modèle** n'a pas de squelette : sa configuration
+voyage avec lui, dans l'instantané, et c'est elle qui dit comment le dessiner.
+Les deux fabriques qui la remontent en squelette vivent dans le moteur
+(`squeletteDeRegistre`, `squeletteDeCalcul`), d'où l'écran et le serveur les
+tirent toutes les deux. Tant qu'elles n'étaient que du côté de l'écran, le
+serveur ne trouvait rien à dessiner et la page répondait 200 avec « Ce lien ne
+mène à rien » : **l'outil payé était le seul qu'on ne pouvait pas partager.**
+
+### Ce que le dépôt refuse
+
+`/api/publier` est une adresse publique : ce qui écrit dedans n'est pas
+seulement le client d'aujourd'hui, mais aussi une version plus ancienne, une
+file d'attente qui rejoue, ou n'importe qui avec `curl`. Chaque refus a sa
+raison, que l'écran peut afficher.
+
+| | | |
+|---|---|---|
+| 400 | `lien-invalide` | la forme du lien, avant de toucher au stockage |
+| 400 | `instantane-absent` | le corps n'est pas un dépôt |
+| 400 | `squelette-inconnu` | publié par une version que ce serveur ne connaît pas |
+| 400 | `instantane-illisible` | l'état ne se dessine pas — voir plus bas |
+| 403 | `non-publiable` | l'ardoise et le call-box, avec le pourquoi |
+| 409 | `version-perimee` | le serveur détient plus récent, **et le dit** |
+
+`version-perimee` porte `versionServeur` : sans elle, un téléphone dont la
+file rejoue une vieille publication perd son travail en silence. Et **zéro est
+une version** — un outil qu'on vient de créer est en version 0, ce qui est le
+cas le plus courant puisqu'on diffuse souvent juste après avoir créé.
+
+`instantane-illisible` est le dernier contrôle, et il coûte un rendu : le
+serveur **essaie de dessiner** avant d'accepter. C'est la seule vérification
+qui ne puisse pas diverger du rendu, puisque c'est le rendu ; un schéma recopié
+côté serveur finirait par ne plus dire la même chose que l'écran. Le refus
+appartient à la publication parce que l'envoyeur est là pour l'entendre — sans
+lui, le rendu jetait à la lecture et c'est le destinataire qui découvrait la
+page d'erreur de l'hébergeur, devant un lien qu'on lui avait donné.
+
+Le contrôle ferme la porte devant ; il ne réécrit pas ce qui est déjà dans KV.
+La page de lecture ne jette donc plus non plus : un dépôt qu'elle ne sait pas
+dessiner donne une page qui le dit, **distincte de l'introuvable** — le lien
+est bon, ce n'est pas la peine d'aller le revérifier.
+
+### Le poids de la page
+
+La feuille de style est **inlinée** — une feuille séparée serait une requête de
+plus sur une connexion qui hoquette — mais sans ses commentaires : ils faisaient
+vingt-neuf pour cent de la page, six kilo-octets que le destinataire d'un devis
+télécharge sans jamais les lire. Une page de devis fait **quinze kilo-octets,
+moins de quatre comprimée**. Rien à charger après le premier octet : la page est
+finie quand elle arrive.
+
+### La file d'attente
+
+Le réseau ne sert qu'à publier, payer et appeler le modèle — trois choses qui
+peuvent attendre (§ 2.7). « Diffuser » sans réseau dépose donc la demande dans
+une file, et la carte part quand même, sans adresse : l'écran dit pourquoi.
+
+`viderLaFile` la vide **au lancement et au retour du réseau**, sans rien
+afficher : la publication est une conséquence de « Diffuser », pas une tâche
+que l'utilisateur suit. Ce qui change, c'est que l'outil a désormais son
+adresse.
+
+Elle rejoue **l'état d'aujourd'hui**, et non celui du jour où la publication a
+été mise en attente : quelqu'un qui a continué de travailler hors ligne veut
+voir partir son carnet tel qu'il est. L'entrée de file ne dit donc qu'une
+chose — cet outil attend d'être publié. Un verrou empêche les deux
+déclencheurs de se marcher dessus, les entrées d'un même outil sont regroupées,
+et un refus ou un conflit retire l'entrée au lieu de la rejouer sans fin :
+réessayer n'y changerait rien.
+
+### La carte et l'aperçu
+
+La carte est **dessinée sur le téléphone** et téléversée telle quelle (§ 1,
+point 6). Le serveur n'a ni police, ni canvas, ni la moindre raison d'apprendre
+à dessiner : il range un octet et le rend. Elle part **après** le dépôt, jamais
+avec lui — une image en base64 dans du JSON coûte un tiers de sa taille en
+plus, et la page de lecture fonctionne sans elle.
+
+`og:image` n'est annoncée **que si la carte existe** : la page demande à R2 si
+elle est là. Une `og:image` qui rend 404 fait un aperçu cassé, ce qui est pire
+qu'un aperçu sobre — il donne l'air d'un lien douteux.
+
+Le seau n'est pas ouvert au monde : les cartes passent par une route de ce
+domaine, ce qui garde l'aperçu et la page sur la même origine. Et seule une
+vraie image y entre : on vérifie la **signature** du fichier et non l'en-tête
+annoncé, qui est déclaratif. Sans ce contrôle, l'adresse deviendrait un
+hébergement de fichiers sous notre nom.
+
+### Trois pièges du rendu serveur
+
+**Le nom du fichier est la route.** `functions/d/[lien].js` répond à
+`/d/n'importe quoi`. Rollup assainit les crochets d'un nom de sortie : le
+fichier sortait `_lien_.js`, qui ne répond qu'à `/d/_lien_`. Toutes les pages
+auraient rendu 404, et la construction aurait réussi. Une garde du budget exige
+le nom exact, et refuse tout fichier de `functions/` qui ne soit pas une route
+attendue — un fragment partagé déposé dans `functions/assets/` deviendrait une
+route `/assets/…` qui masquerait les vrais fichiers de l'application.
+
+**Un `https://` écrit en dur.** L'adresse absolue sert à `og:url` et
+`og:image`, que WhatsApp suit telles quelles. Bâtie sur un schéma supposé, elle
+est fausse partout où le schéma diffère — à commencer par le serveur local, où
+l'on éprouve justement la chaîne complète. L'origine vient de la requête.
+
+**`min(1, calc((100vw - 32px) / 793.7))` est invalide.** Diviser une longueur
+par un nombre rend une longueur, et `min` refuse de mélanger un nombre et une
+longueur : la déclaration est ignorée sans un mot, l'échelle retombe à 1, et le
+document sort à sa taille réelle — coupé par le cadre sur un téléphone. Le
+diviseur porte son unité : `793.7px`.
 
 ## Où poser les variables — deux familles à ne pas confondre
 
@@ -289,3 +569,79 @@ sur la clef borne la dépense, quoi qu'il arrive côté application. C'est le se
 garde-fou disponible tant que les comptes de D1 n'existent pas — il est global
 et non par utilisateur, donc le premier venu peut l'épuiser pour tout le monde.
 Raison de plus pour le poser bas.
+
+---
+
+## Les quatre formes composables, vérifiées en production le 10 septembre 2026
+
+Le navigateur sans tête ne joignait pas l'adresse publique depuis cette machine
+— le tunnel TLS du mandataire tombait, `curl` passant sans peine. Le parcours
+complet avec navigateur a donc été joué contre un vrai Worker local
+(`wrangler pages dev`, avec son KV, sa base D1 et `workerd`), et la production a
+été vérifiée en requêtes. Ce qui se mesure ainsi est tout ce qui vit sur le
+serveur ; ce qui vit dans le navigateur l'a été localement, JavaScript coupé
+compris.
+
+| Ce qui a été vérifié | Résultat |
+|---|---|
+| Publier un formulaire sans appareil | **401** — les réponses ne reviendraient à personne |
+| Publier avec l'appareil | 200, propriétaire noté |
+| La page publiée porte un vrai `<form method="post">` | oui, et **aucun script** |
+| `form-action` | `'self'` sur un formulaire, `'none'` partout ailleurs |
+| Le pied de page d'un formulaire | « Ta réponse va à la personne qui t'a envoyé ce lien » |
+| Un inconnu répond | **303** vers la page de remerciement |
+| Un robot remplit le champ piège | 303, et rien en base |
+| Une réponse sans l'obligatoire | la page revient en nommant ce qui manque |
+| Le propriétaire relit | sa réponse, avec le choix et le nombre |
+| Un autre appareil | **404** — il n'apprend pas que le lien existe |
+| Une vitrine | numéro lisible, sommaire avec ancres, aucun script, **7,7 Ko** |
+| Un événement | « dans 2 jours · Samedi 12 septembre 2026 **à 15 h** » |
+
+La dernière ligne est celle qui compte le plus : elle confirme en production que
+l'heure écrite sans fuseau est bien lue à Douala. Un Worker vit en UTC, et la
+même invitation se serait affichée à 16 h pour l'invité et à 15 h pour celui qui
+l'a écrite.
+
+Les instantanés déposés par cette vérification ont été retirés de KV, et les
+lignes de D1 avec eux. Les comptes d'essai ouverts au passage sont restés :
+cinq crédits chacun, jamais dépensés, et rien ne les distingue d'une vraie
+première visite.
+
+### Le numéro que le modèle inventait — trouvé par une vraie génération
+
+Aucun test unitaire ne pouvait le voir, et il n'a coûté que trois générations
+réelles à trouver. « Je veux un site internet pour ma quincaillerie à Bépanda »
+a rendu une page portant `6 99 41 27 08`, `Rue Bépanda-Omnisport, en face du
+marché` et `Lundi à samedi, 7 h – 19 h` — **les exemples du schéma, recopiés au
+caractère près**, alors que l'invite dit déjà « n'invente jamais un numéro ».
+Une valeur concrète posée à côté d'un champ est une démonstration de ce qu'il
+faut y mettre, et elle est plus forte qu'une interdiction écrite ailleurs.
+
+Les exemples retirés, le modèle en a **inventé** un : `699 12 34 56`, qui est un
+numéro camerounais valide, et qui appartient donc à quelqu'un. La page aurait
+été publiée sous le nom d'un commerçant, et ses clients auraient appelé un
+inconnu. Personne ne relit dix chiffres avant de partager un lien.
+
+Une interdiction dans l'invite ne pouvait pas suffire : un champ vide appelle
+une valeur plus fort qu'une phrase ne l'en dissuade. Ce qui suffit est une
+vérification, et elle est possible parce que la demande est là — c'est le seul
+endroit d'où un vrai numéro peut venir. Un numéro absent de la demande est
+**retiré** de la page, sans reprise : une reprise coûterait un tour entier pour
+un seul champ, et le reste de la page est bon.
+
+Vérifié en production après correction, trois fois de suite : le numéro inventé
+disparaît, et celui que la demande donne reste.
+
+**L'adresse, elle, n'est pas traitée de même, et il faut le dire.** Elle ne se
+vérifie pas mécaniquement, et le modèle continue de rendre « Rue de la Liberté,
+Bepanda ». Le pari est qu'un commerçant voit qu'une rue n'est pas la sienne — il
+sait où est sa boutique — alors que personne ne relit dix chiffres. Ce qui
+distingue vraiment les deux : un numéro inventé fait du tort à **un tiers qui
+n'a rien demandé**.
+
+### Ce qu'il reste à voir sur un vrai téléphone
+
+Un formulaire rempli **depuis WhatsApp**, dans son navigateur intégré, sur une
+connexion mobile camerounaise. C'est le seul endroit où le pari « pas de
+script » se vérifie vraiment, et c'est le même critère que la phase 6 pose pour
+tout le reste : ce qui marche au bureau n'a rien prouvé.

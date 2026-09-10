@@ -31,8 +31,9 @@ export {
 export { calculerLignes, montantAcompte } from './compute/tva.js'
 
 export {
-  anneeDe, arreteLe, dateCourte, dateLongue, dateLongueSiValide, ESPACE_INSECABLE,
-  heureCourte, initiales, joursEntre, jourWAT, montantF, nf, normaliser,
+  anneeDe, arreteLe, coutF, dateCourte, dateLongue, dateLongueSiValide, ESPACE_INSECABLE,
+  heureCourte, initiales, instantWAT, jourDeLaSemaineWAT, joursEntre, jourWAT, montantF, nf,
+  normaliser,
 } from './format.js'
 
 export { lettres, montantEnLettres } from './lettres.js'
@@ -86,13 +87,51 @@ export {
 } from './compute/callbox.js'
 export { callbox, callboxCard, callboxShare } from './skeletons/callbox.js'
 export { callboxSchema } from './schema/callbox.js'
+export type { ConflitVersion, Instantane } from './publication.js'
+export {
+  ALPHABET_LIEN, LONGUEUR_LIEN, NON_PUBLIABLES, accepteLaVersion, lienPublic,
+  lienValide, pourquoiNonPubliable, publiable,
+} from './publication.js'
 export { cvSchema } from './schema/cv.js'
+export { ID_COMPOSE_CALCUL } from './calcul.js'
 export type { CalculDemande, EntreeDemandee } from './calcul.js'
 export { MAX_ENTREES, schemaCalcul, verifierCalcul } from './calcul.js'
+export {
+  ID_COMPOSE_FORMULAIRE, MAX_CHAMPS, MAX_OPTIONS, MAX_PARAGRAPHE, MAX_REPONSES, MAX_TEXTE,
+  depouiller, schemaFormulaire, verifierFormulaire,
+} from './formulaire.js'
+export type {
+  ChampDemande, Depouille, FormulaireDemande, Reponse, SorteChamp,
+} from './formulaire.js'
+export {
+  composeDe, ebaucheFinie, ebaucher, familleDe, lireTour, squeletteDe,
+} from './agent.js'
+export type { Ebauche, FamilleOutil, LectureTour, TourModele } from './agent.js'
+export { lireJsonPartiel } from './partiel.js'
+export { pourLeModele } from './schema-modele.js'
+export { clefPropre } from './clefs.js'
 export type { ReponseModele } from './composition.js'
 export { lireReponseModele } from './composition.js'
 export type { Expression, Operation } from './expression.js'
 export { DESCRIPTION_FORMULE, PROFONDEUR_MAX, evaluer, verifierExpression } from './expression.js'
+export {
+  ID_COMPOSE_PAGE, MAX_LIGNES_SECTION, MAX_SECTIONS, SECTIONS_POUR_SOMMAIRE,
+  avecSommaire, carteDePage, direLeJour, partageDePage, redresserPage, schemaPage,
+  sectionsAncrees, verifierPage,
+} from './page.js'
+export type {
+  JourDit, LigneSection, PageDemande, SectionAncree, SectionDemandee, SorteSection,
+} from './page.js'
+export { ID_COMPOSE } from './registre.js'
+/*
+ * Les liens `wa.me` vivent dans le moteur et non dans l'application : le
+ * serveur en a besoin aussi, pour le bouton d'une page publiée. C'est du calcul
+ * sur des chaînes — aucune API de navigateur — et deux copies finiraient par ne
+ * plus accepter les mêmes numéros.
+ */
+export {
+  INDICATIF_CM, lienWhatsApp, numeroDansLaDemande, numeroInternational, numeroLisible,
+} from './whatsapp.js'
 export type { ColonneDemandee, RefusModele, RegistreDemande } from './registre.js'
 export { MAX_COLONNES, schemaRefus, schemaRegistre, verifierRegistre } from './registre.js'
 export type { AvecMotsClefs, Correspondance } from './match.js'
@@ -111,6 +150,7 @@ export {
   colonnesSecondaires, comptageBascule, lignesEnAlerte, ligneNeuve, nombreDe,
   retirerLigne, schemaListe, texteDe, totalListe,
 } from './compute/liste.js'
+export { squeletteDeCalcul, squeletteDeRegistre } from './compose.js'
 export { cellule, squeletteListe } from './skeletons/liste.js'
 export type { DefinitionListe, SqueletteListe } from './skeletons/liste.js'
 export { REGISTRES_LISTE } from './skeletons/registres.js'
@@ -128,8 +168,8 @@ export {
 } from './skeletons/index.js'
 
 export type {
-  CardItem, CardSpec, ComputeMap, Encre, EngineKind, ErreurValidation, JsonSchema,
-  Ligne, LigneCalculee, Relance, RenderContext, ShareSpec, Skeleton, SkeletonGroup,
+  CardItem, CardSpec, ComputeMap, Encre, EngineKind, ErreurValidation, JsonSchema, MontrerSi, ReglagesEcran,
+  Ligne, LigneCalculee, Relance, RenderContext, BatirPartage, ShareSpec, Skeleton, SkeletonGroup,
   SkeletonAnonyme, SkeletonId, Totaux, XAF,
 } from './types.js'
 

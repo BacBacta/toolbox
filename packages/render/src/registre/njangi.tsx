@@ -1,4 +1,4 @@
-import type { EtatNjangi, MembreNjangi, Periode, RenderContext, ShareSpec } from '@a237/engine'
+import type { BatirPartage, EtatNjangi, MembreNjangi, Periode, RenderContext } from '@a237/engine'
 import {
   ajouterMembre, basculerVersement, beneficiaireDuTour, classementFiabilite,
   collecte, estFiable, fiabilite, montantF, njangi, prochainTour, retirerMembre,
@@ -61,7 +61,7 @@ export function RegistreNjangi(props: {
   readonly etat: EtatNjangi
   readonly ctx: RenderContext
   readonly onChange: (etat: EtatNjangi) => void
-  readonly onDiffuser: (partage: ShareSpec) => void
+  readonly onDiffuser: (batir: BatirPartage) => void
   readonly ongletInitial?: OngletNjangi
 }): JSX.Element {
   const [onglet, setOnglet] = useState<OngletNjangi>(props.ongletInitial ?? 'Cagnotte')
@@ -134,7 +134,7 @@ export function RegistreNjangi(props: {
           )}
 
           <Actions>
-            <Action principale onClick={() => props.onDiffuser(njangi.share(etat, props.ctx))}>
+            <Action principale onClick={() => props.onDiffuser((c) => njangi.share(etat, c))}>
               Diffuser
             </Action>
             <Action onClick={() => props.onChange(prochainTour(etat))}>

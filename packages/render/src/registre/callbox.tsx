@@ -1,4 +1,4 @@
-import type { EtatCallbox, RenderContext, ShareSpec } from '@a237/engine'
+import type { BatirPartage, EtatCallbox, RenderContext } from '@a237/engine'
 import {
   callboxShare, commissionDe, enregistrerOperation, fixerCommission, heureCourte,
   jourWAT, journees, montantF, nf, operationsDuJour, resteAuClient, retirerOperation,
@@ -39,7 +39,7 @@ export function RegistreCallbox(props: {
   readonly etat: EtatCallbox
   readonly ctx: RenderContext
   readonly onChange: (etat: EtatCallbox) => void
-  readonly onDiffuser: (partage: ShareSpec) => void
+  readonly onDiffuser: (batir: BatirPartage) => void
   readonly ongletInitial?: OngletCallbox
 }): JSX.Element {
   const [onglet, setOnglet] = useState<OngletCallbox>(props.ongletInitial ?? 'Caisse')
@@ -103,7 +103,7 @@ export function RegistreCallbox(props: {
             <Action principale onClick={enregistrer}>
               Enregistrer
             </Action>
-            <Action onClick={() => props.onDiffuser(callboxShare(etat, props.ctx))}>
+            <Action onClick={() => props.onDiffuser((c) => callboxShare(etat, c))}>
               Diffuser
             </Action>
           </Actions>

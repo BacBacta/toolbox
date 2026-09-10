@@ -9,6 +9,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@a237/comptes": "workspace:*",
     "@a237/engine": "workspace:*"
   },
   "devDependencies": {

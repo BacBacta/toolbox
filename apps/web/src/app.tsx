@@ -1,13 +1,21 @@
-import type { RenderContext, ShareSpec } from '@a237/engine'
-import { CATALOGUE, EXTRAIT_VIDE, montantF } from '@a237/engine'
+import type { BatirPartage, RenderContext, ShareSpec } from '@a237/engine'
+import { CATALOGUE, EXTRAIT_VIDE, coutF, lienPublic } from '@a237/engine'
 import type { Extrait } from '@a237/engine'
 import type { JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
+import { dernierEtatConnu } from './compte.js'
+import type { EtatCompte } from './compte.js'
 import { Diffusion } from './diffusion.js'
+import type { ProprietesCompte } from './ecran-compte.js'
+import { viderLaFile } from './file.js'
+import { publier, televerserCarte } from './publier.js'
 import { CHARGEURS, outilDisponible } from './outils.js'
 import type { Compose, ModuleOutil } from './outils.js'
 import { numeroter } from './numeros.js'
-import { creerOutil, listerOutils, lireOutil, majEtat, supprimerOutil } from './stockage.js'
+import {
+  creerOutil, filerPublication, listerOutils, lireOutil, majEtat, noterPublication,
+  nouvelIdentifiant, supprimerOutil,
+} from './stockage.js'
 import type { OutilEnregistre } from './stockage.js'
 import { Atelier } from './atelier.js'
 
@@ -43,6 +51,7 @@ function Accueil(props: {
     compose?: Compose,
     fcfa?: number,
   ) => void
+  readonly onDiscuter: (demande: string) => void
   readonly onOuvrir: (id: string) => void
   readonly onSupprimer: (id: string) => void
 }): JSX.Element {
@@ -53,7 +62,7 @@ function Accueil(props: {
         <span class="app-baseline">hors ligne, sur ton téléphone</span>
       </header>
 
-      <Atelier fiches={DISPONIBLES} onCreer={props.onCreer} />
+      <Atelier fiches={DISPONIBLES} onCreer={props.onCreer} onDiscuter={props.onDiscuter} />
 
       <h2 class="outil-surtitre">Tous les outils</h2>
       <div class="grille">
@@ -106,15 +115,75 @@ function Accueil(props: {
 
 export function App(): JSX.Element {
   const [outils, setOutils] = useState<readonly OutilEnregistre[]>([])
+  const [compte, setCompte] = useState<EtatCompte | null>(null)
+  /*
+   * L'écran du compte se charge à la demande, comme les outils.
+   *
+   * Il n'est sur le chemin de personne : on y arrive par une ligne discrète, et
+   * la plupart des gens ne l'ouvriront jamais. Deux kilo-octets dans la
+   * coquille initiale pour ça, c'est deux kilo-octets payés par tout le monde
+   * avant le premier affichage, sur la connexion qu'ils ont.
+   */
+  const [surLeCompte, setSurLeCompte] = useState(false)
+  /**
+   * La demande en cours de discussion, quand l'agent est ouvert.
+   *
+   * L'écran de l'agent se charge à la demande, comme les outils : il porte le
+   * fil, l'aperçu et le flux, et la plupart des gens ouvriront d'abord un
+   * devis. Deux kilo-octets dans la coquille initiale, ce sont deux
+   * kilo-octets payés par tout le monde avant le premier affichage.
+   */
+  const [discussion, setDiscussion] = useState<string | null>(null)
+  const [ecranAgent, setEcranAgent] = useState<
+    ((p: import('./ecran-agent.js').ProprietesAgent) => JSX.Element) | null
+  >(null)
+  const [ecranCompte, setEcranCompte] = useState<((p: ProprietesCompte) => JSX.Element) | null>(null)
   const [ouvert, setOuvert] = useState<OutilEnregistre | null>(null)
   const [module, setModule] = useState<ModuleOutil | null>(null)
   const [coutDernier, setCoutDernier] = useState<number | null>(null)
   const [partage, setPartage] = useState<ShareSpec | null>(null)
   const [erreur, setErreur] = useState('')
+  /** Ce que la dernière tentative de dépôt a donné, dit dans la feuille. */
+  const [motPublication, setMotPublication] = useState('')
 
   useEffect(() => {
     void listerOutils().then(setOutils)
+    // Le dernier état connu, gardé sur l'appareil : la ligne s'affiche en mode
+    // avion, et se rafraîchit quand une composition la met à jour.
+    void dernierEtatConnu().then(setCompte)
   }, [])
+
+  /*
+   * Ce qui n'est pas parti repart, au lancement et au retour du réseau.
+   *
+   * Une file dans laquelle on dépose sans jamais rien retirer n'est pas une
+   * file d'attente, c'est un tiroir. Rien ne s'affiche : la publication est
+   * une conséquence de « Diffuser », pas une tâche que l'utilisateur suit. Ce
+   * qui change, c'est que l'outil a désormais son adresse.
+   */
+  useEffect(() => {
+    const reprendre = (): void => {
+      void viderLaFile(new Date()).then(async (bilan) => {
+        if (bilan.publies > 0) setOutils(await listerOutils())
+      })
+    }
+    reprendre()
+    globalThis.addEventListener('online', reprendre)
+    return () => globalThis.removeEventListener('online', reprendre)
+  }, [])
+
+  useEffect(() => {
+    if (!surLeCompte) return
+    void import('./ecran-compte.js').then((m) => setEcranCompte(() => m.EcranCompte))
+  }, [surLeCompte])
+
+  useEffect(() => {
+    if (discussion === null) return
+    void import('./ecran-agent.js').then(
+      (m) => setEcranAgent(() => m.EcranAgent),
+      () => setErreur('L’atelier n’a pas pu s’ouvrir. Réessaie une fois en ligne.'),
+    )
+  }, [discussion])
 
   useEffect(() => {
     if (ouvert === null) {
@@ -136,6 +205,62 @@ export function App(): JSX.Element {
    * rien dire — le pire des comportements pour quelqu'un qui a un réseau
    * capricieux et un téléphone plein. Tout ce qui est asynchrone passe par ici.
    */
+  /**
+   * Diffuser, c'est d'abord publier.
+   *
+   * L'ordre n'est pas indifférent : la carte porte le lien, donc il faut que
+   * le lien existe avant de la dessiner. Un dépôt refusé, en conflit ou
+   * simplement hors ligne n'empêche pas de partager — la carte part sans
+   * adresse, comme avant, et l'écran dit pourquoi.
+   */
+  async function diffuser(batir: BatirPartage, outil: OutilEnregistre): Promise<void> {
+    const maintenant = new Date()
+    const avec = (lien: string | undefined): ShareSpec =>
+      batir({
+        lien: lien === undefined ? '' : lienPublic(location.host, lien),
+        maintenant,
+      })
+
+    if (outil.lien !== undefined && outil.versionPubliee === outil.version) {
+      // Rien n'a bougé depuis le dernier dépôt : le lien vaut toujours, et on
+      // ne dépense pas une requête pour le redire.
+      setMotPublication('')
+      setPartage(avec(outil.lien))
+      return
+    }
+
+    const issue = await publier(outil, maintenant, outil.lien)
+
+    if (issue.sorte === 'publie') {
+      const suivant = await noterPublication(outil, issue.lien, outil.version)
+      setOuvert(suivant)
+      setOutils(await listerOutils())
+      setMotPublication('')
+      setPartage(avec(issue.lien))
+      return
+    }
+
+    if (issue.sorte === 'refuse') setMotPublication(issue.pourquoi)
+    else if (issue.sorte === 'conflit') {
+      setMotPublication(
+        `Une version plus récente de cet outil est déjà publiée (version ${issue.versionServeur}). ` +
+          'Ouvre-la, compare, puis modifie ici pour la remplacer.',
+      )
+    } else {
+      await filerPublication({
+        id: nouvelIdentifiant(),
+        outilId: outil.id,
+        version: outil.version,
+        creeLe: Date.now(),
+      })
+      setMotPublication(
+        'Pas de réseau : la publication attend son tour. La carte part sans lien pour l’instant.',
+      )
+    }
+    // La carte part sans adresse plutôt que d'en porter une qui ne répond pas.
+    setPartage(avec(issue.sorte === 'refuse' ? undefined : outil.lien))
+  }
+
   function tenter(travail: () => Promise<void>, quoi: string): void {
     void travail().catch((cause: unknown) => {
       setErreur(`${quoi} : ${cause instanceof Error ? cause.message : String(cause)}`)
@@ -162,6 +287,19 @@ export function App(): JSX.Element {
     const outil = await creerOutil(skeleton, neuf.nom, etat, maintenant, compose)
     setOutils(await listerOutils())
     setOuvert(outil)
+    /*
+     * Le solde a peut-être changé, et l'écran doit le voir.
+     *
+     * Une composition rapporte le solde avec sa réponse, et `composer` le range
+     * sur l'appareil — mais l'état affiché avait été lu une fois, au montage.
+     * La ligne du compte restait donc absente jusqu'au lancement suivant : on
+     * venait de dépenser un crédit sans que rien ne le dise.
+     *
+     * On relit après chaque création, y compris celles qui ne coûtent rien :
+     * une lecture d'IndexedDB ne se sent pas, et distinguer les deux cas ici
+     * ferait dépendre l'affichage d'une règle qui se décide ailleurs.
+     */
+    setCompte(await dernierEtatConnu())
     /*
      * Ce que la composition a coûté, dit une fois.
      *
@@ -191,6 +329,40 @@ export function App(): JSX.Element {
     setOuvert(await lireOutil(id))
   }
 
+  if (surLeCompte) {
+    const Ecran = ecranCompte
+    return (
+      <main class="app">
+        {Ecran === null ? (
+          <p class="note">Un instant…</p>
+        ) : (
+          <Ecran etat={compte} onEtat={setCompte} onRetour={() => setSurLeCompte(false)} />
+        )}
+      </main>
+    )
+  }
+
+  if (discussion !== null) {
+    const Ecran = ecranAgent
+    return (
+      <main class="app">
+        {erreur !== '' && <div class="alerte">{erreur}</div>}
+        {Ecran === null ? (
+          <p class="note">Un instant…</p>
+        ) : (
+          <Ecran
+            demande={discussion}
+            onCreer={(s, extrait, compose, fcfa) => {
+              setDiscussion(null)
+              tenter(() => creer(s, extrait, compose, fcfa), 'Création impossible')
+            }}
+            onFermer={() => setDiscussion(null)}
+          />
+        )}
+      </main>
+    )
+  }
+
   if (ouvert === null) {
     return (
       <main class="app">
@@ -200,22 +372,40 @@ export function App(): JSX.Element {
           onCreer={(s, extrait, compose, fcfa) =>
             tenter(() => creer(s, extrait, compose, fcfa), 'Création impossible')
           }
+          onDiscuter={setDiscussion}
           onOuvrir={(id) => tenter(() => ouvrir(id), 'Ouverture impossible')}
           onSupprimer={(id) => tenter(() => supprimer(id), 'Suppression impossible')}
         />
+        {/*
+          Une ligne, en bas, hors du chemin de qui vient faire une facture.
+          Elle ne dit rien tant qu'on n'a jamais composé — il n'y a alors rien
+          à savoir, et une invitation à s'occuper de son compte serait la
+          première chose que verrait quelqu'un venu pour un devis.
+        */}
+        {compte !== null && (
+          <button type="button" class="compte-ligne" onClick={() => setSurLeCompte(true)}>
+            {compte.plan === 'atelier'
+              ? `Atelier · ${compte.credits} compositions`
+              : compte.credits === 0
+                ? 'Essai · plus de composition'
+                : `Essai · ${compte.credits} composition${compte.credits > 1 ? 's' : ''}`}
+          </button>
+        )}
       </main>
     )
   }
 
   /**
-   * Le lien est vide tant que la publication n'existe pas.
+   * Le lien de l'outil ouvert, ou rien.
    *
-   * Il serait facile d'écrire `atl.cm/a/1234` sur la carte et dans les
-   * relances : ce serait un lien mort, envoyé par le trésorier à ses membres,
-   * sous son nom. Le moteur sait taire un lien vide ; la phase 2 le remplira
-   * avec l'adresse que le serveur aura vraiment attribuée.
+   * Il ne s'écrit qu'une fois le dépôt accepté. Inventer `atl.cm/a/1234` sur
+   * la carte et dans les relances ferait un lien mort, envoyé par le trésorier
+   * à ses membres, sous son nom. Le moteur sait taire un lien vide.
    */
-  const ctx: RenderContext = { lien: '', maintenant: new Date() }
+  const ctx: RenderContext = {
+    lien: ouvert.lien === undefined ? '' : lienPublic(location.host, ouvert.lien),
+    maintenant: new Date(),
+  }
 
   return (
     <main class="app">
@@ -234,7 +424,7 @@ export function App(): JSX.Element {
 
       {coutDernier !== null && (
         <p class="note cout-compose">
-          Composé par le modèle pour {montantF(coutDernier)}.
+          Composé par le modèle pour {coutF(coutDernier)}.
         </p>
       )}
 
@@ -246,11 +436,27 @@ export function App(): JSX.Element {
           glyphe={glyphePour(ouvert.skeleton)}
           ctx={ctx}
           onChange={(etat) => tenter(() => changer(etat), 'Enregistrement impossible')}
-          onDiffuser={setPartage}
+          onDiffuser={(batir) =>
+            tenter(() => diffuser(batir, ouvert), 'Diffusion impossible')
+          }
         />
       )}
 
-      {partage !== null && <Diffusion partage={partage} onFermer={() => setPartage(null)} />}
+      {partage !== null && (
+        <Diffusion
+          partage={partage}
+          mot={motPublication}
+          /*
+           * La carte suit le dépôt, elle ne le précède pas. Ce qui rate ici ne
+           * se dit pas : sans image, l'aperçu WhatsApp porte le titre et la
+           * description, ce qui est moins bien et n'est pas une panne.
+           */
+          onCarte={(png) => {
+            if (ouvert.lien !== undefined) void televerserCarte(ouvert.lien, png)
+          }}
+          onFermer={() => setPartage(null)}
+        />
+      )}
     </main>
   )
 }

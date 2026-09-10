@@ -27,6 +27,19 @@ export interface OutilEnregistre {
      * une publication plus récente (BRIEF.md § 3.5).
      */
     readonly version: number;
+    /**
+     * L'adresse publique, une fois qu'elle existe vraiment.
+     *
+     * Elle est tirée au premier dépôt accepté et ne change plus : un outil
+     * republié garde son lien, sans quoi chaque correction d'une facture
+     * enverrait le client sur une adresse morte.
+     */
+    readonly lien?: string;
+    /**
+     * La version que le serveur détient. Elle dit si republier a un objet :
+     * `version === versionPubliee` veut dire que rien n'a bougé depuis.
+     */
+    readonly versionPubliee?: number;
     readonly creeLe: number;
     readonly majLe: number;
 }
@@ -51,6 +64,14 @@ export declare function supprimerOutil(id: string): Promise<void>;
  * l'appareil est resté longtemps hors ligne.
  */
 export declare function majEtat(outil: OutilEnregistre, etat: unknown, maintenant: Date): Promise<OutilEnregistre>;
+/**
+ * Note qu'un dépôt a été accepté.
+ *
+ * Le lien et la version publiée sont écrits **après** la réponse du serveur, et
+ * jamais avant : un lien inscrit d'avance serait une adresse morte, envoyée
+ * sous le nom de celui qui la partage.
+ */
+export declare function noterPublication(outil: OutilEnregistre, lien: string, version: number): Promise<OutilEnregistre>;
 /**
  * Range un outil neuf.
  *

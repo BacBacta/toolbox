@@ -1,0 +1,109 @@
+import type { Instantane } from '@a237/engine'
+import { dateLongue } from '@a237/engine'
+import type { JSX } from 'preact'
+
+/**
+ * La page de lecture : ce que voit un client qui ouvre le lien.
+ *
+ * **Aucun script.** Ce n'est pas une économie, c'est ce qui la rend fiable :
+ * elle s'ouvre sur un téléphone d'entrée de gamme, sur une connexion qui
+ * hoquette, dans le navigateur intégré de WhatsApp, et elle s'imprime. Rien à
+ * charger, rien à attendre, rien qui puisse échouer à mi-chemin.
+ *
+ * Elle est **en lecture seule** et ne porte aucun bouton : ce lien s'envoie à
+ * quelqu'un qui n'a pas de compte et n'en veut pas.
+ */
+
+/** L'entête de la page : ce que WhatsApp lit pour son aperçu. */
+export interface MetaPage {
+  readonly titre: string
+  readonly description: string
+  /** L'adresse de la carte, quand elle existe. Absente tant que R2 n'est pas là. */
+  readonly image?: string
+  readonly lien: string
+}
+
+/**
+ * Le pied de page.
+ *
+ * Il dit d'où vient le document et quand il a été arrêté. Un client qui reçoit
+ * un devis doit pouvoir répondre « celui du 9 septembre » sans ouvrir un
+ * fichier.
+ */
+export function PiedLecture(props: {
+  readonly instantane: Instantane
+  /** L'adresse du PDF, quand ce document en a un. */
+  readonly pdf?: string
+  /**
+   * Vrai sur une page qui reçoit. Le pied dit alors autre chose, et c'est
+   * important : « Document en lecture seule » sous un formulaire qu'on invite
+   * à remplir se contredit, et ce qu'une personne veut savoir avant de taper
+   * son numéro n'est pas la date de dépôt — c'est où va ce qu'elle écrit.
+   */
+  readonly recoit?: boolean
+}): JSX.Element {
+  const quand = new Date(props.instantane.publieLe)
+  return (
+    <footer class="lecture-pied">
+      <p>
+        {props.recoit === true
+          ? 'Ta réponse va à la personne qui t’a envoyé ce lien, et à personne d’autre.'
+          : `Arrêté le ${Number.isNaN(quand.getTime()) ? '—' : dateLongue(quand)}. Document en lecture seule.`}
+      </p>
+      {/*
+        Un lien, pas un bouton : la page n'a pas de script, et un client qui
+        reçoit un devis veut souvent le fichier — pour l'imprimer chez le
+        photocopieur du coin, ou le garder dans son dossier. Il ne s'affiche
+        que pour les écrits A4 : un registre n'a pas de feuille.
+      */}
+      {props.pdf !== undefined && (
+        <p class="lecture-pdf">
+          <a href={props.pdf} download>
+            Enregistrer en PDF
+          </a>
+        </p>
+      )}
+      <p class="lecture-marque">Atelier&nbsp;237</p>
+    </footer>
+  )
+}
+
+/**
+ * La page quand le lien ne mène à rien.
+ *
+ * Un 404 nu laisse croire à une panne. Celui-ci dit la seule chose utile : le
+ * lien est peut-être mal recopié, ou le document n'est plus publié.
+ */
+export function PageIntrouvable(): JSX.Element {
+  return (
+    <main class="lecture lecture-vide">
+      <h1>Ce lien ne mène à rien</h1>
+      <p>
+        Le document n’est plus publié, ou le lien a été recopié de travers.
+        Demande-le à nouveau à la personne qui te l’a envoyé.
+      </p>
+      <p class="lecture-marque">Atelier&nbsp;237</p>
+    </main>
+  )
+}
+
+/**
+ * La page quand le document est là mais ne se dessine pas.
+ *
+ * Distincte de l'introuvable, parce que ce n'est pas la même nouvelle : le
+ * lien est bon, il a bien été envoyé, et c'est le serveur qui n'y arrive pas.
+ * Dire « ce lien ne mène à rien » enverrait la personne vérifier une adresse
+ * qui est correcte.
+ */
+export function PageIllisible(): JSX.Element {
+  return (
+    <main class="lecture lecture-vide">
+      <h1>Ce document ne peut pas être affiché</h1>
+      <p>
+        Le lien est bon, mais le document déposé n’est pas lisible ici.
+        Demande à la personne qui te l’a envoyé de le rediffuser.
+      </p>
+      <p class="lecture-marque">Atelier&nbsp;237</p>
+    </main>
+  )
+}

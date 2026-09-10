@@ -9,6 +9,7 @@
   },
   "include": ["src", "test", "vite.config.ts", "vite.sw.config.ts"],
   "references": [
+    { "path": "../../packages/comptes" },
     { "path": "../../packages/engine" },
     { "path": "../../packages/render" },
     { "path": "../../packages/outils-test" }

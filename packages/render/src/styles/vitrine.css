@@ -1,0 +1,360 @@
+/*
+ * La page composée par le modèle.
+ *
+ * Elle vit à deux endroits : en aperçu dans l'application, et publiée sur le
+ * serveur pour qui reçoit le lien. Une seule feuille, pour que les deux
+ * montrent la même chose — celle que le client voit ne doit pas être la
+ * surprise.
+ *
+ * Elle se lit d'un pouce, sur un téléphone d'entrée de gamme, souvent dans le
+ * navigateur intégré de WhatsApp. Aucune animation, aucune police à charger :
+ * ce qui arrive est fini quand il arrive.
+ */
+
+.vitrine {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 4px 0 8px;
+}
+
+.vitrine-tete {
+  padding-bottom: 18px;
+  border-bottom: 2px solid var(--accent);
+}
+
+.vitrine-tete .kicker {
+  margin: 0 0 6px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.vitrine-tete h1 {
+  margin: 0;
+  font-size: 27px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.vitrine-tete .accroche {
+  margin: 8px 0 0;
+  color: var(--encre-2);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.vitrine-section {
+  margin-top: 24px;
+}
+
+.vitrine-section h2 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--encre-3);
+}
+
+.vitrine-section p {
+  margin: 0 0 8px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--encre-2);
+}
+
+.vitrine-liste,
+.vitrine-prix {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vitrine-liste li,
+.vitrine-prix li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 9px 0;
+  border-top: 1px solid var(--trait);
+  font-size: 15px;
+}
+
+.vitrine-liste li:first-child,
+.vitrine-prix li:first-child {
+  border-top: 0;
+}
+
+.vitrine-liste .quoi,
+.vitrine-prix .quoi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.vitrine-liste .detail,
+.vitrine-prix .detail {
+  color: var(--encre-3);
+  font-size: 13px;
+}
+
+/* Le prix ne se coupe jamais : c'est le chiffre qu'on cherche du regard. */
+.vitrine-prix .combien {
+  flex: none;
+  color: var(--accent);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.vitrine-liste .combien {
+  flex: none;
+  color: var(--encre-3);
+  white-space: nowrap;
+}
+
+.vitrine-pied {
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--trait);
+}
+
+/*
+ * Le bouton qui rapporte.
+ *
+ * Quelqu'un qui lit la page et veut acheter ne doit pas avoir à recopier dix
+ * chiffres : `wa.me` ouvre WhatsApp avec le message déjà écrit, gratuitement
+ * et sans compte (§ 6).
+ */
+.vitrine-appel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 13px 16px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.vitrine-appel span {
+  font-weight: 400;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.vitrine-ou {
+  display: flex;
+  gap: 10px;
+  margin: 12px 0 0;
+  color: var(--encre-2);
+  font-size: 14px;
+}
+
+.vitrine-ou .etiquette {
+  /*
+   * Assez large pour « QUAND », le plus long des libellés. À 46 px il touchait
+   * le texte alors que « OÙ » gardait sa gouttière : la colonne était taillée
+   * pour le mot le plus court.
+   */
+  flex: none;
+  width: 58px;
+  color: var(--encre-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.6;
+}
+
+/*
+ * Le sommaire d'un « site ».
+ *
+ * Des ancres et non des adresses : sur une connexion qui hoquette, un menu qui
+ * recharge est un menu qu'on n'ose plus toucher. Il défile horizontalement
+ * plutôt que de passer à la ligne — six titres empilés repousseraient la
+ * première section sous le pli, et on cacherait le contenu pour montrer son
+ * plan.
+ */
+.vitrine-sommaire {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.vitrine-sommaire a {
+  flex: none;
+  padding: 7px 12px;
+  border: 1px solid var(--trait);
+  border-radius: 999px;
+  color: var(--encre-2);
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* Une section visée par le sommaire ne doit pas coller au bord de l'écran. */
+.vitrine-section {
+  scroll-margin-top: 12px;
+}
+
+/*
+ * Le jour d'un événement.
+ *
+ * Le délai est le gros caractère, pas la date : on ne lit pas une affiche pour
+ * sa date, on la lit pour savoir si on a le temps. Quand le jour est passé, le
+ * bloc s'éteint — une affiche qui garde son air d'urgence après coup fait
+ * traverser la ville pour rien.
+ */
+.vitrine-jour {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+}
+
+.vitrine-jour b {
+  font-size: 19px;
+  line-height: 1.2;
+}
+
+.vitrine-jour span {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.vitrine-jour.passe {
+  background: var(--surface);
+  border: 1px solid var(--trait);
+  color: var(--encre-3);
+}
+
+/*
+ * Le formulaire.
+ *
+ * Il partage l'entête de la vitrine — même titre, même accroche, même trait —
+ * parce que c'est la même page : ce qui change est qu'elle reçoit au lieu de
+ * se lire. Les cibles font 48 px comme partout : on remplit ça au pouce, dans
+ * un taxi.
+ *
+ * Plus étroit qu'une vitrine, et pas par goût : un champ de saisie large de
+ * 560 px se remplit sans qu'on voie où il commence, et une question dont
+ * l'étiquette est loin de sa réponse se relit deux fois.
+ */
+.vitrine.form {
+  max-width: 480px;
+}
+
+.form-corps {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.form-champ {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-question {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.form-question i {
+  color: var(--accent);
+  font-style: normal;
+}
+
+.form-aide {
+  color: var(--encre-3);
+  font-size: 13px;
+}
+
+.form-champ input[type="text"],
+.form-champ input[type="tel"],
+.form-champ select,
+.form-champ textarea {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px solid var(--trait);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--encre);
+  font: inherit;
+}
+
+.form-champ textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+/* La case est petite, mais son étiquette fait la cible. */
+.form-champ input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+  accent-color: var(--accent);
+}
+
+.form-envoyer {
+  min-height: 52px;
+  padding: 14px 18px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.form-envoyer:disabled {
+  opacity: 0.55;
+}
+
+/*
+ * Le champ que personne ne doit remplir : hors écran plutôt que `display:
+ * none`, qu'un robot un peu sérieux sait reconnaître. Il sort aussi de l'ordre
+ * de tabulation, pour qu'un doigt ou un clavier ne tombe jamais dessus.
+ */
+.form-piege {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.form-manque,
+.form-clos {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--alerte);
+  color: var(--alerte);
+  font-size: 14px;
+}
+
+.form-clos {
+  margin-top: 22px;
+}
+
+.form-merci {
+  margin: 24px 0 0;
+  font-size: 17px;
+  line-height: 1.5;
+}

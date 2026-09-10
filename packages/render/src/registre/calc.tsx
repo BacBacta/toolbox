@@ -1,4 +1,4 @@
-import type { ConfigCalc, EtatCalc, RenderContext, ShareSpec } from '@a237/engine'
+import type { BatirPartage, ConfigCalc, EtatCalc, RenderContext, ShareSpec } from '@a237/engine'
 import {
   changerValeur, montantF, nf, partCalc, precisionCalc, resultatCalc, valeurDe,
 } from '@a237/engine'
@@ -24,7 +24,7 @@ export function Calculatrice(props: {
   readonly etat: EtatCalc
   readonly ctx: RenderContext
   readonly onChange: (etat: EtatCalc) => void
-  readonly onDiffuser: (partage: ShareSpec) => void
+  readonly onDiffuser: (batir: BatirPartage) => void
   readonly partage: (etat: EtatCalc, ctx: RenderContext) => ShareSpec
 }): JSX.Element {
   const { config, etat } = props
@@ -77,7 +77,7 @@ export function Calculatrice(props: {
       ))}
 
       <Actions>
-        <Action principale onClick={() => props.onDiffuser(props.partage(etat, props.ctx))}>
+        <Action principale onClick={() => props.onDiffuser((c) => props.partage(etat, c))}>
           Diffuser
         </Action>
       </Actions>

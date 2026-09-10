@@ -1,5 +1,6 @@
 import type { TypeColonne } from './compute/liste.js'
 import type { ErreurValidation, JsonSchema } from './types.js'
+import { plierLesClefs } from './clefs.js'
 import { valider } from './valider.js'
 
 /**
@@ -27,6 +28,17 @@ import { valider } from './valider.js'
  * `TypeColonne` vient de `compute/liste.ts` : c'est le même vocabulaire, et le
  * redéclarer ici en ferait deux qui divergeraient au premier type ajouté.
  */
+/**
+ * L'identifiant d'un registre composé par le modèle.
+ *
+ * Il vit ici, avec le contrat, et non avec la fabrique qui en tire un
+ * squelette : l'atelier a besoin du nom pour créer l'outil, et rien d'autre.
+ * Le prendre là où est la fabrique faisait entrer les deux fabriques de
+ * squelettes dans la coquille initiale — deux kilo-octets avant le premier
+ * affichage, pour deux chaînes de caractères.
+ */
+export const ID_COMPOSE = 'compose'
+
 export interface ColonneDemandee {
   readonly clef: string
   readonly titre: string
@@ -60,7 +72,16 @@ export const MAX_COLONNES = 6
 export const schemaRegistre: JsonSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['titre', 'kicker', 'titreNom', 'colonnes', 'libelleVide', 'libelleAjout', 'relancesVides'],
+  /*
+   * Les trois libellés d'ambiance ne sont pas exigés.
+   *
+   * `libelleVide`, `libelleAjout` et `relancesVides` habillent des écrans
+   * vides ; la personne n'en a demandé aucun. Les exiger mettait trois champs
+   * décoratifs sur le chemin de chaque registre — dont un au nom trompeur, qui
+   * a coûté deux registres justes sur trente en production. `redresserRegistre`
+   * les remplit quand ils manquent ; le modèle les écrit toujours, et mieux.
+   */
+  required: ['titre', 'kicker', 'titreNom', 'colonnes'],
   properties: {
     titre: {
       type: 'string', minLength: 2, maxLength: 40, title: 'Nom de l’outil',
@@ -147,17 +168,76 @@ export interface RefusModele {
   readonly impossible: string
 }
 
+/** Ce qu'un refus peut faire de long avant qu'on le coupe. */
+export const MAX_REFUS = 160
+
 export const schemaRefus: JsonSchema = {
   type: 'object',
   additionalProperties: false,
   required: ['impossible'],
   properties: {
     impossible: {
-      type: 'string', minLength: 4, maxLength: 160,
+      type: 'string', minLength: 4, maxLength: MAX_REFUS,
       description:
         'Pourquoi la demande ne se range pas dans un registre. Une phrase, en français, adressée à l’utilisateur.',
     },
   },
+}
+
+/**
+ * Les clefs pliées, et le total qui les désigne suivi avec elles.
+ *
+ * `montantDû` devient `montantDu` ; si le total additionnait `montantDû`, il
+ * additionne désormais `montantDu`. Renommer les colonnes sans suivre le total
+ * échangerait une faute contre une autre — « ne désigne aucune colonne » — et
+ * la génération mourrait tout autant.
+ *
+ * Pure, et tolérante à ce qui n'est pas un registre : elle reçoit ce que le
+ * modèle a rendu, et le schéma s'expliquera mieux qu'elle.
+ */
+export const LIBELLES_PAR_DEFAUT = {
+  libelleVide: 'Rien de noté pour l’instant.',
+  libelleAjout: 'Ajouter une ligne',
+  relancesVides: 'Personne à relancer pour l’instant.',
+} as const
+
+/**
+ * Les libellés d'ambiance, remplis quand ils manquent ou qu'ils ont glissé.
+ *
+ * Ce sont des écrans vides, pas le travail de la personne : un registre sans
+ * eux se tient parfaitement, un registre sans colonnes non. On remplace donc,
+ * là où pour une colonne on refuserait.
+ */
+function avecLesLibelles(valeur: object): object {
+  const r = valeur as Record<string, unknown>
+  const manquants = Object.entries(LIBELLES_PAR_DEFAUT).filter(
+    ([clef]) => typeof r[clef] !== 'string' || (r[clef] as string).trim() === '',
+  )
+  return manquants.length === 0 ? valeur : { ...r, ...Object.fromEntries(manquants) }
+}
+
+export function redresserRegistre(valeur: unknown): unknown {
+  if (typeof valeur !== 'object' || valeur === null) return valeur
+  const habille = avecLesLibelles(valeur)
+  const r = habille as { colonnes?: unknown; total?: unknown }
+  const pliage = plierLesClefs(r.colonnes)
+  if (pliage === null || !pliage.change) return habille
+
+  const suivre = (clef: unknown): unknown =>
+    typeof clef === 'string' ? (pliage.renommes.get(clef) ?? clef) : clef
+
+  const total =
+    typeof r.total === 'object' && r.total !== null
+      ? Object.fromEntries(
+          Object.entries(r.total as Record<string, unknown>).map(([champ, v]) =>
+            champ === 'clef' || champ === 'plus' || champ === 'moins'
+              ? [champ, suivre(v)]
+              : [champ, v],
+          ),
+        )
+      : r.total
+
+  return { ...habille, colonnes: pliage.liste, ...(r.total === undefined ? {} : { total }) }
 }
 
 export function verifierRegistre(valeur: unknown): readonly ErreurValidation[] {

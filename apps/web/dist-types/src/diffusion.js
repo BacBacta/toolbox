@@ -1,7 +1,7 @@
 import { Fragment as _Fragment, jsx as _jsx, jsxs as _jsxs } from "preact/jsx-runtime";
+import { lienWhatsApp } from '@a237/engine';
 import { cartePng, dessinerCarte } from '@a237/render/carte';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { lienWhatsApp } from './whatsapp.js';
 /**
  * La feuille de diffusion.
  *
@@ -31,7 +31,10 @@ export function Diffusion(props) {
             return;
         try {
             dessinerCarte(element, props.partage.card);
-            void cartePng(element).then((blob) => setPoids(Math.round(blob.size / 1024)), () => setPoids(null));
+            void cartePng(element).then((blob) => {
+                setPoids(Math.round(blob.size / 1024));
+                props.onCarte?.(blob);
+            }, () => setPoids(null));
         }
         catch {
             setMessage('La carte n’a pas pu être dessinée sur cet appareil.');
@@ -56,7 +59,7 @@ export function Diffusion(props) {
             ? 'Texte copié. Appuie longuement sur l’image pour l’enregistrer.'
             : 'Copie impossible sur cet appareil.');
     }
-    return (_jsxs(_Fragment, { children: [_jsx("button", { type: "button", class: "feuille-fond", "aria-label": "Fermer la diffusion", onClick: props.onFermer }), _jsxs("div", { class: "feuille", role: "dialog", "aria-modal": "true", "aria-label": "Diffuser", children: [_jsxs("div", { class: "feuille-tete", children: [_jsx("b", { children: "Diffuser" }), _jsx("button", { type: "button", class: "feuille-fermer", onClick: props.onFermer, "aria-label": "Fermer", children: "\u00D7" })] }), props.partage.warn !== null && _jsx("div", { class: "alerte", children: props.partage.warn }), _jsx("canvas", { ref: canvas, class: "carte-apercu", "aria-label": props.partage.desc }), poids !== null && _jsxs("p", { class: "champ-aide", children: ["PNG de ", poids, " Ko"] }), _jsx("pre", { class: "resume", children: props.partage.txt }), _jsxs("div", { class: "outil-actions", children: [_jsx("button", { type: "button", class: "outil-action principale", onClick: () => void partager(), children: "Partager la carte" }), _jsx("button", { type: "button", class: "outil-action", onClick: () => {
+    return (_jsxs(_Fragment, { children: [_jsx("button", { type: "button", class: "feuille-fond", "aria-label": "Fermer la diffusion", onClick: props.onFermer }), _jsxs("div", { class: "feuille", role: "dialog", "aria-modal": "true", "aria-label": "Diffuser", children: [_jsxs("div", { class: "feuille-tete", children: [_jsx("b", { children: "Diffuser" }), _jsx("button", { type: "button", class: "feuille-fermer", onClick: props.onFermer, "aria-label": "Fermer", children: "\u00D7" })] }), props.partage.warn !== null && _jsx("div", { class: "alerte", children: props.partage.warn }), props.mot !== undefined && props.mot !== '' && _jsx("p", { class: "note", children: props.mot }), _jsx("canvas", { ref: canvas, class: "carte-apercu", "aria-label": props.partage.desc }), poids !== null && _jsxs("p", { class: "champ-aide", children: ["PNG de ", poids, " Ko"] }), _jsx("pre", { class: "resume", children: props.partage.txt }), _jsxs("div", { class: "outil-actions", children: [_jsx("button", { type: "button", class: "outil-action principale", onClick: () => void partager(), children: "Partager la carte" }), _jsx("button", { type: "button", class: "outil-action", onClick: () => {
                                     void copier(props.partage.txt).then((ok) => setMessage(ok ? 'Résumé copié.' : 'Copie impossible sur cet appareil.'));
                                 }, children: "Copier le texte" })] }), message !== '' && _jsx("p", { class: "note", children: message }), _jsx("h3", { class: "outil-surtitre", children: "Relances" }), props.partage.relances.length === 0 ? (_jsx("p", { class: "note", children: props.partage.relancesVides })) : (_jsx("div", { class: "outil-rangees", children: props.partage.relances.map((r) => {
                             const lien = r.tel === null ? null : lienWhatsApp(r.tel, r.message);

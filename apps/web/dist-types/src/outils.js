@@ -11,6 +11,15 @@ export const CHARGEURS = {
     // configuration voyage simplement avec l'outil au lieu d'un squelette.
     compose: () => import('./outils/liste.js'),
     'compose-calcul': () => import('./outils/calc.js'),
+    /*
+     * Une page n'a pas d'état séparé de sa configuration : ce qu'on édite est
+     * ce qui se publie. Son écran est donc l'éditeur et l'aperçu côte à côte,
+     * et non un formulaire qui remplirait un gabarit.
+     */
+    'compose-page': () => import('./outils/page.js'),
+    // La seule des quatre formes qui reçoit : son écran a un onglet de plus, où
+    // arrivent les réponses.
+    'compose-formulaire': () => import('./outils/formulaire.js'),
     devis: () => import('./outils/devis.js'),
     facture: () => import('./outils/facture.js'),
     // Un seul fragment pour les quatre actes : même cadre, même formulaire, seul

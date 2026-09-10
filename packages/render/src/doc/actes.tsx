@@ -69,6 +69,14 @@ function villeDe(adresse: string): string {
 export function DocumentRecu(props: { readonly etat: EtatRecu }): JSX.Element {
   const etat = props.etat
   const t = totauxRecu(etat)
+  /*
+   * Une ligne sans désignation et sans montant ne dit rien : « Ajouter une
+   * ligne » en insère une vide, on peut être interrompu, et le client recevait
+   * un reçu portant une rangée à zéro. La retirer ne change aucun total. Un
+   * poste offert, lui, porte un nom : il s'imprime. Voir `tableau.tsx`, où le
+   * devis et la facture font le même écart.
+   */
+  const lignes = etat.lignes.filter((l) => l.designation.trim() !== '' || l.montant !== 0)
 
   return (
     <PageA4 encre={etat.encre}>
@@ -86,7 +94,7 @@ export function DocumentRecu(props: { readonly etat: EtatRecu }): JSX.Element {
         </div>
       </section>
 
-      {etat.lignes.length === 0 ? (
+      {lignes.length === 0 ? (
         <div class="a4-vide">Aucune ligne pour l’instant.</div>
       ) : (
         <table class="a4-tableau">
@@ -97,7 +105,7 @@ export function DocumentRecu(props: { readonly etat: EtatRecu }): JSX.Element {
             </tr>
           </thead>
           <tbody>
-            {etat.lignes.map((l, i) => (
+            {lignes.map((l, i) => (
               <tr key={`${i}-${l.designation}`}>
                 <td>{l.designation}</td>
                 <td class="nombre">{nf(l.montant)}</td>

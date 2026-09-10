@@ -128,7 +128,14 @@ export function squeletteListe(def: DefinitionListe): SqueletteListe {
     return {
       kicker: config.kicker,
       title: etat.nom,
-      sub: def.title,
+      /*
+       * Le sous-titre dit de quelle sorte d'outil il s'agit — « Livre de
+       * caisse » sous « Caisse de septembre ». Un registre composé par le
+       * modèle n'a pas de sorte : son titre *est* son nom, et la carte
+       * l'écrivait alors deux fois, sur l'image partagée comme sur la page de
+       * lecture.
+       */
+      sub: etat.nom === def.title ? '' : def.title,
       tag: null,
       bigLabel: grand.libelle,
       big: grand.valeur,

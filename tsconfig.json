@@ -17,7 +17,19 @@
       "path": "./packages/ia"
     },
     {
+      "path": "./packages/serveur"
+    },
+    {
+      "path": "./packages/comptes"
+    },
+    {
+      "path": "./packages/etabli"
+    },
+    {
       "path": "./apps/web"
+    },
+    {
+      "path": "./apps/etabli"
     }
   ]
 }

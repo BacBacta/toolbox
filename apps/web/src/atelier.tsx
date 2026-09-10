@@ -1,9 +1,7 @@
-import type { Comprehension, Extrait, FicheSquelette } from '@a237/engine'
-import { CE_QUE_COUTE, EXTRAIT_VIDE, comprendre, etageDe, montantF } from '@a237/engine'
+import type { Comprehension, Etage, Extrait, FicheSquelette } from '@a237/engine'
+import { CE_QUE_COUTE, comprendre, etageDe, montantF } from '@a237/engine'
 import type { JSX } from 'preact'
 import { useState } from 'preact/hooks'
-import { composer } from './composer.js'
-import type { Compose } from './outils.js'
 
 /**
  * L'atelier : on dit ce dont on a besoin, l'outil s'ouvre.
@@ -28,31 +26,17 @@ import type { Compose } from './outils.js'
 
 export interface ProprietesAtelier {
   readonly fiches: readonly FicheSquelette[]
+  readonly onCreer: (skeleton: string, extrait: Extrait) => void
   /**
-   * `fcfa` est ce que la composition a coûté. Il ne sert pas à décorer : la
-   * consommation se paie à l'appel, et une dépense qu'on ne voit pas est une
-   * dépense qu'on découvre à la fin du mois.
+   * Ouvrir la conversation avec l'agent, la phrase déjà tapée en main.
+   *
+   * L'atelier ne compose plus lui-même. Un bouton qui lançait une génération
+   * et rendait un outil marchait, mais il ne laissait aucune place à la
+   * deuxième phrase — et personne ne décrit du premier coup l'outil qu'il
+   * veut.
    */
-  readonly onCreer: (
-    skeleton: string,
-    extrait: Extrait,
-    compose?: Compose,
-    fcfa?: number,
-  ) => void
+  readonly onDiscuter: (demande: string) => void
 }
-
-/** Les identifiants des outils qui n'ont pas de squelette. Voir `outils/`. */
-const ID_COMPOSE_REGISTRE = 'compose'
-const ID_COMPOSE_CALCUL = 'compose-calcul'
-
-type Composition =
-  | 'repos'
-  | 'en-cours'
-  | 'pas-ouvert'
-  | 'sans-credit'
-  | { readonly abonnement: string }
-  | { readonly echoue: string }
-  | { readonly horsSujet: string }
 
 /**
  * Des exemples qui montrent ce qu'une phrase peut porter, pas seulement le nom
@@ -72,48 +56,10 @@ const EXEMPLES: readonly string[] = [
 export function Atelier(props: ProprietesAtelier): JSX.Element {
   const [demande, setDemande] = useState('')
   const [reponse, setReponse] = useState<Comprehension | null>(null)
-  const [composition, setComposition] = useState<Composition>('repos')
 
   function repondre(texte: string): void {
     setDemande(texte)
-    setComposition('repos')
     setReponse(texte.trim() === '' ? null : comprendre(texte, props.fiches))
-  }
-
-  /**
-   * L'étage 2 : le modèle compose un registre que l'étage 1 ne connaissait pas.
-   *
-   * Il ne part que sur un geste — jamais en tapant. Chaque appel coûte de
-   * l'argent (§ 8, moins d'un franc la génération), et lancer une génération à
-   * chaque frappe brûlerait un budget pour des phrases inachevées.
-   */
-  function reussi(): void {
-    setComposition('repos')
-    setDemande('')
-    setReponse(null)
-  }
-
-  function faireComposer(): void {
-    setComposition('en-cours')
-    void composer(demande).then((r) => {
-      if (r.sorte === 'compose') {
-        reussi()
-        props.onCreer(ID_COMPOSE_REGISTRE, EXTRAIT_VIDE, { registre: r.registre }, r.fcfa)
-      } else if (r.sorte === 'calcule') {
-        reussi()
-        props.onCreer(ID_COMPOSE_CALCUL, EXTRAIT_VIDE, { calcul: r.calcul }, r.fcfa)
-      } else if (r.sorte === 'pas-ouvert') {
-        setComposition('pas-ouvert')
-      } else if (r.sorte === 'sans-credit') {
-        setComposition('sans-credit')
-      } else if (r.sorte === 'abonnement-requis') {
-        setComposition({ abonnement: r.pourquoi })
-      } else if (r.sorte === 'hors-sujet') {
-        setComposition({ horsSujet: r.pourquoi })
-      } else {
-        setComposition({ echoue: r.pourquoi })
-      }
-    })
   }
 
   function ouvrir(fiche: FicheSquelette, extrait: Extrait): void {
@@ -159,7 +105,10 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
       )}
 
       {reponse?.sorte === 'sur' && (
-        <Proposition fiche={reponse.fiche} extrait={reponse.extrait} onOuvrir={ouvrir} />
+        <>
+          <Proposition fiche={reponse.fiche} extrait={reponse.extrait} onOuvrir={ouvrir} />
+          <EnParler demande={demande} fiches={props.fiches} onDiscuter={props.onDiscuter} />
+        </>
       )}
 
       {reponse?.sorte === 'ambigu' && (
@@ -178,6 +127,7 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
               </button>
             ))}
           </div>
+          <EnParler demande={demande} fiches={props.fiches} onDiscuter={props.onDiscuter} />
         </div>
       )}
 
@@ -193,65 +143,80 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
       {reponse?.sorte === 'hors-portee' && (
         <div class="atelier-reponse">
           <p class="atelier-dit">
-            Aucun de mes outils ne correspond. Je peux en composer un — un registre
-            avec tes colonnes, ou une calculatrice avec tes champs.
+            Aucun de mes outils ne correspond. On en fabrique un ensemble — un registre,
+            une calculatrice, une page à envoyer sur WhatsApp, ou un formulaire qui
+            ramasse les réponses.
           </p>
 
-          {composition === 'repos' && (
-            <button type="button" class="atelier-option principale" onClick={faireComposer}>
-              <span class="marque" aria-hidden="true">✳</span>
-              <span class="texte">
-                <b>Compose-le pour moi</b>
-                {/*
-                  * Le prix se dit avant le clic, pas après.
-                  *
-                  * L'étage se calcule ici, gratuitement et sans réseau : c'est
-                  * ce qui permet d'annoncer un prix plutôt qu'une facture. Le
-                  * serveur le recalcule et tranche — un prix qu'on peut
-                  * contourner depuis le navigateur n'est pas un prix.
-                  */}
-                <span>{CE_QUE_COUTE[etageDe(demande, props.fiches)]}</span>
-              </span>
-            </button>
-          )}
-
-          {composition === 'en-cours' && <p class="note">Je compose…</p>}
-
-          {typeof composition === 'object' && 'abonnement' in composition && (
-            <p class="note">
-              {composition.abonnement === ''
-                ? 'Cette demande vaut plusieurs outils d’un coup.'
-                : composition.abonnement}
-            </p>
-          )}
-
-          {composition === 'sans-credit' && (
-            <p class="note">
-              Il n’y a plus de crédit pour composer. Les outils que tu as déjà continuent
-              de marcher, et ceux de la liste ci-dessous s’ouvrent sans rien coûter.
-            </p>
-          )}
-
-          {composition === 'pas-ouvert' && (
-            <p class="note">
-              La composition n’est pas encore ouverte. En attendant, prends l’outil le plus
-              proche dans la liste ci-dessous.
-            </p>
-          )}
-
-          {typeof composition === 'object' && 'horsSujet' in composition && (
-            // Le modèle a dit non. On le rapporte tel quel plutôt que de
-            // proposer de réessayer : la réponse ne changera pas, et chaque
-            // essai coûte.
-            <p class="note">{composition.horsSujet}</p>
-          )}
-
-          {typeof composition === 'object' && 'echoue' in composition && (
-            <p class="note">Je n’ai pas pu composer — {composition.echoue}. Réessaie ?</p>
-          )}
+          <EnParler
+            demande={demande}
+            fiches={props.fiches}
+            onDiscuter={props.onDiscuter}
+            principale
+          />
         </div>
       )}
+
     </section>
+  )
+}
+
+/**
+ * La porte de l'atelier, et elle reste ouverte partout.
+ *
+ * Elle n'apparaissait que quand aucun outil ne correspondait. « Un menu pour
+ * mon restaurant » tombe sur « liste de prix » — un bon rapprochement, gratuit
+ * et immédiat, qui garde donc la première place. Mais quelqu'un qui voulait
+ * une vraie page de menu, avec ses rubriques, n'avait aucun moyen de le dire :
+ * il n'y avait qu'un bouton, et il menait ailleurs.
+ *
+ * L'outil qui correspond reste en tête, parce qu'il ne coûte rien et qu'il
+ * s'ouvre tout de suite. La conversation est en dessous, et se paie — d'où le
+ * prix, dit avant le clic.
+ */
+/**
+ * Ce que coûte la conversation, et jamais moins que ce qu'elle coûte.
+ *
+ * `etageDe` rend l'étage 1 — « gratuit, et ça marche hors ligne » — dès qu'un
+ * squelette se détache de la demande, et c'est exact : ce squelette-là est
+ * gratuit. Ça ne l'est pas de ce bouton-ci, qui appelle le modèle et prend un
+ * crédit. Tant que la conversation n'apparaissait qu'à défaut d'outil, la
+ * question ne se posait pas ; elle apparaît maintenant à côté d'eux.
+ */
+function prixDeLaConversation(
+  demande: string,
+  fiches: readonly FicheSquelette[],
+): Exclude<Etage, 1> {
+  const etage = etageDe(demande, fiches)
+  return etage === 1 ? 2 : etage
+}
+
+function EnParler(props: {
+  readonly demande: string
+  readonly fiches: readonly FicheSquelette[]
+  readonly onDiscuter: (demande: string) => void
+  readonly principale?: boolean
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      class={props.principale === true ? 'atelier-option principale' : 'atelier-option'}
+      onClick={() => props.onDiscuter(props.demande)}
+    >
+      <span class="marque" aria-hidden="true">✳</span>
+      <span class="texte">
+        <b>En parler à l’atelier</b>
+        {/*
+          * Le prix se dit avant le clic, pas après.
+          *
+          * L'étage se calcule ici, gratuitement et sans réseau : c'est ce qui
+          * permet d'annoncer un prix plutôt qu'une facture. Le serveur le
+          * recalcule et tranche — un prix qu'on peut contourner depuis le
+          * navigateur n'est pas un prix.
+          */}
+        <span>{CE_QUE_COUTE[prixDeLaConversation(props.demande, props.fiches)]}</span>
+      </span>
+    </button>
   )
 }
 

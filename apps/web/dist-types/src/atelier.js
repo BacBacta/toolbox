@@ -1,10 +1,6 @@
-import { jsx as _jsx, jsxs as _jsxs } from "preact/jsx-runtime";
-import { CE_QUE_COUTE, EXTRAIT_VIDE, comprendre, etageDe, montantF } from '@a237/engine';
+import { Fragment as _Fragment, jsx as _jsx, jsxs as _jsxs } from "preact/jsx-runtime";
+import { CE_QUE_COUTE, comprendre, etageDe, montantF } from '@a237/engine';
 import { useState } from 'preact/hooks';
-import { composer } from './composer.js';
-/** Les identifiants des outils qui n'ont pas de squelette. Voir `outils/`. */
-const ID_COMPOSE_REGISTRE = 'compose';
-const ID_COMPOSE_CALCUL = 'compose-calcul';
 /**
  * Des exemples qui montrent ce qu'une phrase peut porter, pas seulement le nom
  * d'un outil : le premier prouve qu'un montant et une période sont entendus.
@@ -22,51 +18,9 @@ const EXEMPLES = [
 export function Atelier(props) {
     const [demande, setDemande] = useState('');
     const [reponse, setReponse] = useState(null);
-    const [composition, setComposition] = useState('repos');
     function repondre(texte) {
         setDemande(texte);
-        setComposition('repos');
         setReponse(texte.trim() === '' ? null : comprendre(texte, props.fiches));
-    }
-    /**
-     * L'étage 2 : le modèle compose un registre que l'étage 1 ne connaissait pas.
-     *
-     * Il ne part que sur un geste — jamais en tapant. Chaque appel coûte de
-     * l'argent (§ 8, moins d'un franc la génération), et lancer une génération à
-     * chaque frappe brûlerait un budget pour des phrases inachevées.
-     */
-    function reussi() {
-        setComposition('repos');
-        setDemande('');
-        setReponse(null);
-    }
-    function faireComposer() {
-        setComposition('en-cours');
-        void composer(demande).then((r) => {
-            if (r.sorte === 'compose') {
-                reussi();
-                props.onCreer(ID_COMPOSE_REGISTRE, EXTRAIT_VIDE, { registre: r.registre }, r.fcfa);
-            }
-            else if (r.sorte === 'calcule') {
-                reussi();
-                props.onCreer(ID_COMPOSE_CALCUL, EXTRAIT_VIDE, { calcul: r.calcul }, r.fcfa);
-            }
-            else if (r.sorte === 'pas-ouvert') {
-                setComposition('pas-ouvert');
-            }
-            else if (r.sorte === 'sans-credit') {
-                setComposition('sans-credit');
-            }
-            else if (r.sorte === 'abonnement-requis') {
-                setComposition({ abonnement: r.pourquoi });
-            }
-            else if (r.sorte === 'hors-sujet') {
-                setComposition({ horsSujet: r.pourquoi });
-            }
-            else {
-                setComposition({ echoue: r.pourquoi });
-            }
-        });
     }
     function ouvrir(fiche, extrait) {
         setDemande('');
@@ -80,9 +34,36 @@ export function Atelier(props) {
                     // chemin de quelqu'un qui sait ce qu'il veut et tape vite.
                     if (r?.sorte === 'sur')
                         ouvrir(r.fiche, r.extrait);
-                }, children: _jsxs("label", { class: "champ", for: "demande", children: [_jsx("span", { class: "champ-libelle", children: "De quoi as-tu besoin ?" }), _jsx("input", { id: "demande", type: "text", enterkeyhint: "go", autocomplete: "off", value: demande, placeholder: "njangi de 20 000 F par mois\u2026", onInput: (e) => repondre(e.target.value) })] }) }), reponse === null && (_jsx("div", { class: "atelier-exemples", children: EXEMPLES.map((e) => (_jsx("button", { type: "button", class: "atelier-exemple", onClick: () => repondre(e), children: e }, e))) })), reponse?.sorte === 'sur' && (_jsx(Proposition, { fiche: reponse.fiche, extrait: reponse.extrait, onOuvrir: ouvrir })), reponse?.sorte === 'ambigu' && (_jsxs("div", { class: "atelier-reponse", children: [_jsx("p", { class: "atelier-dit", children: "Lequel veux-tu ?" }), _jsx("div", { class: "atelier-choix", children: reponse.fiches.map((f) => (_jsxs("button", { type: "button", class: "atelier-option", onClick: () => ouvrir(f, reponse.extrait), children: [_jsx("span", { class: "marque", "aria-hidden": "true", children: f.glyphe }), _jsx("b", { children: f.title })] }, f.id))) })] })), reponse?.sorte === 'plusieurs' && (_jsx("div", { class: "atelier-reponse", children: _jsx("p", { class: "atelier-dit", children: "\u00C7a fait plusieurs outils d\u2019un coup. Demande-les un par un \u2014 chacun co\u00FBte quelques centimes \u2014 ou prends un abonnement." }) })), reponse?.sorte === 'hors-portee' && (_jsxs("div", { class: "atelier-reponse", children: [_jsx("p", { class: "atelier-dit", children: "Aucun de mes outils ne correspond. Je peux en composer un \u2014 un registre avec tes colonnes, ou une calculatrice avec tes champs." }), composition === 'repos' && (_jsxs("button", { type: "button", class: "atelier-option principale", onClick: faireComposer, children: [_jsx("span", { class: "marque", "aria-hidden": "true", children: "\u2733" }), _jsxs("span", { class: "texte", children: [_jsx("b", { children: "Compose-le pour moi" }), _jsx("span", { children: CE_QUE_COUTE[etageDe(demande, props.fiches)] })] })] })), composition === 'en-cours' && _jsx("p", { class: "note", children: "Je compose\u2026" }), typeof composition === 'object' && 'abonnement' in composition && (_jsx("p", { class: "note", children: composition.abonnement === ''
-                            ? 'Cette demande vaut plusieurs outils d’un coup.'
-                            : composition.abonnement })), composition === 'sans-credit' && (_jsx("p", { class: "note", children: "Il n\u2019y a plus de cr\u00E9dit pour composer. Les outils que tu as d\u00E9j\u00E0 continuent de marcher, et ceux de la liste ci-dessous s\u2019ouvrent sans rien co\u00FBter." })), composition === 'pas-ouvert' && (_jsx("p", { class: "note", children: "La composition n\u2019est pas encore ouverte. En attendant, prends l\u2019outil le plus proche dans la liste ci-dessous." })), typeof composition === 'object' && 'horsSujet' in composition && (_jsx("p", { class: "note", children: composition.horsSujet })), typeof composition === 'object' && 'echoue' in composition && (_jsxs("p", { class: "note", children: ["Je n\u2019ai pas pu composer \u2014 ", composition.echoue, ". R\u00E9essaie ?"] }))] }))] }));
+                }, children: _jsxs("label", { class: "champ", for: "demande", children: [_jsx("span", { class: "champ-libelle", children: "De quoi as-tu besoin ?" }), _jsx("input", { id: "demande", type: "text", enterkeyhint: "go", autocomplete: "off", value: demande, placeholder: "njangi de 20 000 F par mois\u2026", onInput: (e) => repondre(e.target.value) })] }) }), reponse === null && (_jsx("div", { class: "atelier-exemples", children: EXEMPLES.map((e) => (_jsx("button", { type: "button", class: "atelier-exemple", onClick: () => repondre(e), children: e }, e))) })), reponse?.sorte === 'sur' && (_jsxs(_Fragment, { children: [_jsx(Proposition, { fiche: reponse.fiche, extrait: reponse.extrait, onOuvrir: ouvrir }), _jsx(EnParler, { demande: demande, fiches: props.fiches, onDiscuter: props.onDiscuter })] })), reponse?.sorte === 'ambigu' && (_jsxs("div", { class: "atelier-reponse", children: [_jsx("p", { class: "atelier-dit", children: "Lequel veux-tu ?" }), _jsx("div", { class: "atelier-choix", children: reponse.fiches.map((f) => (_jsxs("button", { type: "button", class: "atelier-option", onClick: () => ouvrir(f, reponse.extrait), children: [_jsx("span", { class: "marque", "aria-hidden": "true", children: f.glyphe }), _jsx("b", { children: f.title })] }, f.id))) }), _jsx(EnParler, { demande: demande, fiches: props.fiches, onDiscuter: props.onDiscuter })] })), reponse?.sorte === 'plusieurs' && (_jsx("div", { class: "atelier-reponse", children: _jsx("p", { class: "atelier-dit", children: "\u00C7a fait plusieurs outils d\u2019un coup. Demande-les un par un \u2014 chacun co\u00FBte quelques centimes \u2014 ou prends un abonnement." }) })), reponse?.sorte === 'hors-portee' && (_jsxs("div", { class: "atelier-reponse", children: [_jsx("p", { class: "atelier-dit", children: "Aucun de mes outils ne correspond. On en fabrique un ensemble \u2014 un registre, une calculatrice, une page \u00E0 envoyer sur WhatsApp, ou un formulaire qui ramasse les r\u00E9ponses." }), _jsx(EnParler, { demande: demande, fiches: props.fiches, onDiscuter: props.onDiscuter, principale: true })] }))] }));
+}
+/**
+ * La porte de l'atelier, et elle reste ouverte partout.
+ *
+ * Elle n'apparaissait que quand aucun outil ne correspondait. « Un menu pour
+ * mon restaurant » tombe sur « liste de prix » — un bon rapprochement, gratuit
+ * et immédiat, qui garde donc la première place. Mais quelqu'un qui voulait
+ * une vraie page de menu, avec ses rubriques, n'avait aucun moyen de le dire :
+ * il n'y avait qu'un bouton, et il menait ailleurs.
+ *
+ * L'outil qui correspond reste en tête, parce qu'il ne coûte rien et qu'il
+ * s'ouvre tout de suite. La conversation est en dessous, et se paie — d'où le
+ * prix, dit avant le clic.
+ */
+/**
+ * Ce que coûte la conversation, et jamais moins que ce qu'elle coûte.
+ *
+ * `etageDe` rend l'étage 1 — « gratuit, et ça marche hors ligne » — dès qu'un
+ * squelette se détache de la demande, et c'est exact : ce squelette-là est
+ * gratuit. Ça ne l'est pas de ce bouton-ci, qui appelle le modèle et prend un
+ * crédit. Tant que la conversation n'apparaissait qu'à défaut d'outil, la
+ * question ne se posait pas ; elle apparaît maintenant à côté d'eux.
+ */
+function prixDeLaConversation(demande, fiches) {
+    const etage = etageDe(demande, fiches);
+    return etage === 1 ? 2 : etage;
+}
+function EnParler(props) {
+    return (_jsxs("button", { type: "button", class: props.principale === true ? 'atelier-option principale' : 'atelier-option', onClick: () => props.onDiscuter(props.demande), children: [_jsx("span", { class: "marque", "aria-hidden": "true", children: "\u2733" }), _jsxs("span", { class: "texte", children: [_jsx("b", { children: "En parler \u00E0 l\u2019atelier" }), _jsx("span", { children: CE_QUE_COUTE[prixDeLaConversation(props.demande, props.fiches)] })] })] }));
 }
 /**
  * Ce qu'on a compris, dit avant d'ouvrir.

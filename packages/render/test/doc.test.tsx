@@ -295,3 +295,42 @@ describe('Paragraphes — le texte libre des actes', () => {
     expect(render(<Paragraphes texte="<b>gras</b>" />)).not.toMatch(/<b>/)
   })
 })
+
+describe('une ligne ajoutée puis laissée vide', () => {
+  /*
+   * « Ajouter une ligne » insère une ligne vide, et c'est voulu : on la
+   * remplit ensuite. Reste qu'on peut être interrompu et diffuser sans y
+   * revenir — le client recevait alors un devis portant une rangée de cinq
+   * zéros sans désignation, sur le document imprimé comme sur la page publiée.
+   *
+   * La retirer ne change aucun total : une ligne à zéro n'apporte rien. Elle
+   * reste bien visible dans l'outil, où elle attend d'être remplie ; c'est le
+   * document qui ne l'imprime pas.
+   */
+  const VIDE = { designation: '', quantite: 0, prixUnitaire: 0 }
+
+  it('ne s’imprime pas sur le devis', () => {
+    const avec = render(<DocumentDevis etat={{ ...DEVIS, lignes: [...LIGNES, VIDE] }} />)
+    const sans = render(<DocumentDevis etat={DEVIS} />)
+    expect(avec).toBe(sans)
+  })
+
+  it('ni sur la facture', () => {
+    const avec = render(<DocumentFacture etat={{ ...FACTURE, lignes: [...LIGNES, VIDE] }} maintenant={LE_15_SEPT} />)
+    const sans = render(<DocumentFacture etat={FACTURE} maintenant={LE_15_SEPT} />)
+    expect(avec).toBe(sans)
+  })
+
+  it('mais une ligne nommée sans montant s’imprime : c’est un poste offert', () => {
+    // « Livraison offerte » à zéro franc dit quelque chose ; une ligne sans
+    // nom ni montant ne dit rien.
+    const offerte = { designation: 'Livraison offerte', quantite: 1, prixUnitaire: 0 }
+    const page = render(<DocumentDevis etat={{ ...DEVIS, lignes: [...LIGNES, offerte] }} />)
+    expect(page).toContain('Livraison offerte')
+  })
+
+  it('et un devis qui n’a que des lignes vides le dit', () => {
+    const page = render(<DocumentDevis etat={{ ...DEVIS, lignes: [VIDE, VIDE] }} />)
+    expect(page).toContain('Aucune ligne pour l’instant')
+  })
+})

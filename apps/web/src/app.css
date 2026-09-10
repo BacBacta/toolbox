@@ -533,3 +533,309 @@ body {
     --echelle: 0.78;
   }
 }
+
+/*
+ * L'aperçu d'une page composée.
+ *
+ * Il ne cherche pas à imiter un téléphone dans un cadre : la coquille est déjà
+ * lue sur un téléphone, et un mockup dans un mockup mange la largeur qui sert
+ * à lire. Un filet et le fond du papier suffisent à dire « ceci est ce que le
+ * client verra », et ce qui est dedans est le composant de la page publiée,
+ * pas une approximation.
+ */
+.page-apercu {
+  margin: 0 calc(-1 * var(--pas-3));
+  padding: var(--pas-3);
+  border: 1px solid var(--trait);
+  border-radius: var(--rond-m);
+  background: var(--surface);
+}
+
+/*
+ * Les réponses reçues par un formulaire.
+ *
+ * Une fiche par réponse, et non un tableau : sur 390 px un tableau de huit
+ * colonnes se lit de travers, et ce qu'on veut savoir d'une commande c'est ce
+ * qu'elle contient, pas comment elle se compare aux autres.
+ */
+.reponses {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pas-3);
+}
+
+.reponse {
+  padding: var(--pas-3);
+  border: 1px solid var(--trait);
+  border-radius: var(--rond-m);
+  background: var(--surface);
+}
+
+.reponse-quand {
+  margin: 0 0 var(--pas-2);
+  color: var(--encre-3);
+  font-size: 12px;
+}
+
+.reponse dl {
+  margin: 0;
+}
+
+.reponse-ligne {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--pas-3);
+  padding: 6px 0;
+  border-top: 1px solid var(--trait);
+}
+
+.reponse-ligne:first-child {
+  border-top: 0;
+}
+
+.reponse dt {
+  flex: none;
+  max-width: 45%;
+  color: var(--encre-3);
+  font-size: 13px;
+}
+
+.reponse dd {
+  margin: 0;
+  min-width: 0;
+  text-align: right;
+  font-weight: 600;
+}
+
+.reponses-compte {
+  margin: 0 0 var(--pas-3);
+  font-weight: 700;
+}
+
+/*
+ * L'agent : la conversation, et la fenêtre où l'outil se dessine.
+ *
+ * La fenêtre est **en haut**, et ce n'est pas un détail de goût. Sur un
+ * téléphone, le clavier mange la moitié basse de l'écran dès qu'on tape : ce
+ * qu'on veut regarder pendant qu'on parle doit être au-dessus du fil, sinon il
+ * disparaît au moment précis où l'on demande une modification.
+ */
+.agent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pas-3);
+  min-height: 100dvh;
+  padding-bottom: var(--pas-3);
+}
+
+.agent-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pas-3);
+}
+
+.agent-cout {
+  color: var(--encre-3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-fenetre {
+  /*
+   * Une hauteur plafonnée, avec son propre défilement.
+   *
+   * La fenêtre peut porter une vitrine entière, qui ferait deux écrans : sans
+   * plafond, elle repousse la conversation hors de vue et on ne sait plus à
+   * qui on parle. La moitié de l'écran laisse voir les deux.
+   */
+  flex: none;
+  max-height: 46dvh;
+  overflow-y: auto;
+}
+
+.fenetre {
+  min-height: 132px;
+  padding: var(--pas-4);
+  border: 1px solid var(--trait);
+  border-radius: var(--rond-l);
+  background: var(--surface);
+  box-shadow: var(--ombre-1);
+}
+
+/*
+ * Pendant que ça s'écrit, le cadre s'allume.
+ *
+ * Une bordure qui change de couleur suffit à dire « ça travaille » sans
+ * animer : le § 8 tient un budget, et une animation qui tourne sur un Android
+ * d'entrée de gamme se paie en batterie pendant tout le temps de l'attente.
+ */
+.fenetre.ecrit {
+  border-color: var(--accent);
+}
+
+.fenetre.vide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+  background: transparent;
+  box-shadow: none;
+}
+
+.fenetre-attente {
+  margin: 0;
+  color: var(--encre-3);
+  font-size: 14px;
+  text-align: center;
+}
+
+.fenetre-famille {
+  margin: 0;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.fenetre-titre {
+  margin: 4px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.fenetre-pieces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: var(--pas-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fenetre-pieces li {
+  padding: 5px 10px;
+  border: 1px solid var(--trait);
+  border-radius: var(--rond-plein);
+  font-size: 13px;
+}
+
+.fenetre-encours {
+  margin: var(--pas-3) 0 0;
+  color: var(--encre-3);
+  font-size: 12px;
+}
+
+.agent-fil {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--pas-2);
+  min-height: 120px;
+  overflow-y: auto;
+}
+
+.dit-personne,
+.dit-agent,
+.dit-panne {
+  max-width: 85%;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--rond-l);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.dit-personne {
+  align-self: flex-end;
+  background: var(--accent);
+  color: #fff;
+}
+
+.dit-agent {
+  align-self: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--trait);
+}
+
+.dit-agent.attente {
+  color: var(--encre-3);
+  letter-spacing: 0.2em;
+}
+
+.dit-panne {
+  align-self: flex-start;
+  background: var(--surface);
+  border: 1px solid var(--alerte);
+  color: var(--alerte);
+}
+
+.agent-ouvrir {
+  min-height: var(--cible);
+  padding: 14px 18px;
+  border: 0;
+  border-radius: var(--rond-m);
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+}
+
+.agent-saisie {
+  display: flex;
+  gap: var(--pas-2);
+}
+
+.agent-saisie input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--cible);
+  padding: 12px 14px;
+  border: 1px solid var(--trait);
+  border-radius: var(--rond-m);
+  background: var(--surface);
+  color: var(--encre);
+  font: inherit;
+}
+
+.agent-saisie button {
+  flex: none;
+  min-height: var(--cible);
+  padding: 0 16px;
+  border: 1px solid var(--trait);
+  border-radius: var(--rond-m);
+  background: var(--surface-haute);
+  color: var(--encre);
+  font: inherit;
+  font-weight: 600;
+}
+
+.agent-saisie button:disabled {
+  opacity: 0.5;
+}
+
+/* La fenêtre qui montre la chose elle-même, et non son plan. */
+.fenetre.montre {
+  padding: var(--pas-3);
+}
+
+.fenetre-vue {
+  margin-top: var(--pas-2);
+  padding: var(--pas-3);
+  border-top: 1px solid var(--trait);
+}
+
+/*
+ * L'aperçu est dessiné petit : ce qui compte ici est de reconnaître la page
+ * d'un coup d'œil pendant qu'on discute, pas de la lire. On la lit une fois
+ * l'outil ouvert.
+ */
+.fenetre-vue .vitrine-tete h1 {
+  font-size: 20px;
+}
+
+.fenetre-vue .vitrine {
+  padding: 0;
+}

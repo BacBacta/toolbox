@@ -5,7 +5,15 @@ import {
   retirerLigne, schemaListe, texteDe, totalListe,
 } from '../src/compute/liste.js'
 import type { ConfigListe, EtatListe } from '../src/compute/liste.js'
+import { squeletteDeRegistre } from '../src/compose.js'
+import { REGISTRES_LISTE } from '../src/skeletons/registres.js'
+import type { RenderContext } from '../src/types.js'
 import { estValide, messageErreurs, valider } from '../src/valider.js'
+
+const CTX: RenderContext = {
+  lien: 'atelier237.pages.dev/d/K7M2XQ4BN9PZ',
+  maintenant: new Date('2026-09-09T07:45:00.000Z'),
+}
 
 const CAISSE: ConfigListe = {
   kicker: 'LIVRE DE CAISSE',
@@ -219,5 +227,60 @@ describe('le schéma se déduit des colonnes', () => {
     const item = lignes?.type === 'array' ? lignes.items : undefined
     const entree = item?.type === 'object' ? item.properties['entree'] : undefined
     expect(entree?.title).toBe('Entrée (F CFA)')
+  })
+})
+
+describe('la carte d’un registre composé', () => {
+  /*
+   * Le sous-titre dit de quelle sorte d'outil il s'agit — « Livre de caisse »
+   * sous « Caisse de septembre ». Un registre composé, lui, n'a pas de sorte :
+   * son titre *est* son nom, et la carte l'écrivait donc deux fois, sur la
+   * page de lecture comme sur l'image partagée dans WhatsApp.
+   */
+  const REGISTRE = {
+    titre: 'Ponte des poules',
+    titreNom: 'Jour',
+    kicker: 'REGISTRE',
+    colonnes: [
+      { clef: 'jour', titre: 'Jour', type: 'texte' as const },
+      { clef: 'pondus', titre: 'Pondus', type: 'nombre' as const },
+    ],
+    libelleVide: 'Aucun jour noté.',
+    libelleAjout: 'Ajouter un jour',
+    relancesVides: 'Un registre de ponte ne se relance pas.',
+  }
+
+  it('ne répète pas son titre en sous-titre', () => {
+    const squelette = squeletteDeRegistre(REGISTRE)
+    const carte = squelette.card(squelette.defaults, CTX)
+    expect(carte.title).toBe('Ponte des poules')
+    expect(carte.sub).toBe('')
+  })
+
+  it('emporte le total et les personnes quand la configuration en a', () => {
+    // Deux champs facultatifs : un registre qui totalise, et un registre dont
+    // chaque ligne nomme quelqu'un — celui-là tire des relances `wa.me`. Les
+    // omettre par défaut évite d'inventer un total qui n'a pas de sens.
+    const avec = squeletteDeRegistre({
+      ...REGISTRE,
+      total: { type: 'somme', clef: 'pondus', libelle: 'Oeufs', unite: '' },
+      personnes: true,
+    })
+    expect(avec.config.total).toEqual({ type: 'somme', clef: 'pondus', libelle: 'Oeufs', unite: '' })
+    expect(avec.config.personnes).toBe(true)
+
+    const sans = squeletteDeRegistre(REGISTRE)
+    expect(sans.config.total).toBeUndefined()
+    expect(sans.config.personnes).toBeUndefined()
+  })
+
+  it('mais un squelette du catalogue garde le sien : il dit la sorte', () => {
+    // « Caisse de septembre » sous-titré « Livre de caisse » : les deux
+    // renseignent, et c'est le cas courant.
+    const caisse = REGISTRES_LISTE.find((s) => s.id === 'caisse')
+    if (caisse === undefined) throw new Error('le livre de caisse a disparu du catalogue')
+    const carte = caisse.card({ ...caisse.defaults, nom: 'Caisse de septembre' }, CTX)
+    expect(carte.title).toBe('Caisse de septembre')
+    expect(carte.sub).toBe(caisse.title)
   })
 })

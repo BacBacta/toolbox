@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { EtatNjangi, RenderContext, ShareSpec } from '@a237/engine'
+import type { BatirPartage, EtatNjangi, RenderContext } from '@a237/engine'
 import { ESPACE_INSECABLE } from '@a237/engine'
 import { render as monter } from 'preact'
 import { act } from 'preact/test-utils'
@@ -235,7 +235,7 @@ describe('les gestes appellent le moteur, et rien d’autre', () => {
     const onDiffuser = vi.fn()
     poser(CARNET, () => undefined, onDiffuser)
     cliquer('.outil-action.principale')
-    const partage = onDiffuser.mock.calls[0]?.[0] as ShareSpec
+    const partage = (onDiffuser.mock.calls[0]?.[0] as BatirPartage)(CTX)
     expect(partage.title).toBe('Njangi Nkolbisson')
     expect(partage.card.link).toBe('atl.cm/n/ZBV3?t=36')
     // Les relances attendent le pouce du trésorier (invariant § 2.4).

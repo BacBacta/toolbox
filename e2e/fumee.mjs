@@ -1,11 +1,16 @@
 import { createServer } from 'node:http'
 import { readFileSync, statSync } from 'node:fs'
 import { extname, join, normalize } from 'node:path'
-// playwright-core est installé à part : voir README.md.
-import { chromium } from 'playwright-core'
 import { entetesDe } from './entetes.mjs'
 
-const DIST = '/home/user/toolbox/apps/web/dist'
+// playwright-core est installé à part : voir README.md. Son chemin se passe
+// par PLAYWRIGHT, comme pour les trois autres scripts.
+const CHROME = process.env.CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
+const { chromium } = await import(process.env.PLAYWRIGHT ?? 'playwright-core')
+
+// Le dépôt se trouve tout seul : un chemin écrit en dur ne marchait que sur
+// la machine où ce script a été écrit.
+const DIST = join(new URL('..', import.meta.url).pathname, 'apps/web/dist')
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css',
   '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml',
@@ -51,10 +56,7 @@ const serveur = createServer((req, res) => {
 await new Promise((r) => serveur.listen(5199, '127.0.0.1', r))
 const BASE = 'http://127.0.0.1:5199'
 
-const navigateur = await chromium.launch({
-  executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-  args: ['--no-sandbox'],
-})
+const navigateur = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] })
 // Un Android d'entrée de gamme : petit écran, doigt.
 const contexte = await navigateur.newContext({
   viewport: { width: 360, height: 740 },

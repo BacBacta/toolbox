@@ -81,6 +81,16 @@ export interface CardSpec {
   readonly stamp: string
 }
 
+/**
+ * De quoi bâtir une diffusion, une fois le contexte connu.
+ *
+ * L'écran rend une fonction et non une `ShareSpec` déjà faite, parce que le
+ * lien public n'existe pas encore au moment du clic : il est attribué par le
+ * dépôt, qui a lieu ensuite. Bâtir d'abord ferait une carte sans adresse, et
+ * des relances qui n'en portent pas non plus.
+ */
+export type BatirPartage = (ctx: RenderContext) => ShareSpec
+
 /** Une relance individuelle. Elle part du pouce du propriétaire, via `wa.me`. */
 export interface Relance {
   readonly nom: string
@@ -191,19 +201,74 @@ export interface Skeleton<E = unknown, C extends ComputeMap = ComputeMap> {
  * modèle en phase 4, et à dresser le formulaire d'édition sans table de
  * traduction à part, qui dériverait du schéma dès le deuxième oubli.
  */
+/**
+ * Quand un champ a lieu d'être montré, selon ce que vaut un de ses voisins.
+ *
+ * Une section de page porte `texte` **ou** `lignes`, jamais les deux, et c'est
+ * `sorte` qui décide. Le schéma ne sait pas dire ça — il les déclare tous deux
+ * facultatifs — et l'éditeur montrait donc, pour chaque section, une zone de
+ * texte vide sous une liste de prix et une liste vide sous un paragraphe. La
+ * moitié des champs à l'écran ne menaient nulle part : ce qu'on y tape ne
+ * s'affiche jamais sur la page.
+ *
+ * Il vit dans `ecran`, avec tout ce qui ne sert qu'au formulaire, et non à la
+ * racine du schéma. La raison est concrète : un registre a une propriété qui
+ * s'appelle `libelleAjout` — le bouton du registre composé — et un mot-clef
+ * d'éditeur portant le même nom devenait indiscernable de ce contenu-là dès
+ * qu'on cherchait l'un ou l'autre dans l'invite. Un seul nom réservé, et la
+ * frontière se vérifie d'un coup d'œil.
+ */
+export interface MontrerSi {
+  /** Le champ voisin qui décide, dans le même objet. */
+  readonly champ: string
+  /** Les valeurs qui rendent ce champ pertinent. */
+  readonly vaut: readonly string[]
+}
+
+/**
+ * Ce qui ne sert qu'à dresser le formulaire, et ne part jamais au modèle.
+ *
+ * `pourLeModele` retire cette clef entière, avec les `title`. Ce qui aide à
+ * remplir un formulaire n'aide pas à remplir un JSON, et chaque caractère
+ * d'invite se paie à chaque appel, sur un budget d'un franc (§ 8).
+ */
+export interface ReglagesEcran {
+  /** Quand ce champ a lieu d'être montré, selon un de ses voisins. */
+  readonly montrerSi?: MontrerSi
+  /**
+   * Ce que disent les deux boutons d'une liste.
+   *
+   * Une section de page contient une liste de lignes : les deux sont des
+   * listes, et leurs boutons disaient « Ajouter une ligne » et « Retirer ».
+   * Deux boutons identiques qui détruisent des choses différentes se
+   * distinguent au moment où on s'est trompé.
+   */
+  readonly ajout?: string
+  readonly retrait?: string
+}
+
+interface CommunSchema {
+  readonly title?: string
+  readonly description?: string
+  readonly ecran?: ReglagesEcran
+}
+
 export type JsonSchema =
-  | { readonly type: 'string'; readonly enum?: readonly string[]; readonly minLength?: number; readonly maxLength?: number; readonly title?: string; readonly description?: string }
-  | { readonly type: 'number' | 'integer'; readonly minimum?: number; readonly maximum?: number; readonly title?: string; readonly description?: string }
-  | { readonly type: 'boolean'; readonly title?: string; readonly description?: string }
-  | { readonly type: 'array'; readonly items: JsonSchema; readonly minItems?: number; readonly maxItems?: number; readonly title?: string; readonly description?: string }
-  | {
+  | (CommunSchema & { readonly type: 'string'; readonly enum?: readonly string[]; readonly minLength?: number; readonly maxLength?: number })
+  | (CommunSchema & { readonly type: 'number' | 'integer'; readonly minimum?: number; readonly maximum?: number })
+  | (CommunSchema & { readonly type: 'boolean' })
+  | (CommunSchema & {
+      readonly type: 'array'
+      readonly items: JsonSchema
+      readonly minItems?: number
+      readonly maxItems?: number
+    })
+  | (CommunSchema & {
       readonly type: 'object'
       readonly properties: Readonly<Record<string, JsonSchema>>
       readonly required?: readonly string[]
       readonly additionalProperties?: false
-      readonly title?: string
-      readonly description?: string
-    }
+    })
 
 /** Une erreur de validation, désignée par son chemin dans l'objet. */
 export interface ErreurValidation {

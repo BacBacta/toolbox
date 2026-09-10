@@ -11,8 +11,26 @@ import type { JSX } from 'preact'
  * doit pouvoir recalculer chaque ligne au stylo et retomber sur le total — d'où
  * aussi la règle d'arrondi du moteur, qui arrondit à la ligne avant de sommer.
  */
+/**
+ * Une ligne qui ne dit rien : ni désignation, ni montant.
+ *
+ * « Ajouter une ligne » en insère une vide, et c'est voulu — on la remplit
+ * ensuite. Reste qu'on peut être interrompu et diffuser sans y revenir : le
+ * client recevait alors un devis portant une rangée de cinq zéros sans
+ * désignation. La retirer ne change aucun total, une ligne à zéro n'apportant
+ * rien à la somme ; elle reste bien visible dans l'outil, où elle attend d'être
+ * remplie, et c'est le document qui ne l'imprime pas.
+ *
+ * Le montant compte autant que le nom : « Livraison offerte » à zéro franc dit
+ * quelque chose, et s'imprime.
+ */
+function neDitRien(ligne: Totaux['lignes'][number]): boolean {
+  return ligne.designation.trim() === '' && ligne.montantTTC === 0
+}
+
 export function TableauLignes(props: { readonly totaux: Totaux }): JSX.Element {
-  if (props.totaux.lignes.length === 0) {
+  const lignes = props.totaux.lignes.filter((l) => !neDitRien(l))
+  if (lignes.length === 0) {
     return <div class="a4-vide">Aucune ligne pour l’instant.</div>
   }
   return (
@@ -28,7 +46,7 @@ export function TableauLignes(props: { readonly totaux: Totaux }): JSX.Element {
         </tr>
       </thead>
       <tbody>
-        {props.totaux.lignes.map((l, i) => (
+        {lignes.map((l, i) => (
           <tr key={`${i}-${l.designation}`}>
             <td>{l.designation}</td>
             <td class="nombre">{nf(l.quantite)}</td>

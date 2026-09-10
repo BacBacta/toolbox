@@ -1,0 +1,276 @@
+import { describe, expect, it } from 'vitest'
+import { lireReponseModele } from '../src/composition.js'
+import { MAX_REFUS } from '../src/registre.js'
+
+/**
+ * La frontière : rien de ce que le modèle a dit n'atteint l'écran sans passer
+ * ici.
+ *
+ * L'aiguillage se fait sur **la forme**, et non sur un champ « type » que le
+ * modèle devrait penser à remplir : un champ de discrimination de plus, c'est
+ * une occasion de plus de se tromper, et une reprise coûte un tour.
+ */
+
+const REGISTRE = {
+  titre: 'Suivi des livraisons',
+  kicker: 'SUIVI DES LIVRAISONS',
+  titreNom: 'Nom du dépôt',
+  colonnes: [{ clef: 'client', titre: 'Client', type: 'texte' }],
+  libelleVide: 'Aucune livraison.',
+  libelleAjout: 'Ajouter',
+  relancesVides: 'Un suivi ne se relance pas.',
+}
+
+const CALCUL = {
+  titre: 'Marge', kicker: 'MARGE', titreNom: 'Nom du produit',
+  entrees: [
+    { clef: 'achat', titre: 'Prix d’achat', defaut: 0, unite: 'F' },
+    { clef: 'vente', titre: 'Prix de vente', defaut: 0, unite: 'F' },
+  ],
+  sortie: {
+    libelle: 'Marge', unite: 'F',
+    formule: { op: 'moins', gauche: { ref: 'vente' }, droite: { ref: 'achat' } },
+  },
+}
+
+const PAGE = {
+  titre: 'Quincaillerie', kicker: 'QUINCAILLERIE', accroche: 'Tôles et ciment.',
+  sections: [{ titre: 'Nos prix', sorte: 'prix', lignes: [{ nom: 'Ciment', valeur: '5 800 F' }] }],
+}
+
+const FORMULAIRE = {
+  titre: 'Commandes', kicker: 'TRAITEUR', accroche: 'Commande avant vendredi.',
+  champs: [{ clef: 'nom', titre: 'Ton nom', sorte: 'texte' }],
+  bouton: 'Envoyer', merci: 'C’est noté.',
+}
+
+describe('la forme dit la famille', () => {
+  it.each([
+    ['un registre', REGISTRE, 'registre'],
+    ['une calculatrice', CALCUL, 'calcul'],
+    ['une page', PAGE, 'page'],
+    ['un formulaire', FORMULAIRE, 'formulaire'],
+    ['un refus', { impossible: 'Un logo se dessine, il ne se tient pas en lignes.' }, 'refus'],
+  ])('%s se reconnaît', (_nom, valeur, attendue) => {
+    expect(lireReponseModele(valeur).sorte).toBe(attendue)
+  })
+
+  it('reconnaît le refus avant tout le reste', () => {
+    // Un modèle qui dit « je ne peux pas » a bien travaillé ; le reprendre pour
+    // non-conformité brûlerait un tour à lui faire inventer ce qu'il vient de
+    // refuser d'inventer.
+    expect(lireReponseModele({ impossible: 'Non, je ne peux pas.', colonnes: [] }).sorte).toBe('refus')
+  })
+
+  it('rapporte les reproches quand la forme est bonne et le contenu faux', () => {
+    // Une colonne qui porte un type inconnu : le modèle a écrit quelque chose,
+    // et ce quelque chose est faux. À distinguer de la coquille vide, qui ne
+    // porte rien et se lit comme une question.
+    const lu = lireReponseModele({
+      ...REGISTRE,
+      colonnes: [{ clef: 'quoi', titre: 'Quoi', type: 'vidéo' }],
+    })
+    expect(lu.sorte).toBe('invalide')
+    expect(lu.sorte === 'invalide' && lu.erreurs.length).toBeGreaterThan(0)
+  })
+
+  it('refuse ce qui n’est pas un objet', () => {
+    for (const valeur of [null, 'bonjour', 42, undefined]) {
+      expect(lireReponseModele(valeur).sorte).toBe('invalide')
+    }
+  })
+})
+
+describe('le schéma renvoyé au lieu d’un objet qui le respecte', () => {
+  /*
+   * Mesuré en production : une demande sur dix recevait notre propre schéma,
+   * renvoyé tel quel. Il est long, il se fait couper en route, et le reproche
+   * qui suivait — « la réponse n'est pas du JSON » — ne disait rien de ce qui
+   * s'était passé. La reprise repartait au hasard, et coûtait un tour pour
+   * rien.
+   */
+  it('se reconnaît, et le reproche dit quoi faire', () => {
+    const lu = lireReponseModele({ type: 'object', properties: { titre: { type: 'string' } } })
+    expect(lu.sorte).toBe('invalide')
+    expect(lu.sorte === 'invalide' && lu.erreurs[0]?.message).toContain('renvoyé le schéma')
+  })
+
+  it('ne se déclenche pas sur une colonne qui s’appelle « type »', () => {
+    // Un registre de motos en a une. Mais elle vit dans `colonnes`, pas à la
+    // racine.
+    const motos = {
+      ...REGISTRE,
+      colonnes: [{ clef: 'type', titre: 'Type', type: 'texte' }],
+    }
+    expect(lireReponseModele(motos).sorte).toBe('registre')
+  })
+})
+
+describe('un refus trop long', () => {
+  it('se coupe à un mot, plutôt que d’être jeté', () => {
+    /*
+     * Mesuré en production : un refus de cent quatre-vingt-onze caractères a
+     * été jugé invalide, le modèle repris — donc payé deux fois — puis
+     * abandonné. La personne a dépensé un crédit pour lire « le modèle n'a pas
+     * produit un registre utilisable » à la place d'une phrase qui répondait à
+     * sa question.
+     */
+    const long = `${'Je ne peux pas faire cela, '.repeat(10)}désolé.`
+    const lu = lireReponseModele({ impossible: long })
+    expect(lu.sorte).toBe('refus')
+    if (lu.sorte !== 'refus') return
+    expect(lu.pourquoi.length).toBeLessThanOrEqual(MAX_REFUS)
+    // Coupé à un mot : « je ne peux pas créer ce regis… » donne l'air d'une
+    // panne plutôt que d'une phrase abrégée.
+    expect(lu.pourquoi.endsWith('…')).toBe(true)
+    expect(lu.pourquoi).not.toMatch(/\s…$/)
+  })
+
+  it('mais un refus vide n’est pas un refus', () => {
+    expect(lireReponseModele({ impossible: '' }).sorte).toBe('invalide')
+    expect(lireReponseModele({ impossible: 42 }).sorte).toBe('invalide')
+  })
+})
+
+/**
+ * Le lecteur rend la page redressée, et pas celle qu'il a jugée.
+ *
+ * Juger la redressée puis publier l'originale serait pire que ne rien
+ * redresser : la contradiction passerait le contrôle et ressortirait entière à
+ * l'écran, avec un « liste » qui ne montre aucune ligne. C'est ce que la
+ * frontière est là pour empêcher.
+ */
+describe('une page dont une étiquette contredisait son contenu', () => {
+  const RENDU = {
+    titre: 'Quincaillerie Bépanda',
+    kicker: 'QUINCAILLERIE',
+    accroche: 'Tôles, ciment et outillage, à Bépanda depuis 2012.',
+    sections: [{ titre: 'La livraison', sorte: 'liste', texte: 'Sur tout Douala.' }],
+  }
+
+  it('ressort lisible, et c’est la version corrigée qu’on garde', () => {
+    const lu = lireReponseModele(RENDU)
+    expect(lu.sorte).toBe('page')
+    if (lu.sorte !== 'page') return
+    expect(lu.page.sections[0]?.sorte).toBe('texte')
+    expect(lu.page.sections[0]?.texte).toBe('Sur tout Douala.')
+  })
+
+  it('mais une section qui ne porte rien du tout ne s’invente pas', () => {
+    // Elle s'en va au redressement, et il ne reste alors plus de page : le tour
+    // se lit comme une question, jamais comme une vitrine à trous.
+    expect(lireReponseModele({ ...RENDU, sections: [{ titre: 'Ce que je vends', sorte: 'liste' }] }).sorte)
+      .toBe('vide')
+  })
+})
+
+/**
+ * Le modèle nomme la famille de l'outil, et le contrat ne prévoit pas de le lui
+ * laisser dire.
+ *
+ * Mesuré en production : deux fois sur vingt-quatre, une calculatrice
+ * parfaitement juste — entrées, formule, unités — refusée pour un seul champ
+ * en trop, `"type": "calculatrice"`. Le modèle a quatre schémas devant lui et
+ * aucun moyen de dire lequel il a choisi ; il se le dit à lui-même. La forme
+ * le disait déjà : c'est ainsi que la frontière aiguille.
+ *
+ * Une étiquette de famille ne porte aucun contenu — c'est ce qui la rend
+ * jetable, et ce qui distingue ce cas d'un champ mal nommé, où le contenu, lui,
+ * partirait avec.
+ */
+describe('un outil qui se nomme lui-même', () => {
+  const CALCUL = {
+    type: 'calculatrice',
+    titre: 'Commission',
+    kicker: 'COMMISSION',
+    titreNom: 'Transfert',
+    entrees: [{ clef: 'montant', titre: 'Montant', defaut: 0, unite: 'F' }],
+    sortie: { libelle: 'Commission', unite: 'F', formule: { ref: 'montant' } },
+  }
+
+  it('perd son étiquette et passe', () => {
+    const lu = lireReponseModele(CALCUL)
+    expect(lu.sorte).toBe('calcul')
+    if (lu.sorte !== 'calcul') return
+    expect(lu.calcul).not.toHaveProperty('type')
+  })
+
+  it('« sorte » à la racine se jette aussi : aucun des quatre n’en porte', () => {
+    const { type: _, ...sansType } = CALCUL
+    expect(lireReponseModele({ ...sansType, sorte: 'calcul' }).sorte).toBe('calcul')
+  })
+
+  /*
+   * Ce qui n'est pas une étiquette reste refusé. Sans cette limite, la
+   * tolérance deviendrait « on jette ce qu'on ne comprend pas » — et une
+   * section rangée sous un nom de champ inventé partirait en silence, en
+   * laissant une page à trous publiée sous le nom de quelqu'un.
+   */
+  it('mais un champ inconnu qui porte quelque chose reste refusé', () => {
+    expect(lireReponseModele({ ...CALCUL, type: 'calculatrice', bonus: { a: 1 } }).sorte).toBe('invalide')
+    expect(lireReponseModele({ ...CALCUL, type: ['calculatrice'] }).sorte).toBe('invalide')
+    expect(lireReponseModele({ ...CALCUL, type: 'calculatrice', colonnes: [] }).sorte).toBe('invalide')
+  })
+
+  it('et le schéma renvoyé tel quel reste reconnu comme tel', () => {
+    const lu = lireReponseModele({ type: 'object', properties: { titre: { type: 'string' } } })
+    expect(lu.sorte).toBe('invalide')
+    if (lu.sorte !== 'invalide') return
+    expect(lu.erreurs[0]?.message).toMatch(/tu as renvoyé le schéma/)
+  })
+})
+
+/**
+ * Un outil sans rien dedans n'est pas un outil raté : c'est une question.
+ *
+ * « Un menu pour mon restaurant » : six fois sur six, le modèle demandait le
+ * nom de l'établissement — la bonne question — et joignait une page à zéro
+ * section. Deux passes d'invite n'y ont rien changé ; il veut poser son
+ * ébauche à côté de sa question, et chaque tentative de l'en empêcher déplaçait
+ * le problème ailleurs.
+ *
+ * Alors on le lit pour ce qu'il est. Une coquille vide ne porte aucune
+ * information : la jeter ne perd rien, et ce qui reste — la question — est
+ * exactement ce dont la personne a besoin pour que le tour suivant fabrique
+ * quelque chose. Le tour est réussi ; c'est le refuser qui le gâchait.
+ *
+ * La frontière n'a pas bougé d'un pouce : « vide » ne se dit que d'un outil qui
+ * ne porte rien. Tout ce qui porte quelque chose de faux reste « invalide », et
+ * le dit.
+ */
+describe('un outil qui ne porte rien', () => {
+  it('une page sans section se lit comme une question, pas comme une erreur', () => {
+    const lu = lireReponseModele({ titre: 'Menu', kicker: 'MENU', accroche: 'Nos plats.', sections: [] })
+    expect(lu.sorte).toBe('vide')
+  })
+
+  it('un registre sans colonne, une calculatrice sans entrée, un formulaire sans champ', () => {
+    expect(lireReponseModele({ titre: 'A', kicker: 'A', titreNom: 'A', colonnes: [] }).sorte).toBe('vide')
+    expect(lireReponseModele({ titre: 'A', kicker: 'A', titreNom: 'A', entrees: [] }).sorte).toBe('vide')
+    expect(lireReponseModele({ titre: 'A', kicker: 'A', accroche: 'A', champs: [] }).sorte).toBe('vide')
+    expect(lireReponseModele({}).sorte).toBe('vide')
+  })
+
+  it('une page dont toutes les sections étaient des coquilles aussi', () => {
+    const lu = lireReponseModele({
+      titre: 'Menu', kicker: 'MENU', accroche: 'Nos plats.',
+      sections: [
+        { titre: 'Nos entrées', sorte: 'prix', lignes: [] },
+        { titre: 'Nos plats', sorte: 'prix', lignes: [] },
+      ],
+    })
+    expect(lu.sorte).toBe('vide')
+  })
+
+  it('mais un outil qui porte quelque chose de faux reste invalide, et le dit', () => {
+    const lu = lireReponseModele({
+      titre: 'Menu', kicker: 'MENU', accroche: 'Nos plats.',
+      sections: [{ titre: 'Nos plats', sorte: 'prix', lignes: [{ valeur: '2000 F' }] }],
+    })
+    expect(lu.sorte).toBe('invalide')
+  })
+
+  it('et un refus reste un refus : il porte sa phrase', () => {
+    expect(lireReponseModele({ impossible: 'Un logo se dessine.' }).sorte).toBe('refus')
+  })
+})

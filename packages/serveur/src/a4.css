@@ -1,0 +1,44 @@
+/*
+ * Ce que seuls les écrits A4 emportent : la mise à l'échelle de la feuille et
+ * le lien d'impression. Une vitrine ne se met pas dans une chemise, et une
+ * carte ne s'imprime pas — leur donner ces règles serait du poids sans dessin.
+ */
+/*
+ * La feuille A4 occupe exactement la largeur disponible.
+ *
+ * Par paliers — 0,44 puis 0,66 puis 0,86 — elle ne la remplissait presque
+ * jamais : sur un écran de 500 px elle restait dessinée pour 390, et son texte
+ * finissait plus petit que celui du pied de page. Or c'est le document qu'on
+ * vient lire. Le calcul le met à la largeur juste à chaque taille d'écran, et
+ * s'arrête à 1 : un devis agrandi au-delà de sa taille réelle n'apprend rien de
+ * plus et se met à baver.
+ *
+ * 210 mm valent 793,7 px à 96 ppp ; les 32 px sont les marges du corps. Le
+ * diviseur porte son unité : diviser une longueur par un nombre rend une
+ * longueur, et `min(1, 0.41px)` mélange un nombre et une longueur — déclaration
+ * invalide, silencieusement ignorée. L'échelle retombait alors à 1 et le
+ * document sortait à sa taille réelle, coupé par le cadre sur un téléphone.
+ */
+.a4-cadre {
+  --echelle: min(1, calc((100vw - 32px) / 793.7px));
+  margin: 0 auto;
+}
+@media print {
+  body { padding: 0; background: #fff; }
+  .lecture-pied { display: none; }
+}
+
+/*
+ * « Enregistrer en PDF » : un lien, pas un bouton.
+ *
+ * La page n'a aucun script, et c'est ce qui la rend fiable dans le navigateur
+ * intégré de WhatsApp, sur un téléphone d'entrée de gamme. Un lien de
+ * téléchargement n'en demande pas.
+ */
+.lecture-pdf { margin: 10px 0 0; }
+.lecture-pdf a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+}

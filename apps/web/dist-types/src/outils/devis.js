@@ -14,7 +14,7 @@ export function Outil(props) {
     if (erreurs.length > 0)
         return _jsx(EtatInvalide, { erreurs: erreurs });
     const etat = props.outil.etat;
-    return (_jsx(CadreDocument, { titre: props.outil.nom, glyphe: props.glyphe, sousTitre: `Devis N° ${etat.numero}`, onglet: onglet, onOnglet: setOnglet, onDiffuser: () => props.onDiffuser(devis.share(etat, props.ctx)), children: onglet === 'Document' ? (_jsxs(_Fragment, { children: [_jsx(Manquements, { manquements: controleLegal(etat), consequence: "Sans elles, un client qui veut d\u00E9duire ne pourra pas s\u2019en servir.", onCompleter: () => setOnglet('Modifier') }), _jsx(DocumentDevis, { etat: etat })] })) : (_jsx(ChampsSchema, { schema: devis.schema, valeur: etat, masques: MASQUES, onChange: props.onChange })) }));
+    return (_jsx(CadreDocument, { titre: props.outil.nom, glyphe: props.glyphe, sousTitre: `Devis N° ${etat.numero}`, onglet: onglet, onOnglet: setOnglet, onDiffuser: () => props.onDiffuser((c) => devis.share(etat, c)), children: onglet === 'Document' ? (_jsxs(_Fragment, { children: [_jsx(Manquements, { manquements: controleLegal(etat), consequence: "Sans elles, un client qui veut d\u00E9duire ne pourra pas s\u2019en servir.", onCompleter: () => setOnglet('Modifier') }), _jsx(DocumentDevis, { etat: etat })] })) : (_jsx(ChampsSchema, { schema: devis.schema, valeur: etat, masques: MASQUES, onChange: props.onChange })) }));
 }
 export function creer(_skeleton, maintenant, extrait) {
     const neuf = devis.initialiser?.({ lien: '', maintenant }) ?? devis.defaults;

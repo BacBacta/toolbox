@@ -75,6 +75,19 @@ describe('le reçu', () => {
   }
   const html = enChaine(<DocumentRecu etat={etat} />)
 
+  it('n’imprime pas une ligne ajoutée puis laissée vide', () => {
+    // Même défaut que sur le devis : une rangée « ​ 0 » sans désignation, sur
+    // le reçu qu'on remet au client. La retirer ne change aucun total.
+    const vide = { designation: '', montant: 0 }
+    expect(enChaine(<DocumentRecu etat={{ ...etat, lignes: [...etat.lignes, vide] }} />)).toBe(html)
+  })
+
+  it('mais bien un poste offert, qui porte un nom', () => {
+    const offert = { designation: 'Retouche offerte', montant: 0 }
+    expect(enChaine(<DocumentRecu etat={{ ...etat, lignes: [...etat.lignes, offert] }} />))
+      .toContain('Retouche offerte')
+  })
+
   it('montre le total, la somme reçue et le reste', () => {
     expect(html).toContain('Total')
     expect(html).toContain('Somme reçue ce jour')

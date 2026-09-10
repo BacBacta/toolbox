@@ -1,0 +1,247 @@
+/*
+ * L'Établi, sur un écran de 360 pixels.
+ *
+ * Deux règles gouvernent tout le reste. Les zones tactiles font au moins
+ * 44 pixels, parce qu'en dessous on rate la cible sur un écran de téléphone
+ * tenu d'une main dans un taxi. Et la hauteur est un budget : le clavier prend
+ * la moitié basse dès qu'on touche la zone de texte, donc tout ce qui n'est pas
+ * le code lui-même doit tenir en une ligne.
+ */
+
+:root {
+  --vert: #14532d;
+  --vert-clair: #dcfce7;
+  --encre: #111827;
+  --gris: #6b7280;
+  --bord: #e5e7eb;
+  --fond: #f9fafb;
+  --rouge: #b91c1c;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--encre);
+  background: var(--fond);
+  /* La barre du navigateur mobile bouge ; dvh suit, vh ment. */
+  min-height: 100dvh;
+}
+
+.chargement { padding: 24px; color: var(--gris); }
+
+/* --- La liste --- */
+
+.liste { padding: 16px; padding-bottom: 40px; }
+.liste h1 { margin: 0; font-size: 28px; color: var(--vert); }
+.sous-titre { margin: 4px 0 24px; color: var(--gris); }
+.liste h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .04em; color: var(--gris); }
+
+.modeles { display: grid; gap: 8px; }
+.modele, .projet {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 14px;
+  min-height: 44px;
+  border: 1px solid var(--bord);
+  border-radius: 10px;
+  background: white;
+  font: inherit;
+  cursor: pointer;
+}
+.modele b, .projet b { display: block; font-size: 16px; }
+.modele span, .projet span { display: block; margin-top: 2px; font-size: 13px; color: var(--gris); }
+
+.projets { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.projets li { display: flex; gap: 8px; align-items: stretch; }
+.effacer {
+  flex: 0 0 44px;
+  min-height: 44px;
+  border: 1px solid var(--bord);
+  border-radius: 10px;
+  background: white;
+  color: var(--gris);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+/* --- Un projet ouvert --- */
+
+.projet-ouvert { display: flex; flex-direction: column; height: 100dvh; }
+
+.barre {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--bord);
+  background: white;
+}
+.barre .nom {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.retour, .lancer {
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 0;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.retour { background: none; color: var(--vert); padding-left: 0; }
+.lancer { background: var(--vert); color: white; }
+
+/* --- L'éditeur --- */
+
+.editeur { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+.onglets {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  overflow-x: auto;
+  background: white;
+  border-bottom: 1px solid var(--bord);
+}
+.onglet {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  background: var(--fond);
+  font: inherit;
+  font-size: 13px;
+  font-family: var(--mono);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.onglet.actif { background: var(--vert-clair); border-color: var(--vert); color: var(--vert); }
+.onglet.ajout { font-size: 18px; padding: 0 14px; }
+
+.nouveau-fichier { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; background: white; }
+.nouveau-fichier input {
+  flex: 1;
+  min-width: 140px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  font: inherit;
+  font-family: var(--mono);
+}
+.nouveau-fichier button {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--vert);
+  color: white;
+  font: inherit;
+  cursor: pointer;
+}
+.nouveau-fichier .discret { background: none; color: var(--gris); }
+.reproche { flex: 1 0 100%; margin: 0; color: var(--rouge); font-size: 13px; }
+
+.zone {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  resize: none;
+  font-family: var(--mono);
+  /* Seize pixels : en dessous, iOS zoome à la mise au point et l'écran saute. */
+  font-size: 16px;
+  line-height: 1.5;
+  tab-size: 2;
+  /* Une ligne longue se replie plutôt que de sortir par la droite. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: white;
+}
+.zone:focus { outline: 2px solid var(--vert); outline-offset: -2px; }
+.vide { padding: 24px; color: var(--gris); }
+
+/*
+ * La rangée de symboles, collée au-dessus du clavier.
+ *
+ * C'est la pièce qui rend l'écriture de code possible sur un téléphone : une
+ * accolade est à trois appuis de profondeur sur un clavier Android, derrière
+ * deux pages de symboles. Ici, un appui.
+ */
+.symboles {
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  overflow-x: auto;
+  background: white;
+  border-top: 1px solid var(--bord);
+}
+.symbole {
+  flex: 0 0 auto;
+  min-width: 40px;
+  min-height: 44px;
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  background: var(--fond);
+  font-family: var(--mono);
+  font-size: 17px;
+  cursor: pointer;
+}
+.symbole:active { background: var(--vert-clair); }
+
+/* --- L'aperçu --- */
+
+.apercu { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.apercu-cadre { flex: 1; min-height: 0; width: 100%; border: 0; background: white; }
+
+.console-titre {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-top: 1px solid var(--bord);
+  background: white;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.console-titre.a-des-erreurs { color: var(--rouge); font-weight: 600; }
+.console-compte { color: var(--gris); font-size: 13px; }
+
+.console {
+  max-height: 40dvh;
+  overflow-y: auto;
+  padding: 8px 12px;
+  background: #111827;
+  color: #e5e7eb;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.console-ligne { margin: 0 0 6px; white-space: pre-wrap; word-break: break-word; }
+.console-ligne.erreur { color: #fca5a5; }
+.console-vide { margin: 0; color: #9ca3af; }
+.console-vide code { color: #e5e7eb; }
+
+.actions { display: flex; gap: 8px; padding: 8px; background: white; border-top: 1px solid var(--bord); }
+.actions button {
+  flex: 1;
+  min-height: 44px;
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  background: var(--fond);
+  font: inherit;
+  cursor: pointer;
+}

@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import type { ConfigListe, EtatListe, RenderContext, ShareSpec } from '@a237/engine'
+import type { BatirPartage, ConfigListe, EtatListe, RenderContext } from '@a237/engine'
 import { ESPACE_INSECABLE, prix, stock } from '@a237/engine'
 import { render as monter } from 'preact'
 import { act } from 'preact/test-utils'
@@ -64,7 +64,7 @@ function poser(
   etat: EtatListe,
   squelette: typeof prix,
   onChange: (e: EtatListe) => void = () => undefined,
-  onDiffuser: (p: ShareSpec) => void = () => undefined,
+  onDiffuser: (batir: BatirPartage) => void = () => undefined,
 ): void {
   act(() => {
     monter(
@@ -150,7 +150,8 @@ describe('les gestes appellent le moteur', () => {
     const onDiffuser = vi.fn()
     poser(CONFIG_PRIX, BOUTIQUE, prix, () => undefined, onDiffuser)
     cliquer('.outil-action.principale')
-    const partage = onDiffuser.mock.calls[0]?.[0] as ShareSpec
+    // L'écran rend de quoi bâtir : le lien n'existe qu'après le dépôt.
+    const partage = (onDiffuser.mock.calls[0]?.[0] as BatirPartage)(CTX)
     expect(partage.card.kicker).toBe('LISTE DE PRIX')
     expect(partage.relancesVides).toContain('se diffuse')
   })

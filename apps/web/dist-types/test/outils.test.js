@@ -47,7 +47,7 @@ describe('le registre des outils', () => {
     it('couvre les squelettes qui ont un écran, et le dit', () => {
         expect(Object.keys(CHARGEURS).sort()).toEqual([
             'ardoise', 'attestation', 'caisse', 'callbox', 'clients', 'compose',
-            'compose-calcul', 'course', 'cv', 'dette', 'devis', 'facture', 'motivation',
+            'compose-calcul', 'compose-formulaire', 'compose-page', 'course', 'cv', 'dette', 'devis', 'facture', 'motivation',
             'njangi', 'presence', 'prix', 'recu', 'scolarite', 'stock',
         ]);
         expect(outilDisponible('njangi')).toBe(true);
@@ -84,7 +84,7 @@ describe.each([
         const module = await CHARGEURS[id]();
         const onDiffuser = poser(module, outil(id, module.creer(id, LE_9_SEPT, EXTRAIT_VIDE).etat));
         act(() => hote.querySelector('.outil-action.principale')?.click());
-        const partage = onDiffuser.mock.calls[0]?.[0];
+        const partage = onDiffuser.mock.calls[0]?.[0]?.(CTX);
         expect(partage?.card.link).toBe('atl.cm/a/ZBV3');
     });
 });
@@ -241,7 +241,7 @@ describe('les quatre actes et lettres', () => {
         const neuf = module.creer('recu', LE_9_SEPT, EXTRAIT_VIDE);
         const onDiffuser = poser(module, outil('recu', neuf.etat));
         act(() => hote.querySelector('.outil-action.principale')?.click());
-        const partage = onDiffuser.mock.calls[0]?.[0];
+        const partage = onDiffuser.mock.calls[0]?.[0]?.(CTX);
         expect(partage?.card.kicker).toBe('REÇU');
         expect(partage?.relances).toEqual([]);
     });
@@ -342,7 +342,7 @@ describe('l’ardoise', () => {
         const neuf = module.creer('ardoise', LE_9_SEPT, EXTRAIT_VIDE);
         const onDiffuser = poser(module, outil('ardoise', neuf.etat));
         act(() => hote.querySelector('.outil-action.principale')?.click());
-        const partage = onDiffuser.mock.calls[0]?.[0];
+        const partage = onDiffuser.mock.calls[0]?.[0]?.(CTX);
         expect(partage?.warn).toContain('pour toi, pas pour un groupe');
     });
 });

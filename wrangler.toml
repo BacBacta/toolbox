@@ -13,3 +13,33 @@
 name = "atelier237"
 compatibility_date = "2026-01-01"
 pages_build_output_dir = "apps/web/dist"
+
+# L'instantané publié : un `GET` par lien ouvert, mis en cache au bord.
+[[kv_namespaces]]
+binding = "INSTANTANES"
+id = "5e3c4fb72fd541f3ac31cfd40f9d2618"
+
+# La carte PNG, dessinée sur le téléphone et téléversée au dépôt.
+# R2 est retenu pour une raison chiffrable : pas de frais de sortie. C'est ce
+# qu'on sert le plus, puisque l'aperçu WhatsApp est le tableau de bord.
+[[r2_buckets]]
+binding = "CARTES"
+bucket_name = "atelier237-cartes"
+
+# Les comptes, les appareils, les paiements et le journal des coûts.
+# D1 est du SQLite : relationnel, transactionnel — c'est cette transaction qui
+# empêche un paiement de passer à « réussi » sans que l'abonnement suive.
+# Le schéma vit dans `packages/comptes/migrations/`.
+[[d1_databases]]
+binding = "COMPTES"
+database_name = "atelier237-comptes"
+database_id = "bec8ca4c-a267-4fcc-abef-e14b772fa996"
+
+# Le navigateur qui rend les PDF (§ 7, phase 5).
+#
+# Le brief prévoyait un service Playwright sur un petit VPS : Cloudflare rend le
+# même service par une liaison, sans second hébergeur à tenir, et sans paquet —
+# `quickAction` ne demande ni `puppeteer` ni jeton d'API. Dix minutes de
+# navigateur par jour sur le plan gratuit, soit deux à trois cents feuilles.
+[browser]
+binding = "NAVIGATEUR"

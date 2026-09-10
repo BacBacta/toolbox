@@ -78,10 +78,18 @@ describe('le champ dépend du type', () => {
     expect(champ?.maxLength).toBe(40)
   })
 
-  it('rend un paragraphe au-delà de cent vingt caractères', () => {
+  it('rend un paragraphe à partir de cent caractères', () => {
     poser({ type: 'string', title: 'Conditions', maxLength: 200 }, '')
     expect(hote.querySelector('textarea')).not.toBeNull()
     expect(hote.querySelector('input[type="text"]')).toBeNull()
+  })
+
+  it('et à cent vingt exactement, ce qui est la taille d’une accroche', () => {
+    // Le seuil était « au-delà de cent vingt » : une accroche de page en fait
+    // exactement cent vingt et tombait dans un champ d'une ligne, qui n'en
+    // montrait que la moitié. On ne relit pas une phrase qu'on ne voit pas.
+    poser({ type: 'string', title: 'Accroche', maxLength: 120 }, '')
+    expect(hote.querySelector('textarea')).not.toBeNull()
   })
 
   it('rend une liste déroulante pour un enum', () => {
@@ -310,4 +318,98 @@ describe('« Ajouter une ligne » ne doit jamais casser l’outil', () => {
       expect(fautives).toEqual([])
     },
   )
+})
+
+describe('deux listes sur le même écran', () => {
+  /*
+   * Une section de page contient une liste de lignes : les deux sont des
+   * listes, et leurs boutons disaient la même chose. Deux boutons identiques
+   * qui détruisent des choses différentes se distinguent au moment où on s'est
+   * trompé — et sur un téléphone, c'est trop tard.
+   */
+  const imbrique: JsonSchema = {
+    type: 'array',
+    title: 'Sections',
+    ecran: { ajout: 'Ajouter une section', retrait: 'Retirer la section' },
+    items: {
+      type: 'object',
+      properties: {
+        titre: { type: 'string', title: 'Titre' },
+        lignes: {
+          type: 'array',
+          title: 'Lignes',
+          ecran: { ajout: 'Ajouter une ligne', retrait: 'Retirer la ligne' },
+          items: { type: 'object', properties: { nom: { type: 'string', title: 'Nom' } } },
+        },
+      },
+    },
+  }
+
+  it('nomme ce que chaque bouton ajoute et retire', () => {
+    poser(imbrique, [{ titre: 'Nos prix', lignes: [{ nom: 'Ciment' }] }])
+    const textes = [...hote.querySelectorAll('button')].map((b) => b.textContent)
+    expect(textes).toContain('Ajouter une section')
+    expect(textes).toContain('Ajouter une ligne')
+    expect(textes).toContain('Retirer la section')
+    expect(textes).toContain('Retirer la ligne')
+  })
+})
+
+describe('un champ qui dépend de son voisin', () => {
+  /*
+   * Une section porte un texte **ou** des lignes, jamais les deux, et le
+   * schéma ne sait dire que « facultatif ». L'éditeur montrait donc une zone
+   * de texte vide sous chaque liste de prix : ce qu'on y tape ne s'affiche
+   * jamais, et rien ne le dit.
+   */
+  const conditionnel: JsonSchema = {
+    type: 'object',
+    properties: {
+      sorte: { type: 'string', enum: ['texte', 'liste'], title: 'Sorte' },
+      texte: { type: 'string', title: 'Texte', ecran: { montrerSi: { champ: 'sorte', vaut: ['texte'] } } },
+      lignes: {
+        type: 'array',
+        title: 'Lignes',
+        items: { type: 'string' },
+        ecran: { montrerSi: { champ: 'sorte', vaut: ['liste'] } },
+      },
+    },
+  }
+
+  it('cache ce qui ne mènerait nulle part', () => {
+    poser(conditionnel, { sorte: 'liste', lignes: [] })
+    expect(hote.textContent).toContain('Lignes')
+    expect(hote.textContent).not.toContain('Texte')
+  })
+
+  it('et le montre dès que le voisin change', () => {
+    poser(conditionnel, { sorte: 'texte', texte: '' })
+    expect(hote.textContent).toContain('Texte')
+    expect(hote.textContent).not.toContain('Lignes')
+  })
+
+  it('montre tout quand la règle ne peut pas se lire', () => {
+    // Mieux vaut un champ de trop qu'un champ dont on ne soupçonne pas
+    // l'existence : celui-là, on ne le cherche jamais.
+    poser(conditionnel, null)
+    expect(hote.textContent).toContain('Texte')
+    expect(hote.textContent).toContain('Lignes')
+  })
+})
+
+describe('les aides, qui ne se répètent pas', () => {
+  it('se disent une fois par liste et non une fois par ligne', () => {
+    // Huit lignes de trois champs faisaient vingt-quatre aides identiques :
+    // le formulaire d'une page tenait sur cinq mille pixels de haut.
+    const avecAide: JsonSchema = {
+      type: 'array',
+      title: 'Lignes',
+      items: {
+        type: 'object',
+        properties: { nom: { type: 'string', title: 'Nom', description: 'Ex. « Ciment ».' } },
+      },
+    }
+    poser(avecAide, [{ nom: 'a' }, { nom: 'b' }, { nom: 'c' }])
+    expect(hote.querySelectorAll('.champ-aide')).toHaveLength(1)
+  })
 })
