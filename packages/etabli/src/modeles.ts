@@ -1,3 +1,4 @@
+import type { Langue } from './expliquer.js'
 import type { Fichier } from './projet.js'
 
 /**
@@ -20,7 +21,7 @@ export interface Modele {
   readonly fichiers: readonly Fichier[]
 }
 
-export const MODELES: readonly Modele[] = [
+const MODELES_FR: readonly Modele[] = [
   {
     id: 'vide',
     nom: 'Page vide',
@@ -145,3 +146,148 @@ export const MODELES: readonly Modele[] = [
     ],
   },
 ]
+
+/*
+ * Les mêmes trois modèles, en anglais — code compris.
+ *
+ * Traduire le nom et la description seulement aurait laissé un anglophone
+ * devant `const bouton = document.getElementById("bouton")` et
+ * `mot.textContent = "Tu as appuyé…"`. Le tout premier code qu'on lit est
+ * celui qui apprend à nommer les choses : le lui donner dans une langue qu'il
+ * ne lit pas, c'est lui apprendre à recopier sans comprendre.
+ *
+ * Les prix restent en francs CFA dans les deux : la monnaie du pays ne change
+ * pas avec la langue, et le Nord-Ouest paie en francs comme le reste.
+ */
+const MODELES_EN: readonly Modele[] = [
+  {
+    id: 'vide',
+    nom: 'Blank page',
+    dit: 'Just enough to start from nothing.',
+    fichiers: [
+      { nom: 'index.html', contenu: '<h1>Hello</h1>\n' },
+      { nom: 'style.css', contenu: 'body {\n  font-family: system-ui, sans-serif;\n  padding: 16px;\n}\n' },
+      { nom: 'script.js', contenu: '' },
+    ],
+  },
+  {
+    id: 'bouton',
+    nom: 'A button that answers',
+    dit: 'HTML, CSS and JavaScript working together.',
+    fichiers: [
+      {
+        nom: 'index.html',
+        contenu: [
+          '<h1>My page</h1>',
+          '<p id="word">Press the button.</p>',
+          '<button id="button">Press here</button>',
+          '',
+        ].join('\n'),
+      },
+      {
+        nom: 'style.css',
+        contenu: [
+          'body {',
+          '  font-family: system-ui, sans-serif;',
+          '  padding: 16px;',
+          '}',
+          'button {',
+          '  font-size: 18px;',
+          '  padding: 12px 20px;',
+          '  border: 0;',
+          '  border-radius: 8px;',
+          '  background: #14532d;',
+          '  color: white;',
+          '}',
+          '',
+        ].join('\n'),
+      },
+      {
+        nom: 'script.js',
+        contenu: [
+          'const button = document.getElementById("button")',
+          'const word = document.getElementById("word")',
+          'let times = 0',
+          '',
+          'button.addEventListener("click", () => {',
+          '  times = times + 1',
+          '  word.textContent = "You pressed " + times + " times."',
+          '  console.log("press number", times)',
+          '})',
+          '',
+        ].join('\n'),
+      },
+    ],
+  },
+  {
+    id: 'monnaie',
+    nom: 'Giving change',
+    dit: 'Read a number, do the maths, show the answer.',
+    fichiers: [
+      {
+        nom: 'index.html',
+        contenu: [
+          '<h1>Giving change</h1>',
+          '<label>Price to pay',
+          '  <input id="price" type="number" value="1750">',
+          '</label>',
+          '<label>Customer gives',
+          '  <input id="given" type="number" value="2000">',
+          '</label>',
+          '<button id="work-it-out">Work it out</button>',
+          '<p id="answer"></p>',
+          '',
+        ].join('\n'),
+      },
+      {
+        nom: 'style.css',
+        contenu: [
+          'body {',
+          '  font-family: system-ui, sans-serif;',
+          '  padding: 16px;',
+          '}',
+          'label {',
+          '  display: block;',
+          '  margin: 12px 0;',
+          '}',
+          'input {',
+          '  display: block;',
+          '  font-size: 18px;',
+          '  padding: 8px;',
+          '  width: 100%;',
+          '  box-sizing: border-box;',
+          '}',
+          '#answer {',
+          '  font-size: 22px;',
+          '  font-weight: bold;',
+          '}',
+          '',
+        ].join('\n'),
+      },
+      {
+        nom: 'script.js',
+        contenu: [
+          'document.getElementById("work-it-out").addEventListener("click", () => {',
+          '  const price = Number(document.getElementById("price").value)',
+          '  const given = Number(document.getElementById("given").value)',
+          '  const change = given - price',
+          '',
+          '  if (change < 0) {',
+          '    document.getElementById("answer").textContent = (-change) + " F short"',
+          '  } else {',
+          '    document.getElementById("answer").textContent = "Give back " + change + " F"',
+          '  }',
+          '})',
+          '',
+        ].join('\n'),
+      },
+    ],
+  },
+]
+
+const PAR_LANGUE: Readonly<Record<Langue, readonly Modele[]>> = { fr: MODELES_FR, en: MODELES_EN }
+
+/** Les modèles, dans la langue de la personne. */
+export function modeles(langue: Langue): readonly Modele[] {
+  return PAR_LANGUE[langue]
+}

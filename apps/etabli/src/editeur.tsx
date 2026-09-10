@@ -1,4 +1,4 @@
-import type { Fichier, Projet } from '@a237/etabli'
+import type { Fichier, Langue, Projet, Textes } from '@a237/etabli'
 import { MAX_FICHIERS, sorteDuFichier, verifierNomDeFichier } from '@a237/etabli'
 import type { JSX } from 'preact'
 import { useRef, useState } from 'preact/hooks'
@@ -57,6 +57,8 @@ export function Editeur(props: {
   readonly onOuvrir: (nom: string) => void
   readonly onEcrire: (nom: string, contenu: string) => void
   readonly onAjouter: (fichier: Fichier) => void
+  readonly langue: Langue
+  readonly t: Textes
 }): JSX.Element {
   const zone = useRef<HTMLTextAreaElement | null>(null)
   const [nouveau, setNouveau] = useState<string | null>(null)
@@ -102,7 +104,7 @@ export function Editeur(props: {
 
   function ajouter(): void {
     const nom = (nouveau ?? '').trim()
-    const probleme = verifierNomDeFichier(nom, props.projet.fichiers.map((f) => f.nom))
+    const probleme = verifierNomDeFichier(nom, props.projet.fichiers.map((f) => f.nom), props.langue)
     if (probleme !== null) {
       setReproche(probleme)
       return
@@ -139,27 +141,27 @@ export function Editeur(props: {
           <input
             type="text"
             value={nouveau}
-            placeholder="page.html"
+            placeholder={props.t.nomDeFichier}
             {...SANS_CORRECTION}
             onInput={(e) => setNouveau((e.target as HTMLInputElement).value)}
           />
-          <button type="button" onClick={ajouter}>Ajouter</button>
+          <button type="button" onClick={ajouter}>{props.t.ajouter}</button>
           <button type="button" class="discret" onClick={() => { setNouveau(null); setReproche('') }}>
-            Annuler
+            {props.t.annuler}
           </button>
           {reproche !== '' && <p class="reproche">{reproche}</p>}
         </div>
       )}
 
       {fichier === undefined ? (
-        <p class="vide">Ce projet n’a pas encore de fichier.</p>
+        <p class="vide">{props.t.sansFichier}</p>
       ) : (
         <textarea
           ref={zone}
           class="zone"
           value={fichier.contenu}
           onInput={(e) => props.onEcrire(fichier.nom, (e.target as HTMLTextAreaElement).value)}
-          aria-label={`Contenu de ${fichier.nom}`}
+          aria-label={props.t.contenuDe(fichier.nom)}
           data-sorte={sorteDuFichier(fichier.nom)}
           {...SANS_CORRECTION}
           /*
@@ -177,7 +179,7 @@ export function Editeur(props: {
         />
       )}
 
-      <div class="symboles" aria-label="Caractères du clavier">
+      <div class="symboles" aria-label={props.t.rangeeSymboles}>
         {SYMBOLES.map((s) => (
           <button
             type="button"

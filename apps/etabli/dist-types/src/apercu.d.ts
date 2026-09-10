@@ -1,4 +1,4 @@
-import type { Projet } from '@a237/etabli';
+import type { Langue, Projet, Textes } from '@a237/etabli';
 import type { JSX } from 'preact';
 /**
  * Ce que le code fait, et ce qu'il dit.
@@ -17,4 +17,6 @@ export declare function Apercu(props: {
     readonly projet: Projet;
     /** Change à chaque « Lancer » : c'est ce qui force le cadre à repartir de zéro. */
     readonly tour: number;
+    readonly langue: Langue;
+    readonly t: Textes;
 }): JSX.Element;

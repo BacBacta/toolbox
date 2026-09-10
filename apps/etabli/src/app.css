@@ -35,7 +35,26 @@ body {
 /* --- La liste --- */
 
 .liste { padding: 16px; padding-bottom: 40px; }
+.entete { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .liste h1 { margin: 0; font-size: 28px; color: var(--vert); }
+
+/*
+ * Le bouton de langue porte le nom de l'autre langue : c'est ce vers quoi il
+ * mène. Discret — on le règle une fois — mais toujours visible, parce que
+ * celui qui en a besoin est justement celui qui ne lit pas ce qu'il y a autour.
+ */
+.langue {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--bord);
+  border-radius: 999px;
+  background: white;
+  font: inherit;
+  font-size: 13px;
+  color: var(--vert);
+  cursor: pointer;
+}
 .sous-titre { margin: 4px 0 24px; color: var(--gris); }
 .liste h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .04em; color: var(--gris); }
 
@@ -300,3 +319,22 @@ body {
   text-decoration: none;
   cursor: pointer;
 }
+
+/*
+ * L'explication sous l'erreur.
+ *
+ * Le message d'origine reste au-dessus, en petit : il faudra le reconnaître le
+ * jour où on le cherchera dans un moteur de recherche, et le cacher
+ * apprendrait à dépendre de l'Établi. L'explication, elle, est ce qu'on lit.
+ */
+.console-brut { margin: 0; opacity: .75; font-size: 12px; }
+
+.console-explication {
+  margin-top: 6px;
+  padding-left: 10px;
+  border-left: 2px solid #4ade80;
+  color: #e5e7eb;
+}
+.console-explication .quoi { margin: 0; font-weight: 700; }
+.console-explication .faire { margin: 4px 0 0; opacity: .9; }
+.console-ligne.erreur .console-explication { border-left-color: #fca5a5; }

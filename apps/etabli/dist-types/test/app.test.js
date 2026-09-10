@@ -1,7 +1,7 @@
 import { jsx as _jsx } from "preact/jsx-runtime";
 // @vitest-environment happy-dom
 import 'fake-indexeddb/auto';
-import { MODELES } from '@a237/etabli';
+import { modeles } from '@a237/etabli';
 import { render as monter } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -36,6 +36,15 @@ function cliquer(selecteur, texte) {
 }
 beforeEach(async () => {
     await clear(PROJETS);
+    /*
+     * La langue est fixée, et non héritée du système.
+     *
+     * Sans ça ces essais dépendent de la locale du moteur — happy-dom annonce
+     * `en-US`, et l'application s'ouvrait donc en anglais, ce qui les faisait
+     * tous échouer sur des libellés français. Un essai qui change de résultat
+     * selon la machine ne garde rien.
+     */
+    localStorage.setItem('etabli:langue', 'fr');
 });
 /**
  * L'Établi s'ouvre sur ce qu'on peut faire, pas sur un éditeur vide.
@@ -46,7 +55,7 @@ beforeEach(async () => {
 describe('l’écran d’accueil', () => {
     it('propose les modèles', async () => {
         await ouvrir();
-        for (const m of MODELES)
+        for (const m of modeles('fr'))
             expect(hote.textContent).toContain(m.nom);
     });
     it('ne montre pas de liste de projets quand il n’y en a pas', async () => {
@@ -276,5 +285,52 @@ describe('ce qu’on fait du lien une fois obtenu', () => {
         expect(wa.href).toContain('wa.me');
         expect(decodeURIComponent(wa.href)).toContain('Page vide');
         expect(wa.getAttribute('rel')).toContain('noopener');
+    });
+});
+/**
+ * Le Cameroun a deux langues officielles, et les régions du Nord-Ouest et du
+ * Sud-Ouest sont anglophones.
+ *
+ * Un outil d'apprentissage qui ne parle que français en exclut une partie — et
+ * ce n'est pas une partie qu'on choisit d'exclure.
+ */
+describe('les deux langues', () => {
+    it('bascule tout l’écran, pas seulement un libellé', async () => {
+        await ouvrir();
+        expect(hote.textContent).toContain('Écris du code');
+        expect(hote.textContent).toContain('Page vide');
+        cliquer('.langue');
+        expect(hote.textContent).toContain('Write code');
+        expect(hote.textContent).toContain('Blank page');
+        expect(hote.textContent).not.toContain('Écris du code');
+    });
+    /*
+     * Le bouton porte le nom de l'autre langue : c'est ce vers quoi il mène.
+     */
+    it('et le bouton nomme celle vers laquelle il mène', async () => {
+        await ouvrir();
+        expect(hote.querySelector('.langue')?.textContent).toBe('English');
+        cliquer('.langue');
+        expect(hote.querySelector('.langue')?.textContent).toBe('Français');
+    });
+    it('le choix tient d’une visite à l’autre', async () => {
+        await ouvrir();
+        cliquer('.langue');
+        expect(localStorage.getItem('etabli:langue')).toBe('en');
+        await ouvrir();
+        expect(hote.textContent).toContain('Write code');
+    });
+    /*
+     * Le code du modèle est traduit aussi. Un anglophone devant
+     * `const bouton = document.getElementById("bouton")` apprend à recopier sans
+     * comprendre — c'est exactement ce qu'on essaie d'éviter.
+     */
+    it('et le code du modèle est dans la langue, pas seulement son titre', async () => {
+        await ouvrir();
+        cliquer('.langue');
+        cliquer('.modele', 'A button that answers');
+        const html = hote.querySelector('textarea').value;
+        expect(html).toContain('Press the button');
+        expect(html).not.toContain('Appuie');
     });
 });

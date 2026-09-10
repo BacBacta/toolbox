@@ -10,6 +10,24 @@ function sorteDuFichier(nom) {
 	if (point === -1) return "inconnu";
 	return EXTENSIONS[nom.slice(point + 1).toLowerCase()] ?? "inconnu";
 }
+var REPROCHES = {
+	fr: {
+		vide: () => "Donne-lui un nom.",
+		espace: () => "Un nom ne commence ni ne finit par une espace.",
+		dossier: () => "Pas de dossiers ici : un nom simple, comme « page.html ».",
+		caracteres: () => "Lettres, chiffres, points, tirets et soulignés seulement.",
+		extension: () => "Termine par .html, .css ou .js — ce sont les trois que je sais exécuter.",
+		pris: (nom) => `« ${nom} » existe déjà dans ce projet.`
+	},
+	en: {
+		vide: () => "Give it a name.",
+		espace: () => "A name cannot start or end with a space.",
+		dossier: () => "No folders here: a plain name, like \"page.html\".",
+		caracteres: () => "Letters, digits, dots, dashes and underscores only.",
+		extension: () => "End it with .html, .css or .js — those are the three I can run.",
+		pris: (nom) => `"${nom}" already exists in this project.`
+	}
+};
 /**
 * Le nom d'un fichier, vérifié. `null` quand il va.
 *
@@ -17,14 +35,19 @@ function sorteDuFichier(nom) {
 * laisserait croire à des dossiers qui n'existent pas ; un doublon rendrait
 * l'un des deux fichiers inatteignable — celui qu'on vient d'écrire, parce que
 * la recherche s'arrête au premier.
+*
+* Le reproche est dit dans la langue de la personne. C'est le seul moment où
+* l'éditeur refuse quelque chose ; le dire dans une langue qu'elle ne lit pas
+* en ferait un refus sans raison.
 */
-function verifierNomDeFichier(nom, pris) {
-	if (nom.trim() === "") return "Donne-lui un nom.";
-	if (nom !== nom.trim()) return "Un nom ne commence ni ne finit par une espace.";
-	if (/[/\\]/.test(nom)) return "Pas de dossiers ici : un nom simple, comme « page.html ».";
-	if (!/^[A-Za-z0-9._-]+$/.test(nom)) return "Lettres, chiffres, points, tirets et soulignés seulement.";
-	if (sorteDuFichier(nom) === "inconnu") return "Termine par .html, .css ou .js — ce sont les trois que je sais exécuter.";
-	if (pris.includes(nom)) return `« ${nom} » existe déjà dans ce projet.`;
+function verifierNomDeFichier(nom, pris, langue = "fr") {
+	const dit = REPROCHES[langue];
+	if (nom.trim() === "") return dit["vide"](nom);
+	if (nom !== nom.trim()) return dit["espace"](nom);
+	if (/[/\\]/.test(nom)) return dit["dossier"](nom);
+	if (!/^[A-Za-z0-9._-]+$/.test(nom)) return dit["caracteres"](nom);
+	if (sorteDuFichier(nom) === "inconnu") return dit["extension"](nom);
+	if (pris.includes(nom)) return dit["pris"](nom);
 	return null;
 }
 //#endregion

@@ -17,18 +17,18 @@ export function Partage(props) {
         setEtat({
             quoi: 'raté',
             pourquoi: r.sorte === 'pas-de-reseau'
-                ? 'Pas de réseau. Ton projet est en sécurité sur ce téléphone ; réessaie quand ça revient.'
-                : r.sorte === 'refuse' ? r.pourquoi : 'Le partage a échoué.',
+                ? props.t.pasDeReseau
+                : r.sorte === 'refuse' ? r.pourquoi : props.t.partageEchoue,
         });
     }
     return (_jsxs("div", { class: "partage", children: [_jsx("button", { type: "button", class: "partager", disabled: etat.quoi === 'en-cours', onClick: () => void envoyer(), children: etat.quoi === 'en-cours'
-                    ? 'Envoi…'
+                    ? props.t.envoiEnCours
                     : props.projet.lien === undefined
-                        ? 'Sauvegarder en ligne et partager'
-                        : 'Mettre à jour le lien' }), etat.quoi === 'fait' && (_jsxs("div", { class: "partage-lien", children: [_jsx("p", { class: "mot", children: "Garde ce lien : il retrouve ton projet m\u00EAme si tu perds ce t\u00E9l\u00E9phone." }), _jsx("code", { class: "adresse", children: etat.adresse }), _jsxs("div", { class: "partage-actions", children: [_jsx("button", { type: "button", onClick: () => {
+                        ? props.t.sauvegarder
+                        : props.t.mettreAJour }), etat.quoi === 'fait' && (_jsxs("div", { class: "partage-lien", children: [_jsx("p", { class: "mot", children: props.t.gardeCeLien }), _jsx("code", { class: "adresse", children: etat.adresse }), _jsxs("div", { class: "partage-actions", children: [_jsx("button", { type: "button", onClick: () => {
                                     void navigator.clipboard?.writeText(etat.adresse).then(() => setCopie(true), 
                                     // Le presse-papier peut être refusé : l'adresse reste lisible
                                     // à l'écran, et on ne prétend pas l'avoir copiée.
                                     () => setCopie(false));
-                                }, children: copie ? 'Copié' : 'Copier' }), _jsx("a", { class: "whatsapp", href: `https://wa.me/?text=${encodeURIComponent(`${props.projet.nom} — ${etat.adresse}`)}`, target: "_blank", rel: "noopener noreferrer", children: "Envoyer sur WhatsApp" })] })] })), etat.quoi === 'raté' && _jsx("p", { class: "mot alerte", children: etat.pourquoi })] }));
+                                }, children: copie ? props.t.copie : props.t.copier }), _jsx("a", { class: "whatsapp", href: `https://wa.me/?text=${encodeURIComponent(`${props.projet.nom} — ${etat.adresse}`)}`, target: "_blank", rel: "noopener noreferrer", children: props.t.surWhatsApp })] })] })), etat.quoi === 'raté' && _jsx("p", { class: "mot alerte", children: etat.pourquoi })] }));
 }

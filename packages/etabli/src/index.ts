@@ -6,9 +6,13 @@ export { assembler, fichierAExporter, sorteDuFichier, verifierNomDeFichier } fro
 export type { MessageApercu } from './apercu.js'
 export { BAC_A_SABLE, lireMessageDApercu, pourApercu } from './apercu.js'
 export type { Modele } from './modeles.js'
-export { MODELES } from './modeles.js'
+export { modeles } from './modeles.js'
 export type { Depot } from './depot.js'
 export {
   ALPHABET_LIEN, LONGUEUR_CLEF, LONGUEUR_LIEN, MAX_OCTETS_DEPOT,
   clefValide, lienValide, lireDepot, nouveauLien, nouvelleClef, pourLeDepot,
 } from './depot.js'
+export type { Explication, Langue } from './expliquer.js'
+export { LANGUES, expliquer, langueDuNavigateur } from './expliquer.js'
+export type { Textes } from './textes.js'
+export { textes } from './textes.js'

@@ -1,4 +1,5 @@
 import { assembler } from './assembler.js'
+import type { Langue } from './expliquer.js'
 import type { Projet } from './projet.js'
 
 /**
@@ -35,7 +36,7 @@ export const BAC_A_SABLE = 'allow-scripts'
  * ne contient que ce que le code a déjà écrit, et celui qui le reçoit vérifie
  * qu'il vient bien de son cadre à lui.
  */
-const PONT = `<script id="a237-etabli">
+const PONT = (mot: string): string => `<script id="a237-etabli">
 (function () {
   var envoyer = function (sorte, args) {
     var bouts = []
@@ -63,11 +64,11 @@ const PONT = `<script id="a237-etabli">
     table: vrai.table ? vrai.table.bind(vrai) : function () {},
   }
   window.onerror = function (message, source, ligne) {
-    envoyer('erreur', [ligne ? message + ' (ligne ' + ligne + ')' : message])
+    envoyer('erreur', [ligne ? message + ' (${mot} ' + ligne + ')' : message])
     return false
   }
   window.addEventListener('unhandledrejection', function (e) {
-    envoyer('erreur', ['Promesse rejetée : ' + (e.reason && e.reason.message ? e.reason.message : e.reason)])
+    envoyer('erreur', [(e.reason && e.reason.message ? e.reason.message : e.reason)])
   })
 })()
 </script>`
@@ -80,9 +81,19 @@ const PONT = `<script id="a237-etabli">
  * finiraient par diverger, et on découvrirait la différence chez quelqu'un
  * d'autre, sur son téléphone, sans pouvoir la reproduire.
  */
-export function pourApercu(projet: Projet): string {
+/*
+ * Le mot « ligne », dans la langue de la personne.
+ *
+ * Le pont s'exécute dans le cadre et ne sait rien de l'écran qui le contient :
+ * il faut donc le lui donner au moment de l'assembler. Sans ça, une console en
+ * anglais annonçait « (ligne 64) » — un seul mot français au milieu, qui suffit
+ * à rappeler à un anglophone que l'outil n'a pas été fait pour lui.
+ */
+const LIGNE: Readonly<Record<Langue, string>> = { fr: 'ligne', en: 'line' }
+
+export function pourApercu(projet: Projet, langue: Langue = 'fr'): string {
   const doc = assembler(projet)
-  return doc.replace('<head>', `<head>\n${PONT}`)
+  return doc.replace('<head>', `<head>\n${PONT(LIGNE[langue])}`)
 }
 
 export interface MessageApercu {

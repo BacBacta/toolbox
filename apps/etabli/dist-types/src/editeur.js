@@ -88,7 +88,7 @@ export function Editeur(props) {
     }
     function ajouter() {
         const nom = (nouveau ?? '').trim();
-        const probleme = verifierNomDeFichier(nom, props.projet.fichiers.map((f) => f.nom));
+        const probleme = verifierNomDeFichier(nom, props.projet.fichiers.map((f) => f.nom), props.langue);
         if (probleme !== null) {
             setReproche(probleme);
             return;
@@ -97,7 +97,7 @@ export function Editeur(props) {
         setNouveau(null);
         setReproche('');
     }
-    return (_jsxs("div", { class: "editeur", children: [_jsxs("div", { class: "onglets", role: "tablist", children: [props.projet.fichiers.map((f) => (_jsx("button", { type: "button", role: "tab", "aria-selected": f.nom === props.ouvert, class: f.nom === props.ouvert ? 'onglet actif' : 'onglet', onClick: () => props.onOuvrir(f.nom), children: f.nom }, f.nom))), props.projet.fichiers.length < MAX_FICHIERS && (_jsx("button", { type: "button", class: "onglet ajout", onClick: () => setNouveau(''), children: "+" }))] }), nouveau !== null && (_jsxs("div", { class: "nouveau-fichier", children: [_jsx("input", { type: "text", value: nouveau, placeholder: "page.html", ...SANS_CORRECTION, onInput: (e) => setNouveau(e.target.value) }), _jsx("button", { type: "button", onClick: ajouter, children: "Ajouter" }), _jsx("button", { type: "button", class: "discret", onClick: () => { setNouveau(null); setReproche(''); }, children: "Annuler" }), reproche !== '' && _jsx("p", { class: "reproche", children: reproche })] })), fichier === undefined ? (_jsx("p", { class: "vide", children: "Ce projet n\u2019a pas encore de fichier." })) : (_jsx("textarea", { ref: zone, class: "zone", value: fichier.contenu, onInput: (e) => props.onEcrire(fichier.nom, e.target.value), "aria-label": `Contenu de ${fichier.nom}`, "data-sorte": sorteDuFichier(fichier.nom), ...SANS_CORRECTION, 
+    return (_jsxs("div", { class: "editeur", children: [_jsxs("div", { class: "onglets", role: "tablist", children: [props.projet.fichiers.map((f) => (_jsx("button", { type: "button", role: "tab", "aria-selected": f.nom === props.ouvert, class: f.nom === props.ouvert ? 'onglet actif' : 'onglet', onClick: () => props.onOuvrir(f.nom), children: f.nom }, f.nom))), props.projet.fichiers.length < MAX_FICHIERS && (_jsx("button", { type: "button", class: "onglet ajout", onClick: () => setNouveau(''), children: "+" }))] }), nouveau !== null && (_jsxs("div", { class: "nouveau-fichier", children: [_jsx("input", { type: "text", value: nouveau, placeholder: props.t.nomDeFichier, ...SANS_CORRECTION, onInput: (e) => setNouveau(e.target.value) }), _jsx("button", { type: "button", onClick: ajouter, children: props.t.ajouter }), _jsx("button", { type: "button", class: "discret", onClick: () => { setNouveau(null); setReproche(''); }, children: props.t.annuler }), reproche !== '' && _jsx("p", { class: "reproche", children: reproche })] })), fichier === undefined ? (_jsx("p", { class: "vide", children: props.t.sansFichier })) : (_jsx("textarea", { ref: zone, class: "zone", value: fichier.contenu, onInput: (e) => props.onEcrire(fichier.nom, e.target.value), "aria-label": props.t.contenuDe(fichier.nom), "data-sorte": sorteDuFichier(fichier.nom), ...SANS_CORRECTION, 
                 /*
                  * Le texte revient à la ligne, contrairement à tout éditeur de code.
                  *
@@ -109,7 +109,7 @@ export function Editeur(props) {
                  * est pire qu'une indentation en escalier — surtout pour quelqu'un
                  * qui apprend, et qui ne sait pas encore qu'il faut faire défiler.
                  */
-                wrap: "soft" })), _jsx("div", { class: "symboles", "aria-label": "Caract\u00E8res du clavier", children: SYMBOLES.map((s) => (_jsx("button", { type: "button", class: "symbole", 
+                wrap: "soft" })), _jsx("div", { class: "symboles", "aria-label": props.t.rangeeSymboles, children: SYMBOLES.map((s) => (_jsx("button", { type: "button", class: "symbole", 
                     /* Empêche la zone de perdre le focus : le clavier resterait fermé. */
                     onMouseDown: (e) => e.preventDefault(), onClick: () => inserer(s), children: s }, s))) })] }));
 }
