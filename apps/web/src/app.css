@@ -121,6 +121,22 @@ body {
   flex-direction: column;
   gap: 1px;
   min-width: 0;
+  /*
+   * Un nom d'outil plus long que sa carte se coupe, plutôt que de sortir.
+   *
+   * `min-width: 0` laisse la boîte rétrécir, mais un mot, lui, ne se coupe
+   * pas tout seul : à 360 pixels — la largeur que le brief vise — « Attestation »
+   * et « Reconnaissance » sortaient par la droite de leur carte. Une capture
+   * d'un vrai téléphone l'a montré ; aucun essai unitaire ne pouvait le voir,
+   * puisqu'ils ne font pas de mise en page.
+   *
+   * `hyphens` avant `overflow-wrap` : le document est en `lang="fr"`, donc la
+   * césure tombe où le français la met — « Reconnais-sance » plutôt qu'une
+   * coupe au caractère. `overflow-wrap` reste le filet pour ce que le
+   * dictionnaire ne sait pas couper.
+   */
+  hyphens: auto;
+  overflow-wrap: break-word;
 }
 
 .carte-squelette b {
@@ -165,6 +181,43 @@ body {
 }
 
 /* Des exemples qui montrent ce qu'une phrase peut porter, pas juste un mot. */
+/*
+ * L'appel à l'atelier sur mesure, sur l'écran de repos.
+ *
+ * Discret par rapport à la grille — la grille est gratuite et instantanée,
+ * elle garde la préséance — mais présent sans qu'on ait rien tapé. Il manquait,
+ * et l'agent était donc invisible pour qui ne devinait pas qu'il fallait
+ * écrire d'abord.
+ */
+.atelier-sur-mesure {
+  display: flex;
+  gap: var(--pas-3);
+  align-items: flex-start;
+  width: 100%;
+  margin: var(--pas-2) 0 var(--pas-5);
+  padding: var(--pas-3);
+  /* La cible tactile du reste de l'application : en dessous, on la rate. */
+  min-height: var(--cible);
+  text-align: left;
+  /* Tirets plutôt qu'un trait plein : ce n'est pas un outil, c'en est la porte. */
+  border: 1px dashed var(--trait);
+  border-radius: var(--rond-m);
+  background: none;
+  font: inherit;
+  color: var(--encre);
+  cursor: pointer;
+}
+.atelier-sur-mesure:active { background: var(--surface); }
+.atelier-sur-mesure .marque { flex: 0 0 auto; color: var(--accent); }
+.atelier-sur-mesure .texte { display: block; min-width: 0; }
+.atelier-sur-mesure b { display: block; }
+.atelier-sur-mesure .texte span {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--encre-2);
+}
+
 .atelier-exemple {
   min-height: 36px;
   padding: 0 var(--pas-3);

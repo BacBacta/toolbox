@@ -114,6 +114,33 @@ describe('l’atelier comprend la demande, sans appeler personne', () => {
     expect(hote.textContent).toContain('Lequel veux-tu ?')
   })
 
+  /*
+   * L'agent n'existait nulle part sur l'écran de départ.
+   *
+   * Il fallait taper quelque chose pour apprendre qu'il existe — et une
+   * capture d'écran d'un vrai téléphone l'a montré : la personne qui l'avait
+   * commandé ne le trouvait pas. Une fonction qu'on ne peut découvrir qu'en
+   * devinant qu'elle est là n'existe pas pour ceux qui ne devinent pas.
+   *
+   * L'écran de repos dit donc ce que l'atelier sait faire quand la grille ne
+   * suffit pas, et le dit avant qu'on ait tapé quoi que ce soit.
+   */
+  it('annonce l’atelier sur mesure dès l’écran de repos, sans qu’on ait rien tapé', () => {
+    expect(hote.textContent).toMatch(/sur mesure/i)
+    expect(hote.querySelector('.atelier-sur-mesure')).not.toBe(null)
+  })
+
+  it('et ce n’est pas un bouton mort : il mène au champ où l’on décrit', () => {
+    const bouton = hote.querySelector('.atelier-sur-mesure') as HTMLButtonElement
+    act(() => { bouton.click() })
+    expect(document.activeElement).toBe(hote.querySelector('#demande'))
+  })
+
+  it('mais il s’efface dès qu’on a tapé : la réponse prend la place', () => {
+    demander('devis')
+    expect(hote.querySelector('.atelier-sur-mesure')).toBe(null)
+  })
+
   it('le dit quand c’est hors de sa portée, et propose d’en parler', () => {
     demander('il me faut un contrat de bail')
     expect(hote.textContent).toContain('Aucun de mes outils ne correspond')

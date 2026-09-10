@@ -1,7 +1,7 @@
 import type { Comprehension, Etage, Extrait, FicheSquelette } from '@a237/engine'
 import { CE_QUE_COUTE, comprendre, etageDe, montantF } from '@a237/engine'
 import type { JSX } from 'preact'
-import { useState } from 'preact/hooks'
+import { useRef, useState } from 'preact/hooks'
 
 /**
  * L'atelier : on dit ce dont on a besoin, l'outil s'ouvre.
@@ -56,6 +56,7 @@ const EXEMPLES: readonly string[] = [
 export function Atelier(props: ProprietesAtelier): JSX.Element {
   const [demande, setDemande] = useState('')
   const [reponse, setReponse] = useState<Comprehension | null>(null)
+  const champ = useRef<HTMLInputElement | null>(null)
 
   function repondre(texte: string): void {
     setDemande(texte)
@@ -87,6 +88,7 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
             type="text"
             enterkeyhint="go"
             autocomplete="off"
+            ref={champ}
             value={demande}
             placeholder="njangi de 20 000 F par mois…"
             onInput={(e) => repondre((e.target as HTMLInputElement).value)}
@@ -102,6 +104,35 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
             </button>
           ))}
         </div>
+      )}
+
+      {/*
+        * Ce que l'atelier sait faire quand la grille ne suffit pas, dit avant
+        * qu'on ait tapé quoi que ce soit.
+        *
+        * L'agent n'apparaissait qu'**après** une saisie : il fallait deviner
+        * qu'il existe pour le trouver. Une capture d'un vrai téléphone l'a
+        * montré — la personne qui l'avait commandé ne le voyait pas sur son
+        * écran d'accueil, et concluait que rien n'avait changé. Elle avait
+        * raison de le conclure : sur cet écran-là, rien n'avait changé.
+        *
+        * Il mène au champ plutôt que d'ouvrir la conversation : un tour se
+        * paie, et une conversation ouverte sans demande n'aurait rien à
+        * répondre. Le bouton conduit là où l'on décrit, et c'est la description
+        * qui déclenche.
+        */}
+      {reponse === null && (
+        <button
+          type="button"
+          class="atelier-sur-mesure"
+          onClick={() => champ.current?.focus()}
+        >
+          <span class="marque" aria-hidden="true">✳</span>
+          <span class="texte">
+            <b>Ton outil n’est pas dans la liste ?</b>
+            <span>Décris-le en français : l’atelier le fabrique sur mesure, en discutant.</span>
+          </span>
+        </button>
       )}
 
       {reponse?.sorte === 'sur' && (
