@@ -18,6 +18,13 @@ de gamme, diffusés dans WhatsApp.
 sont en ligne, le modèle compose, et les documents A4 sortent en PDF. Reste la
 phase 6 : le terrain.
 
+**On discute avec l'atelier, et l'outil se dessine sous les yeux.** On dit ce
+qu'on veut ; l'agent répond, fabrique, et montre dans une fenêtre ce qui est en
+train d'être fait — le titre dès qu'il est écrit, puis les colonnes ou les
+sections une à une. On répond « non, ajoute une colonne pour le mode de
+paiement », et il refait. Un outil coûte un crédit ; la conversation qui le
+fabrique est comprise dedans, jusqu'à huit tours.
+
 Ce que le modèle sait composer — **quatre formes**, et le choix entre elles se
 fait sur la demande, pas sur un menu :
 
@@ -41,7 +48,7 @@ plafond par formulaire — et aucune ne demande rien au visiteur.
 | `packages/render` | la feuille A4, les sept écrits, les registres, la vitrine, le formulaire public, la carte partagée en canvas |
 | `packages/serveur` | la page de lecture, le dépôt, le PDF, et la seule route qui reçoit |
 | `packages/comptes` | les comptes, le quota, le paiement, les réponses reçues — tout ce qui touche à D1 |
-| `packages/ia` | le proxy du modèle : la clef ne quitte jamais le serveur |
+| `packages/ia` | l'agent et son proxy : la clef ne quitte jamais le serveur, et le flux rend l'outil visible pendant qu'il s'écrit |
 | `apps/web` | la PWA : atelier, outils, diffusion, service worker |
 | `e2e` | sept vérifications dans un vrai navigateur, mode avion et JavaScript coupé compris |
 
@@ -50,8 +57,10 @@ plafond par formulaire — et aucune ne demande rien au visiteur.
 chacun vit dans son fragment. Deux dépendances tierces de production :
 `preact` et `idb-keyval`.
 
-Une génération coûte **0,86 F au pire cas** pour un plafond d'un franc (§ 8), et
-de l'ordre de 0,36 F au premier tour, qui est le cas courant.
+Un tour de conversation coûte **0,1 à 0,3 F** mesuré en production, pour un
+plafond d'un franc par génération (§ 8). Le premier tour porte les quatre
+schémas parce qu'il faut pouvoir choisir ; les suivants n'emportent que celui
+de la famille en cours, et coûtent un tiers de moins.
 
 En ligne sur **https://atelier237.pages.dev**, et vérifié sur un vrai
 téléphone : l'application s'ouvre **données coupées**, et « Partager la carte »

@@ -426,3 +426,107 @@ respecter à la lettre. Ils sont retirés avant l'envoi.
 Sous **une seule clef réservée**, et non un mot-clef par réglage : un registre a
 une propriété qui s'appelle `libelleAjout`, et un mot-clef d'éditeur du même nom
 devenait indiscernable de ce contenu-là.
+
+---
+
+## L'agent — tranché le 10 septembre 2026
+
+Un bouton qui lance une génération et rend un outil marchait. Il a deux défauts,
+et le second est le plus grave.
+
+Il ne laisse **aucune place à la deuxième phrase**. Personne ne décrit du
+premier coup l'outil qu'il veut : « non, ajoute une colonne pour le mode de
+paiement », « enlève les prix », « mets mon numéro » est la vraie façon dont un
+outil se fabrique. Avec un bouton, la seule reprise possible est de tout
+redemander — et de repayer.
+
+Et il fait attendre huit secondes devant un écran vide. Sur une connexion qui
+hoquette, huit secondes deviennent trente, et rien ne dit si ça marche.
+
+### Le modèle rend deux choses à la fois
+
+Un mot pour la personne, et l'outil, dans la même réponse. Le mot vient en
+premier parce que le modèle écrit ses clefs dans l'ordre du schéma : il s'écrit
+dans la conversation pendant que l'outil se construit à côté. Un second appel
+pour la phrase coûterait deux fois.
+
+Il a le **droit de ne rendre que le mot**. Une demande de trois mots ne
+contient pas de quoi fabriquer quoi que ce soit, et une question coûte le même
+tour qu'un outil inventé — sauf qu'elle, elle sert.
+
+### La fenêtre montre une ébauche, jamais un outil
+
+Ce qui s'y dessine n'a traversé aucun validateur et n'a le droit de rien créer.
+L'outil n'existe qu'à la fin, quand la réponse complète est passée par le
+moteur. **La frontière du § 2.1 n'a pas bougé d'un pouce** : c'est la même
+qu'avec le bouton, à un écran de plus.
+
+Lire du JSON qui n'est pas fini est donc une pièce à part, pure et éprouvée.
+Deux règles la gouvernent : on ne devine jamais — une clef commencée est
+abandonnée plutôt que remplie — et un aperçu ne recule jamais sur ce qui est
+acquis, parce qu'un aperçu qui clignote se lit comme une panne.
+
+Une fois l'outil fini, la fenêtre montre **la chose elle-même** quand elle se
+dessine sans état : une page et un formulaire se rendent à partir de leur seule
+configuration. Un registre et une calculatrice sont des écrans qu'on remplit ;
+leur essence est la liste de leurs colonnes, et c'est déjà ce qui est affiché.
+
+### Le crédit se prend au premier tour, pas à chaque tour
+
+Un outil coûte un crédit ; une conversation en fabrique un. Faire payer chaque
+tour la rendrait impossible : quelqu'un qui a cinq essais n'ose pas dire
+« ajoute une colonne » si ça lui coûte le cinquième de ce qu'il a.
+
+« C'est la suite d'une conversation » ne se croit pas sur parole. Un compteur de
+tours que le navigateur renvoie est un compteur qu'on remet à zéro dans les
+outils de développement, et la composition deviendrait gratuite à volonté. Le
+serveur signe donc un laissez-passer — le compte, le rang du tour, la
+péremption — et refuse ce qui ne porte pas sa signature. Huit tours, après quoi
+la conversation n'affine plus, elle tourne.
+
+Un laissez-passer rafistolé n'est pas refusé : il est **traité comme absent**,
+ce qui fait payer un crédit. Au bon compte.
+
+### Seul le premier tour a besoin de choisir
+
+C'est ce qui rend une conversation abordable. Le premier tour porte les quatre
+schémas ; dès que la famille est connue, les suivants n'emportent que le sien.
+Un affinage n'a aucune raison de payer la description d'un formulaire quand on
+retouche une page. Mesuré en production : 0,1 à 0,3 F le tour.
+
+C'est aussi le routage que le garde-fou de l'invite réclamait depuis qu'une
+quatrième forme y était entrée — obtenu sans jamais risquer de se tromper de
+famille, puisque le premier tour les a toutes.
+
+### `/api/ai` et le bouton disparaissent
+
+Garder une route qui dépense de l'argent et que plus rien n'appelle, c'est
+garder une route que personne ne maintient. Ce que ses essais couvraient et qui
+vit encore a retrouvé des essais à lui : `lireReponseModele` et
+`verifierCalcul` en avaient besoin depuis le début et n'étaient éprouvés qu'en
+passant.
+
+### Ce que trois vrais deuxièmes tours ont appris
+
+Deux fois sur trois, le modèle répondait en **prose** — « Voilà, j'ai retiré la
+date et ajouté la colonne » — sans une accolade. Une conversation qui ressemble
+à une conversation fait glisser le modèle dans le registre de la conversation,
+et un contrat énoncé une seule fois au début d'un échange qui s'allonge ne pèse
+plus assez à la fin.
+
+Cette prose était pire qu'illisible : elle **affirmait** une modification qui
+n'était nulle part.
+
+Trois corrections, et aucune n'est une rustine :
+
+- `response_format` était posé sur l'appel d'un seul tenant et oublié sur le
+  flux — celui que l'agent emploie, c'est-à-dire le seul qui serve ;
+- la forme de la réponse est redite juste avant la question. Ce qui est dit une
+  fois au début ne pèse plus assez ; ce qui est dit juste avant pèse ;
+- le rappel de l'outil est mis dans la bouche de **la personne**. Posé comme un
+  message d'agent, il portait du JSON nu, et le modèle imitait ce qu'il croyait
+  être sa propre dernière réponse.
+
+Le journal du serveur dit désormais ce que le modèle a réellement écrit quand
+un tour est illisible. Sans lui il fallait deviner — c'est ce qu'on a fait au
+premier essai, et on s'est trompé.

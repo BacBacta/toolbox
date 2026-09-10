@@ -59,11 +59,39 @@ const FORMULAIRE = {
 const navigateur = await chromium.launch({
   executablePath: CHROME,
   args: ['--no-sandbox'],
-  ...(process.env.HTTPS_PROXY !== undefined ? { proxy: { server: process.env.HTTPS_PROXY } } : {}),
+  /*
+   * Le navigateur ne lit pas `HTTPS_PROXY` : on le lui passe, **avec sa
+   * dérogation pour la machine locale**. Sans elle, un serveur de
+   * développement sur 127.0.0.1 part lui aussi dans le mandataire, qui le
+   * réinitialise — et l'échec ressemble à une application qui ne démarre pas.
+   */
+  ...(process.env.HTTPS_PROXY !== undefined
+    ? { proxy: { server: process.env.HTTPS_PROXY, bypass: '127.0.0.1,localhost' } }
+    : {}),
 })
 const proprietaire = await navigateur.newContext({ viewport: { width: 390, height: 844 } })
-await proprietaire.route('**/api/ai', (r) =>
-  r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FORMULAIRE) }),
+/*
+ * Le proxy est côté serveur : on le remplace par un tour d'agent, en flux.
+ * Ce qu'on éprouve ici est le formulaire, pas le modèle.
+ */
+await proprietaire.route('**/api/chat', (r) =>
+  r.fulfill({
+    status: 200,
+    contentType: 'text/event-stream',
+    body:
+      `data: ${JSON.stringify({
+        sorte: 'fin',
+        tour: {
+          sorte: 'outil',
+          mot: 'Voilà de quoi savoir qui vient et ce que chacun apporte.',
+          outil: { sorte: 'formulaire', formulaire: FORMULAIRE.formulaire },
+        },
+        fcfa: FORMULAIRE.fcfa,
+        conversation: 'c.1.9999999999999.sig',
+        plan: 'essai',
+        credits: 4,
+      })}\n\n`,
+  }),
 )
 
 let echecs = 0
@@ -80,7 +108,13 @@ page.on('pageerror', (e) => erreurs.push(String(e)))
 await page.goto(BASE, { waitUntil: 'networkidle' })
 await page.fill('#demande', 'savoir qui vient a la fete et ce qu il apporte')
 await page.waitForTimeout(150)
-await page.getByText('Compose-le pour moi').click()
+await page.getByText('En parler à l’atelier').click()
+await page.waitForSelector('text=Ouvrir cet outil', { timeout: 10000 })
+dit(
+  (await page.textContent('.fenetre')).includes('Qui vient samedi'),
+  'la fenêtre montre le formulaire tel qu’un invité le verra',
+)
+await page.getByText('Ouvrir cet outil', { exact: true }).click()
 await page.waitForSelector('text=Qui vient samedi', { timeout: 10000 })
 dit(true, 'le formulaire composé s’ouvre')
 

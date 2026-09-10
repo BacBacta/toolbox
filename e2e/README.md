@@ -7,12 +7,14 @@ Sept scripts, sept choses qu'aucun test unitaire ne peut voir.
 par mots-clés, création d'un carnet de njangi, ajout de membres, versement,
 dessin de la carte, lien de relance `wa.me`, service worker, et **mode avion**.
 
-`compose.mjs` suit un outil **composé par le modèle** du premier mot tapé
-jusqu'au lien reçu : la configuration vient du réseau, traverse le stockage,
-`RegistreListe` — écrit à la main — la dessine, et elle repart au serveur pour
-devenir une page. La réponse est une vraie sortie de production capturée telle
-quelle, pas une réponse inventée : sa première colonne est de type `nombre`, ce
-qui a longtemps été interdit. Il lui faut le Worker et son KV.
+`agent.mjs` suit une **conversation** du premier mot tapé jusqu'au lien reçu :
+le flux traverse le réseau coupé à des endroits quelconques, l'aperçu se
+redessine à chaque morceau, la configuration traverse le stockage, du code
+écrit à la main la dessine, et elle repart au serveur pour devenir une page.
+Il éprouve surtout ce que la conversation apporte et qu'un bouton n'avait pas :
+un **deuxième tour** qui modifie l'outil déjà fait, avec son laissez-passer,
+sans reprendre de crédit. Et le refus, qui se dit dans la fenêtre sans y
+proposer d'ouvrir quoi que ce soit. Il lui faut le Worker et son KV.
 
 `formulaire.mjs` suit le seul parcours du produit où **deux personnes**
 interviennent : celle qui fabrique le formulaire et le partage, et celle qui le

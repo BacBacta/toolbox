@@ -16,6 +16,17 @@ export function EcranAgent(props) {
         { qui: 'personne', texte: props.demande },
     ]);
     const [ebauche, setEbauche] = useState(null);
+    /**
+     * Le dernier tour, quel qu'il soit — et l'outil, seulement s'il s'ouvre.
+     *
+     * Deux états et non un, parce que ce ne sont pas les mêmes questions. La
+     * fenêtre montre **ce que le dernier tour a donné**, y compris un refus ; le
+     * bouton n'apparaît que s'il y a un écran derrière. Confondre les deux
+     * laissait la fenêtre annoncer « ton outil apparaîtra ici » juste après un
+     * « je ne sais pas faire ça » — ce qui est faux, et se lit comme une attente
+     * qui n'aboutira jamais.
+     */
+    const [dernier, setDernier] = useState(null);
     const [outil, setOutil] = useState(null);
     const [conversation, setConversation] = useState(undefined);
     const [etat, setEtat] = useState('repos');
@@ -59,6 +70,7 @@ export function EcranAgent(props) {
                 setCout((c) => c + signe.fcfa);
                 setMessages([...suite, { qui: 'agent', texte: signe.tour.mot }]);
                 setEbauche(null);
+                setDernier(signe.tour);
                 /*
                  * Un refus n'est pas un outil, même s'il en occupe la place.
                  *
@@ -98,7 +110,7 @@ export function EcranAgent(props) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     const pret = outil !== null && outil.tour.sorte === 'outil';
-    return (_jsxs("section", { class: "agent", children: [_jsxs("header", { class: "agent-tete", children: [_jsx("button", { type: "button", class: "retour", onClick: props.onFermer, children: "\u2190 Mes outils" }), cout > 0 && _jsx("span", { class: "agent-cout", children: coutF(cout) })] }), _jsx("div", { class: "agent-fenetre", children: _jsx(Fenetre, { ebauche: ebauche, tour: outil?.tour ?? null, ecoute: etat === 'ecoute' }) }), _jsxs("div", { class: "agent-fil", ref: filDeLaConversation, children: [messages.map((m, i) => (_jsx("p", { class: m.qui === 'agent' ? 'dit-agent' : 'dit-personne', children: m.texte }, `${i}-${m.texte}`))), ebauche !== null && ebauche.mot !== '' && _jsx("p", { class: "dit-agent", children: ebauche.mot }), etat === 'ecoute' && ebauche === null && _jsx("p", { class: "dit-agent attente", children: "\u2026" }), typeof etat === 'object' && _jsx("p", { class: "dit-panne", children: etat.fini })] }), pret && (_jsx("button", { type: "button", class: "agent-ouvrir", onClick: () => ouvrir(outil.tour, props.onCreer, cout), children: "Ouvrir cet outil" })), _jsxs("form", { class: "agent-saisie", onSubmit: (e) => {
+    return (_jsxs("section", { class: "agent", children: [_jsxs("header", { class: "agent-tete", children: [_jsx("button", { type: "button", class: "retour", onClick: props.onFermer, children: "\u2190 Mes outils" }), cout > 0 && _jsx("span", { class: "agent-cout", children: coutF(cout) })] }), _jsx("div", { class: "agent-fenetre", children: _jsx(Fenetre, { ebauche: ebauche, tour: dernier, ecoute: etat === 'ecoute' }) }), _jsxs("div", { class: "agent-fil", ref: filDeLaConversation, children: [messages.map((m, i) => (_jsx("p", { class: m.qui === 'agent' ? 'dit-agent' : 'dit-personne', children: m.texte }, `${i}-${m.texte}`))), ebauche !== null && ebauche.mot !== '' && _jsx("p", { class: "dit-agent", children: ebauche.mot }), etat === 'ecoute' && ebauche === null && _jsx("p", { class: "dit-agent attente", children: "\u2026" }), typeof etat === 'object' && _jsx("p", { class: "dit-panne", children: etat.fini })] }), pret && (_jsx("button", { type: "button", class: "agent-ouvrir", onClick: () => ouvrir(outil.tour, props.onCreer, cout), children: "Ouvrir cet outil" })), _jsxs("form", { class: "agent-saisie", onSubmit: (e) => {
                     e.preventDefault();
                     envoyer(saisie);
                 }, children: [_jsx("input", { type: "text", enterkeyhint: "send", autocomplete: "off", value: saisie, placeholder: pret ? 'Change quelque chose…' : 'Dis-m’en plus…', "aria-label": "R\u00E9pondre \u00E0 l\u2019atelier", onInput: (e) => setSaisie(e.target.value) }), _jsx("button", { type: "submit", disabled: etat === 'ecoute' || saisie.trim() === '', children: "Envoyer" })] })] }));

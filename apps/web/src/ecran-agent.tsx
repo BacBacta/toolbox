@@ -58,6 +58,17 @@ export function EcranAgent(props: ProprietesAgent): JSX.Element {
     { qui: 'personne', texte: props.demande },
   ])
   const [ebauche, setEbauche] = useState<Ebauche | null>(null)
+  /**
+   * Le dernier tour, quel qu'il soit — et l'outil, seulement s'il s'ouvre.
+   *
+   * Deux états et non un, parce que ce ne sont pas les mêmes questions. La
+   * fenêtre montre **ce que le dernier tour a donné**, y compris un refus ; le
+   * bouton n'apparaît que s'il y a un écran derrière. Confondre les deux
+   * laissait la fenêtre annoncer « ton outil apparaîtra ici » juste après un
+   * « je ne sais pas faire ça » — ce qui est faux, et se lit comme une attente
+   * qui n'aboutira jamais.
+   */
+  const [dernier, setDernier] = useState<LectureTour | null>(null)
   const [outil, setOutil] = useState<{ tour: LectureTour } | null>(null)
   const [conversation, setConversation] = useState<string | undefined>(undefined)
   const [etat, setEtat] = useState<Etat>('repos')
@@ -110,6 +121,7 @@ export function EcranAgent(props: ProprietesAgent): JSX.Element {
         setCout((c) => c + signe.fcfa)
         setMessages([...suite, { qui: 'agent', texte: signe.tour.mot }])
         setEbauche(null)
+        setDernier(signe.tour)
         /*
          * Un refus n'est pas un outil, même s'il en occupe la place.
          *
@@ -163,7 +175,7 @@ export function EcranAgent(props: ProprietesAgent): JSX.Element {
       </header>
 
       <div class="agent-fenetre">
-        <Fenetre ebauche={ebauche} tour={outil?.tour ?? null} ecoute={etat === 'ecoute'} />
+        <Fenetre ebauche={ebauche} tour={dernier} ecoute={etat === 'ecoute'} />
       </div>
 
       <div class="agent-fil" ref={filDeLaConversation}>
