@@ -29,6 +29,9 @@ beforeEach(async () => {
   // les tests reste la même — clic, création, enregistrement, ouverture — seul
   // le premier chargement du fragment est déplacé hors du chemin mesuré.
   await Promise.all(Object.values(CHARGEURS).map((chargeur) => chargeur()))
+  // L'écran du compte se charge de la même façon, et se préchauffe pour la
+  // même raison.
+  await import('../src/ecran-compte.js')
 
   for (const o of await listerOutils()) await supprimerOutil(o.id)
   hote = document.createElement('div')
@@ -264,5 +267,66 @@ describe('diffuser, c’est d’abord publier', () => {
 
     expect(hote.textContent).toContain('version 7')
     expect((await listerOutils())[0]?.lien).toBeUndefined()
+  })
+})
+
+describe('la ligne du compte', () => {
+  /*
+   * Elle est en bas, discrète, et n'apparaît qu'une fois qu'on a composé
+   * quelque chose. Avant, il n'y a rien à savoir — et une invitation à
+   * s'occuper de son abonnement serait la première chose que verrait
+   * quelqu'un venu faire un devis. L'atelier marche sans compte (§ 2).
+   */
+  /*
+   * On repose l'application après avoir écrit l'état.
+   *
+   * Le dernier état connu se lit une fois, au montage : le monter d'abord et
+   * l'écrire ensuite ferait lire une base vide, et l'essai ne dirait rien de
+   * ce qu'il croit vérifier.
+   */
+  async function poserEtat(etat: unknown): Promise<void> {
+    const { retenirEtat } = await import('../src/compte.js')
+    await retenirEtat(etat as never)
+    monter(null, hote)
+    act(() => monter(<App />, hote))
+    await reposer()
+  }
+
+  it('ne s’affiche pas tant qu’on n’a rien composé', async () => {
+    const { clear, createStore } = await import('idb-keyval')
+    await clear(createStore('atelier237-compte', 'compte'))
+    monter(null, hote)
+    act(() => monter(<App />, hote))
+    await reposer()
+    expect(hote.querySelector('.compte-ligne')).toBeNull()
+  })
+
+  it('dit ce qu’il reste en essai', async () => {
+    await poserEtat({ plan: 'essai', credits: 3, expire: null, aUnCode: false })
+    expect(hote.querySelector('.compte-ligne')?.textContent).toBe('Essai · 3 compositions')
+  })
+
+  it('et le dit au singulier quand il n’en reste qu’une', async () => {
+    await poserEtat({ plan: 'essai', credits: 1, expire: null, aUnCode: false })
+    expect(hote.querySelector('.compte-ligne')?.textContent).toBe('Essai · 1 composition')
+  })
+
+  it('à zéro, elle ne compte pas : elle le dit', async () => {
+    // « Essai · 0 composition » se lit mal. Ce qui compte est qu'il n'y en a
+    // plus, pas le nombre zéro.
+    await poserEtat({ plan: 'essai', credits: 0, expire: null, aUnCode: false })
+    expect(hote.querySelector('.compte-ligne')?.textContent).toBe('Essai · plus de composition')
+  })
+
+  it('et distingue un abonné', async () => {
+    await poserEtat({ plan: 'atelier', credits: 40, expire: Date.now() + 86_400_000, aUnCode: true })
+    expect(hote.querySelector('.compte-ligne')?.textContent).toBe('Atelier · 40 compositions')
+  })
+
+  it('elle ouvre l’écran du compte, qui n’est pas dans la coquille initiale', async () => {
+    await poserEtat({ plan: 'essai', credits: 3, expire: null, aUnCode: false })
+    cliquer('.compte-ligne')
+    await reposer()
+    expect(hote.textContent).toContain('Mon atelier')
   })
 })

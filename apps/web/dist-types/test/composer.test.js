@@ -1,4 +1,7 @@
 // @vitest-environment happy-dom
+// Le jeton de l'appareil vit dans IndexedDB : sans lui, aucune requête qui
+// engage le compte ne part.
+import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { composer } from '../src/composer.js';
 /**

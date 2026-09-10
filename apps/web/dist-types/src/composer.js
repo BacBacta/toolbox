@@ -1,10 +1,14 @@
 import { lireReponseModele } from '@a237/engine';
+import { entetesDAppareil } from './appareil.js';
+import { noterApresComposition } from './compte.js';
 export async function composer(demande, signal) {
     let reponse;
     try {
         reponse = await fetch('/api/ai', {
             method: 'POST',
-            headers: { 'content-type': 'application/json' },
+            // L'appareil se présente : c'est ce qui lui vaut ses crédits, et ce qui
+            // fait qu'un abonnement suit son propriétaire d'un téléphone à l'autre.
+            headers: { 'content-type': 'application/json', ...(await entetesDAppareil()) },
             body: JSON.stringify({ demande }),
             ...(signal !== undefined ? { signal } : {}),
         });
@@ -17,12 +21,10 @@ export async function composer(demande, signal) {
         return { sorte: 'pas-ouvert' };
     if (reponse.status === 402) {
         const corps = (await reponse.json().catch(() => null));
+        const pourquoi = typeof corps?.pourquoi === 'string' ? corps.pourquoi : '';
         return corps?.erreur === 'abonnement-requis'
-            ? {
-                sorte: 'abonnement-requis',
-                pourquoi: typeof corps.pourquoi === 'string' ? corps.pourquoi : '',
-            }
-            : { sorte: 'sans-credit' };
+            ? { sorte: 'abonnement-requis', pourquoi }
+            : { sorte: 'sans-credit', pourquoi };
     }
     if (!reponse.ok) {
         return {
@@ -31,6 +33,9 @@ export async function composer(demande, signal) {
         };
     }
     const corps = (await reponse.json().catch(() => null));
+    // Le solde revient avec la composition : le compte se tient à jour sans
+    // qu'on l'interroge, et sans coûter un aller-retour de plus.
+    await noterApresComposition(corps?.plan, corps?.credits);
     const fcfa = typeof corps?.fcfa === 'number' ? corps.fcfa : 0;
     /*
      * Le refus se lit sur l'enveloppe, pas au validateur.

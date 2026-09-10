@@ -37,9 +37,14 @@ export type Composition = {
 /**
  * Le compte n'a plus de crédit. Ce n'est pas une panne, et proposer de
  * réessayer ferait tourner quelqu'un en rond sur un mur.
+ *
+ * Le pourquoi vient du serveur : il ne dit pas la même chose à un essai
+ * épuisé — « l'abonnement en donne quarante par mois » — qu'à un abonné qui a
+ * tout consommé, à qui il dit que les jours restants ne sont pas perdus.
  */
  | {
     readonly sorte: 'sans-credit';
+    readonly pourquoi: string;
 }
 /**
  * La demande vaut plusieurs outils. Elle relève de l'abonnement, et on le

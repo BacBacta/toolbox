@@ -32,6 +32,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@a237/comptes':
+        specifier: workspace:*
+        version: link:../../packages/comptes
       '@a237/engine':
         specifier: workspace:*
         version: link:../../packages/engine

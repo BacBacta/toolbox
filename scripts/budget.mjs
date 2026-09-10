@@ -111,6 +111,18 @@ const MARQUEURS_SERVEUR = [
   ['x-goog-api-key', 'entête d’authentification du modèle'],
   ['A237_CLEF_IA', 'nom de la variable qui porte la clef'],
   ['Tu configures un registre', 'invite envoyée au modèle'],
+  /*
+   * Et rien de la base des comptes non plus.
+   *
+   * `apps/web` importe `@a237/comptes` pour une seule fonction — tirer le jeton
+   * de l'appareil. Le même paquet porte les requêtes D1, la vérification de
+   * signature des rappels et le calcul des abonnements. L'arbre les secoue
+   * aujourd'hui ; le jour où un import mal placé les retient, le client
+   * embarquerait la règle économique entière, et qui l'embarque peut la lire.
+   */
+  ['INSERT OR IGNORE INTO comptes', 'requête d’ouverture de compte'],
+  ['appels_ia', 'table du journal des coûts'],
+  ['A237_PAIEMENT_SECRET', 'nom du secret qui signe les rappels'],
 ]
 
 /*

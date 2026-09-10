@@ -47,7 +47,7 @@ type Composition =
   | 'repos'
   | 'en-cours'
   | 'pas-ouvert'
-  | 'sans-credit'
+  | { readonly sansCredit: string }
   | { readonly abonnement: string }
   | { readonly echoue: string }
   | { readonly horsSujet: string }
@@ -103,7 +103,7 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
       } else if (r.sorte === 'pas-ouvert') {
         setComposition('pas-ouvert')
       } else if (r.sorte === 'sans-credit') {
-        setComposition('sans-credit')
+        setComposition({ sansCredit: r.pourquoi })
       } else if (r.sorte === 'abonnement-requis') {
         setComposition({ abonnement: r.pourquoi })
       } else if (r.sorte === 'hors-sujet') {
@@ -223,10 +223,13 @@ export function Atelier(props: ProprietesAtelier): JSX.Element {
             </p>
           )}
 
-          {composition === 'sans-credit' && (
+          {typeof composition === 'object' && 'sansCredit' in composition && (
             <p class="note">
-              Il n’y a plus de crédit pour composer. Les outils que tu as déjà continuent
-              de marcher, et ceux de la liste ci-dessous s’ouvrent sans rien coûter.
+              {composition.sansCredit === ''
+                ? 'Il n’y a plus de crédit pour composer.'
+                : composition.sansCredit}{' '}
+              Les outils que tu as déjà continuent de marcher, et ceux de la liste ci-dessous
+              s’ouvrent sans rien coûter.
             </p>
           )}
 

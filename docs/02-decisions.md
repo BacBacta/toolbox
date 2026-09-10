@@ -277,3 +277,40 @@ le monde a vu de ses yeux, jamais le taux d'assiduité de chacun.
 | Taux USD → XAF pour `ai_calls.cost_xaf` | phase 4 | § 3.1 — le `USD=656` du prototype est le taux fixe **euro**/FCFA appliqué au dollar. À relever à la source, et à mettre en configuration du Worker, pas en constante. |
 | Les six vérifications de la section 6 du brief | à l'ouverture de chaque phase concernée | § 4 — aucune ne concerne la phase 1. |
 | Longueur du lien court pour les documents qui portent des noms et des montants | phase 2 | Un slug de 4 caractères en base32 fait environ un million de combinaisons : énumérable. Acceptable pour une liste de prix, discutable pour une facture ou une ardoise. À trancher avec le format d'URL, avant que des liens soient dans la nature. |
+
+## Les comptes s'écartent du § 3.4 sur quatre points
+
+Le bloc SQL du brief est une illustration, et trois de ses choix ont déjà été
+revus ailleurs — le `slug` de quatre caractères est devenu un lien de douze,
+pour la même raison qu'une clé de coffre n'a pas quatre chiffres. Voici les
+écarts du schéma des comptes, et pourquoi.
+
+**Pas de table `tools`.** Un outil vit sur le téléphone, dans IndexedDB
+(§ 2.7), et son instantané publié vit dans KV. Une troisième copie en base ne
+serait lue par personne, et il faudrait pourtant la tenir à jour à chaque
+modification, hors ligne comprise. On range ce qu'on relit.
+
+**Les noms sont en français**, comme le reste du dépôt (§ 9) : `comptes`,
+`appareils`, `paiements`, `appels_ia`. Les plans sont `essai` et `atelier`
+plutôt que `trial` et `atelier` — un mot sur deux en anglais dans une base
+qu'on lit en français est un mot de trop.
+
+**`ai_calls.kind` devient `appels_ia.etage`.** L'étage est déjà calculé par le
+moteur, gratuitement et sans réseau ; il dit la même chose que `'compose' |
+'libre'`, et c'est lui qui décide du prix. Deux vocabulaires pour une même
+notion finiraient par ne plus se correspondre.
+
+**Le code de récupération n'est pas haché par argon2.** Cette exigence répond à
+un mot de passe *choisi par quelqu'un* — quelques dizaines de bits au mieux,
+qu'un dérivateur lent rend coûteux à essayer hors ligne. Le code d'ici est tiré
+par la machine sur seize lettres d'un alphabet de trente et un, soit près de
+quatre-vingts bits : sa force est dans son entropie, pas dans la lenteur du
+calcul. Un SHA-256 suffit, n'ajoute aucune dépendance au plafond du § 8, et ne
+dépense pas le temps processeur du Worker à chaque récupération.
+
+Un dernier écart, sur l'identité plutôt que sur le schéma : le brief prévoit
+`phone TEXT UNIQUE` renseigné au premier paiement, et cette unicité casse un
+cas réel — un téléphone perdu, un appareil neuf, un compte neuf, et le même
+numéro qui paie de nouveau. Le numéro **suit le compte qui vient de payer** :
+il désigne une personne, et il va au compte dont elle se sert aujourd'hui.
+L'ancien compte garde son abonnement et ses crédits ; il ne perd que le numéro.

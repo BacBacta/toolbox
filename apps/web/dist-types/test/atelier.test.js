@@ -1,9 +1,12 @@
 import { jsx as _jsx } from "preact/jsx-runtime";
 // @vitest-environment happy-dom
+// Le jeton de l'appareil vit dans IndexedDB : sans lui, aucune requête qui
+// engage le compte ne part.
+import 'fake-indexeddb/auto';
 import { CATALOGUE } from '@a237/engine';
 import { render as monter } from 'preact';
 import { act } from 'preact/test-utils';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Atelier } from '../src/atelier.js';
 /**
  * L'atelier de bout en bout, y compris le chemin qui coûte de l'argent.
@@ -51,7 +54,22 @@ function cliquer(texte) {
         throw new Error(`bouton introuvable : ${texte}`);
     act(() => b.click());
 }
-const attendre = () => act(() => new Promise((r) => setTimeout(r, 0)));
+/*
+ * Deux tours et non un.
+ *
+ * Une composition ne fait plus qu'un aller-retour réseau : elle présente le
+ * jeton de l'appareil, lu dans IndexedDB, et range le solde que la réponse
+ * rapporte. Le jeton est tiré une fois avant les cas pour que son premier
+ * accès — le plus lent — ne se mêle pas au minutage.
+ */
+const attendre = async () => {
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+    await act(() => new Promise((r) => setTimeout(r, 0)));
+};
+beforeAll(async () => {
+    const { jetonDeCetAppareil } = await import('../src/appareil.js');
+    await jetonDeCetAppareil();
+});
 function repond(statut, corps) {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
         ok: statut >= 200 && statut < 300,

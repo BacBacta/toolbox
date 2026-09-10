@@ -1,6 +1,7 @@
 import { Fragment as _Fragment, jsx as _jsx, jsxs as _jsxs } from "preact/jsx-runtime";
 import { CATALOGUE, EXTRAIT_VIDE, lienPublic, montantF } from '@a237/engine';
 import { useEffect, useState } from 'preact/hooks';
+import { dernierEtatConnu } from './compte.js';
 import { Diffusion } from './diffusion.js';
 import { viderLaFile } from './file.js';
 import { publier, televerserCarte } from './publier.js';
@@ -35,6 +36,17 @@ function Accueil(props) {
 }
 export function App() {
     const [outils, setOutils] = useState([]);
+    const [compte, setCompte] = useState(null);
+    /*
+     * L'écran du compte se charge à la demande, comme les outils.
+     *
+     * Il n'est sur le chemin de personne : on y arrive par une ligne discrète, et
+     * la plupart des gens ne l'ouvriront jamais. Deux kilo-octets dans la
+     * coquille initiale pour ça, c'est deux kilo-octets payés par tout le monde
+     * avant le premier affichage, sur la connexion qu'ils ont.
+     */
+    const [surLeCompte, setSurLeCompte] = useState(false);
+    const [ecranCompte, setEcranCompte] = useState(null);
     const [ouvert, setOuvert] = useState(null);
     const [module, setModule] = useState(null);
     const [coutDernier, setCoutDernier] = useState(null);
@@ -44,6 +56,9 @@ export function App() {
     const [motPublication, setMotPublication] = useState('');
     useEffect(() => {
         void listerOutils().then(setOutils);
+        // Le dernier état connu, gardé sur l'appareil : la ligne s'affiche en mode
+        // avion, et se rafraîchit quand une composition la met à jour.
+        void dernierEtatConnu().then(setCompte);
     }, []);
     /*
      * Ce qui n'est pas parti repart, au lancement et au retour du réseau.
@@ -64,6 +79,11 @@ export function App() {
         globalThis.addEventListener('online', reprendre);
         return () => globalThis.removeEventListener('online', reprendre);
     }, []);
+    useEffect(() => {
+        if (!surLeCompte)
+            return;
+        void import('./ecran-compte.js').then((m) => setEcranCompte(() => m.EcranCompte));
+    }, [surLeCompte]);
     useEffect(() => {
         if (ouvert === null) {
             setModule(null);
@@ -151,6 +171,19 @@ export function App() {
         setOutils(await listerOutils());
         setOuvert(outil);
         /*
+         * Le solde a peut-être changé, et l'écran doit le voir.
+         *
+         * Une composition rapporte le solde avec sa réponse, et `composer` le range
+         * sur l'appareil — mais l'état affiché avait été lu une fois, au montage.
+         * La ligne du compte restait donc absente jusqu'au lancement suivant : on
+         * venait de dépenser un crédit sans que rien ne le dise.
+         *
+         * On relit après chaque création, y compris celles qui ne coûtent rien :
+         * une lecture d'IndexedDB ne se sent pas, et distinguer les deux cas ici
+         * ferait dépendre l'affichage d'une règle qui se décide ailleurs.
+         */
+        setCompte(await dernierEtatConnu());
+        /*
          * Ce que la composition a coûté, dit une fois.
          *
          * La consommation se paie à l'appel : une dépense qu'on ne voit pas est
@@ -176,8 +209,16 @@ export function App() {
         setCoutDernier(null);
         setOuvert(await lireOutil(id));
     }
+    if (surLeCompte) {
+        const Ecran = ecranCompte;
+        return (_jsx("main", { class: "app", children: Ecran === null ? (_jsx("p", { class: "note", children: "Un instant\u2026" })) : (_jsx(Ecran, { etat: compte, onEtat: setCompte, onRetour: () => setSurLeCompte(false) })) }));
+    }
     if (ouvert === null) {
-        return (_jsxs("main", { class: "app", children: [erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), _jsx(Accueil, { outils: outils, onCreer: (s, extrait, compose, fcfa) => tenter(() => creer(s, extrait, compose, fcfa), 'Création impossible'), onOuvrir: (id) => tenter(() => ouvrir(id), 'Ouverture impossible'), onSupprimer: (id) => tenter(() => supprimer(id), 'Suppression impossible') })] }));
+        return (_jsxs("main", { class: "app", children: [erreur !== '' && _jsx("div", { class: "alerte", children: erreur }), _jsx(Accueil, { outils: outils, onCreer: (s, extrait, compose, fcfa) => tenter(() => creer(s, extrait, compose, fcfa), 'Création impossible'), onOuvrir: (id) => tenter(() => ouvrir(id), 'Ouverture impossible'), onSupprimer: (id) => tenter(() => supprimer(id), 'Suppression impossible') }), compte !== null && (_jsx("button", { type: "button", class: "compte-ligne", onClick: () => setSurLeCompte(true), children: compte.plan === 'atelier'
+                        ? `Atelier · ${compte.credits} compositions`
+                        : compte.credits === 0
+                            ? 'Essai · plus de composition'
+                            : `Essai · ${compte.credits} composition${compte.credits > 1 ? 's' : ''}` }))] }));
     }
     /**
      * Le lien de l'outil ouvert, ou rien.

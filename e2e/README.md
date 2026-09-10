@@ -1,6 +1,6 @@
 # Vérification de bout en bout
 
-Quatre scripts, quatre choses qu'aucun test unitaire ne peut voir.
+Cinq scripts, cinq choses qu'aucun test unitaire ne peut voir.
 
 `fumee.mjs` ouvre l'application **construite** dans un vrai Chromium, sur un
 écran de 360 × 740 avec le tactile, et vérifie la chaîne complète : recherche
@@ -18,6 +18,12 @@ qui a longtemps été interdit. Il lui faut le Worker et son KV.
 crée un outil, on demande à le diffuser, et on regarde la file partir **toute
 seule** quand le réseau revient. Il lui faut le Worker et son KV, donc un vrai
 serveur : `wrangler pages dev`.
+
+`comptes.mjs` joue un compte, un abonnement et un rappel rejoué, en requêtes et
+sans navigateur. Le § 7 fait de l'idempotence le critère d'arrêt de la phase 3 ;
+les essais unitaires le prouvent sur la logique et sur la base, celui-ci sur la
+chaîne entière — le Worker, sa liaison D1, la vérification de signature, et le
+compte tel que l'écran le lit ensuite.
 
 `mise-a-jour.mjs` joue le scénario de la **deuxième** mise en ligne : il
 construit une version, l'installe dans le navigateur, construit une version
@@ -94,6 +100,11 @@ node e2e/mise-a-jour.mjs
 wrangler pages dev --port 8798 --ip 127.0.0.1
 node e2e/compose.mjs
 node e2e/hors-ligne.mjs
+
+# comptes.mjs a besoin en plus du secret de paiement et de la base migrée.
+printf 'A237_PAIEMENT_SECRET=secret-local-essai\n' > .dev.vars
+wrangler d1 execute COMPTES --local --file=packages/comptes/migrations/0001-comptes.sql
+WRANGLER=/chemin/vers/wrangler node e2e/comptes.mjs
 ```
 
 Chacun sort en code 1 s'il échoue : ils s'enchaînent avec `&&`.

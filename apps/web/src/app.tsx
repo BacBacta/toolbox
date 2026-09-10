@@ -3,7 +3,10 @@ import { CATALOGUE, EXTRAIT_VIDE, lienPublic, montantF } from '@a237/engine'
 import type { Extrait } from '@a237/engine'
 import type { JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
+import { dernierEtatConnu } from './compte.js'
+import type { EtatCompte } from './compte.js'
 import { Diffusion } from './diffusion.js'
+import type { ProprietesCompte } from './ecran-compte.js'
 import { viderLaFile } from './file.js'
 import { publier, televerserCarte } from './publier.js'
 import { CHARGEURS, outilDisponible } from './outils.js'
@@ -111,6 +114,17 @@ function Accueil(props: {
 
 export function App(): JSX.Element {
   const [outils, setOutils] = useState<readonly OutilEnregistre[]>([])
+  const [compte, setCompte] = useState<EtatCompte | null>(null)
+  /*
+   * L'écran du compte se charge à la demande, comme les outils.
+   *
+   * Il n'est sur le chemin de personne : on y arrive par une ligne discrète, et
+   * la plupart des gens ne l'ouvriront jamais. Deux kilo-octets dans la
+   * coquille initiale pour ça, c'est deux kilo-octets payés par tout le monde
+   * avant le premier affichage, sur la connexion qu'ils ont.
+   */
+  const [surLeCompte, setSurLeCompte] = useState(false)
+  const [ecranCompte, setEcranCompte] = useState<((p: ProprietesCompte) => JSX.Element) | null>(null)
   const [ouvert, setOuvert] = useState<OutilEnregistre | null>(null)
   const [module, setModule] = useState<ModuleOutil | null>(null)
   const [coutDernier, setCoutDernier] = useState<number | null>(null)
@@ -121,6 +135,9 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     void listerOutils().then(setOutils)
+    // Le dernier état connu, gardé sur l'appareil : la ligne s'affiche en mode
+    // avion, et se rafraîchit quand une composition la met à jour.
+    void dernierEtatConnu().then(setCompte)
   }, [])
 
   /*
@@ -141,6 +158,11 @@ export function App(): JSX.Element {
     globalThis.addEventListener('online', reprendre)
     return () => globalThis.removeEventListener('online', reprendre)
   }, [])
+
+  useEffect(() => {
+    if (!surLeCompte) return
+    void import('./ecran-compte.js').then((m) => setEcranCompte(() => m.EcranCompte))
+  }, [surLeCompte])
 
   useEffect(() => {
     if (ouvert === null) {
@@ -245,6 +267,19 @@ export function App(): JSX.Element {
     setOutils(await listerOutils())
     setOuvert(outil)
     /*
+     * Le solde a peut-être changé, et l'écran doit le voir.
+     *
+     * Une composition rapporte le solde avec sa réponse, et `composer` le range
+     * sur l'appareil — mais l'état affiché avait été lu une fois, au montage.
+     * La ligne du compte restait donc absente jusqu'au lancement suivant : on
+     * venait de dépenser un crédit sans que rien ne le dise.
+     *
+     * On relit après chaque création, y compris celles qui ne coûtent rien :
+     * une lecture d'IndexedDB ne se sent pas, et distinguer les deux cas ici
+     * ferait dépendre l'affichage d'une règle qui se décide ailleurs.
+     */
+    setCompte(await dernierEtatConnu())
+    /*
      * Ce que la composition a coûté, dit une fois.
      *
      * La consommation se paie à l'appel : une dépense qu'on ne voit pas est
@@ -273,6 +308,19 @@ export function App(): JSX.Element {
     setOuvert(await lireOutil(id))
   }
 
+  if (surLeCompte) {
+    const Ecran = ecranCompte
+    return (
+      <main class="app">
+        {Ecran === null ? (
+          <p class="note">Un instant…</p>
+        ) : (
+          <Ecran etat={compte} onEtat={setCompte} onRetour={() => setSurLeCompte(false)} />
+        )}
+      </main>
+    )
+  }
+
   if (ouvert === null) {
     return (
       <main class="app">
@@ -285,6 +333,21 @@ export function App(): JSX.Element {
           onOuvrir={(id) => tenter(() => ouvrir(id), 'Ouverture impossible')}
           onSupprimer={(id) => tenter(() => supprimer(id), 'Suppression impossible')}
         />
+        {/*
+          Une ligne, en bas, hors du chemin de qui vient faire une facture.
+          Elle ne dit rien tant qu'on n'a jamais composé — il n'y a alors rien
+          à savoir, et une invitation à s'occuper de son compte serait la
+          première chose que verrait quelqu'un venu pour un devis.
+        */}
+        {compte !== null && (
+          <button type="button" class="compte-ligne" onClick={() => setSurLeCompte(true)}>
+            {compte.plan === 'atelier'
+              ? `Atelier · ${compte.credits} compositions`
+              : compte.credits === 0
+                ? 'Essai · plus de composition'
+                : `Essai · ${compte.credits} composition${compte.credits > 1 ? 's' : ''}`}
+          </button>
+        )}
       </main>
     )
   }

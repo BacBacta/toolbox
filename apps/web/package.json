@@ -9,6 +9,7 @@
     "apercu": "vite preview"
   },
   "dependencies": {
+    "@a237/comptes": "workspace:*",
     "@a237/engine": "workspace:*",
     "@a237/render": "workspace:*",
     "idb-keyval": "^6.3.0",

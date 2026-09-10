@@ -157,6 +157,75 @@ La vérification de bout en bout (`e2e/`) sert l'application avec **ces en-tête
 exactement** — elle les lit dans `_headers` — dans un vrai Chromium, et la
 chaîne complète passe, mode avion compris.
 
+## Les comptes, les crédits et le paiement
+
+| | |
+|---|---|
+| `GET /api/compte` | plan, crédits, échéance |
+| `POST /api/compte/code` | un code de récupération, montré **une fois** |
+| `POST /api/compte/reprendre` | rattache cet appareil au compte d'un code |
+| `POST /api/pay/demarrer` | ouvre un paiement, rend un identifiant de suivi |
+| `GET /api/pay/:id` | où il en est |
+| `POST /api/pay/rappel` | le fournisseur, **signature vérifiée** |
+| D1 | liaison `COMPTES`, base `atelier237-comptes` |
+
+Le schéma vit dans `packages/comptes/migrations/`. Il s'applique à la main —
+`wrangler d1 execute COMPTES --remote --file=…` — parce qu'une migration
+automatique au déploiement voudrait dire qu'un déploiement raté peut casser la
+base des comptes.
+
+**Personne ne s'inscrit.** L'appareil tire un jeton de cent vingt-huit bits au
+premier lancement et le garde ; le serveur ne le voit qu'au premier appel qui
+coûte quelque chose, et lui ouvre un compte à ce moment-là. Il ne range jamais
+le jeton, seulement son empreinte : une copie de la base ne distribue pas
+d'identités. Le numéro de téléphone n'apparaît qu'au premier paiement.
+
+**Deux plans.** Un essai de cinq compositions, puis mille francs pour trente
+jours et quarante compositions. Un abonnement échu ne fait rien perdre : les
+outils vivent sur le téléphone et les publications restent en ligne, seule
+s'arrête la composition. Payer en avance prolonge au lieu de remplacer.
+
+**Le crédit se réserve avant l'appel**, avec la condition dans la requête SQL
+et non autour d'elle : deux requêtes simultanées d'un compte à qui il en reste
+un passeraient toutes deux un contrôle fait en JavaScript. Un appel qui
+n'atteint jamais le modèle rend son crédit.
+
+**Le code de récupération fait seize lettres** dans l'alphabet des liens, se
+dit au téléphone et n'est montré qu'une fois. Le brief demandait argon2 ; cette
+exigence répond à un mot de passe choisi par quelqu'un, quelques dizaines de
+bits qu'un dérivateur lent rend coûteux à essayer. Un code tiré par la machine
+sur quatre-vingts bits n'a pas ce défaut, et un SHA-256 n'ajoute aucune
+dépendance au plafond du § 8.
+
+### Le fournisseur de paiement
+
+`A237_PAIEMENT_SECRET` signe les rappels, et **sans lui `/api/pay` ne s'ouvre
+pas** : on ne saurait pas distinguer le fournisseur de n'importe qui. Il se
+pose comme la clef du modèle, avec `wrangler pages secret put`, et n'entre
+jamais dans le dépôt.
+
+Le seul fournisseur d'aujourd'hui n'encaisse rien. Ouvrir un compte marchand
+CamPay ou Fapshi demande des pièces et du délai (§ 7, phase 0), et rien de ce
+qui s'écrit autour du paiement n'avait besoin d'attendre ça. Il **signe
+vraiment** ses rappels, en HMAC-SHA256 du corps exact : un faux qui répondrait
+« oui » à tout n'éprouverait pas la seule chose qui compte ici.
+
+Ce qu'il reste à faire le jour où un vrai fournisseur arrive : écrire un
+`Fournisseur` de plus — `demarrer` et `lireRappel` —, poser son secret, et le
+choisir dans `fournisseurChoisi`. Rien d'autre ne bouge : le rejeu, le montant
+partiel, la transaction et l'idempotence sont déjà éprouvés.
+
+### Deux verrous contre le rejeu
+
+`UNIQUE(fournisseur, reference)` dans la base, et un paiement qui n'est plus en
+attente ne se retranche pas. Il en faut deux : les fournisseurs réessaient
+quand ils n'ont pas vu notre 200, et sans le second, trois rappels identiques
+donneraient quatre-vingt-dix jours. Le montant se revérifie même signé — un
+fournisseur peut accepter un versement partiel.
+
+Un rappel qu'on ne reconnaît pas reçoit **200 et non 404** : un fournisseur qui
+reçoit une erreur réessaie en boucle.
+
 ## Ce qui reste à vérifier à la main
 
 Le navigateur de l'environnement de développement ne peut pas atteindre

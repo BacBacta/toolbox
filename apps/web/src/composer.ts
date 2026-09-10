@@ -1,5 +1,7 @@
 import type { CalculDemande, RegistreDemande } from '@a237/engine'
 import { lireReponseModele } from '@a237/engine'
+import { entetesDAppareil } from './appareil.js'
+import { noterApresComposition } from './compte.js'
 
 /**
  * L'étage 2 : ce que l'étage 1 n'a pas su faire, on le fait composer.
@@ -29,8 +31,12 @@ export type Composition =
   /**
    * Le compte n'a plus de crédit. Ce n'est pas une panne, et proposer de
    * réessayer ferait tourner quelqu'un en rond sur un mur.
+   *
+   * Le pourquoi vient du serveur : il ne dit pas la même chose à un essai
+   * épuisé — « l'abonnement en donne quarante par mois » — qu'à un abonné qui a
+   * tout consommé, à qui il dit que les jours restants ne sont pas perdus.
    */
-  | { readonly sorte: 'sans-credit' }
+  | { readonly sorte: 'sans-credit'; readonly pourquoi: string }
   /**
    * La demande vaut plusieurs outils. Elle relève de l'abonnement, et on le
    * dit **avant** d'avoir dépensé quoi que ce soit.
@@ -43,7 +49,9 @@ export async function composer(demande: string, signal?: AbortSignal): Promise<C
   try {
     reponse = await fetch('/api/ai', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      // L'appareil se présente : c'est ce qui lui vaut ses crédits, et ce qui
+      // fait qu'un abonnement suit son propriétaire d'un téléphone à l'autre.
+      headers: { 'content-type': 'application/json', ...(await entetesDAppareil()) },
       body: JSON.stringify({ demande }),
       ...(signal !== undefined ? { signal } : {}),
     })
@@ -57,12 +65,10 @@ export async function composer(demande: string, signal?: AbortSignal): Promise<C
     const corps = (await reponse.json().catch(() => null)) as
       | { erreur?: unknown; pourquoi?: unknown }
       | null
+    const pourquoi = typeof corps?.pourquoi === 'string' ? corps.pourquoi : ''
     return corps?.erreur === 'abonnement-requis'
-      ? {
-          sorte: 'abonnement-requis',
-          pourquoi: typeof corps.pourquoi === 'string' ? corps.pourquoi : '',
-        }
-      : { sorte: 'sans-credit' }
+      ? { sorte: 'abonnement-requis', pourquoi }
+      : { sorte: 'sans-credit', pourquoi }
   }
 
   if (!reponse.ok) {
@@ -73,8 +79,15 @@ export async function composer(demande: string, signal?: AbortSignal): Promise<C
   }
 
   const corps = (await reponse.json().catch(() => null)) as
-    | { registre?: unknown; calcul?: unknown; impossible?: unknown; fcfa?: unknown }
+    | {
+        registre?: unknown; calcul?: unknown; impossible?: unknown; fcfa?: unknown
+        plan?: unknown; credits?: unknown
+      }
     | null
+
+  // Le solde revient avec la composition : le compte se tient à jour sans
+  // qu'on l'interroge, et sans coûter un aller-retour de plus.
+  await noterApresComposition(corps?.plan, corps?.credits)
 
   const fcfa = typeof corps?.fcfa === 'number' ? corps.fcfa : 0
 
