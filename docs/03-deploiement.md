@@ -204,6 +204,15 @@ pas** : on ne saurait pas distinguer le fournisseur de n'importe qui. Il se
 pose comme la clef du modèle, avec `wrangler pages secret put`, et n'entre
 jamais dans le dépôt.
 
+**Un secret posé ne rejoint pas le déploiement en cours.** Pages attache ses
+variables au projet et les applique **à la construction** : après un
+`secret put`, il faut redéployer, sinon les fonctions continuent de tourner
+avec l'environnement d'avant. Le symptôme est trompeur — `/api/pay` répond 503
+« le paiement n'est pas encore ouvert » exactement comme si le secret manquait.
+C'est le même piège que celui de la branche de production, et il se
+diagnostique de la même façon : par le comportement du déploiement, pas par
+l'état de la configuration.
+
 Le seul fournisseur d'aujourd'hui n'encaisse rien. Ouvrir un compte marchand
 CamPay ou Fapshi demande des pièces et du délai (§ 7, phase 0), et rien de ce
 qui s'écrit autour du paiement n'avait besoin d'attendre ça. Il **signe
