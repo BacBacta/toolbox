@@ -246,6 +246,7 @@ for (const [chemin, marqueur, quoi] of [
   const attendus = new Set([
     'functions/api/ai.js', 'functions/api/publier.js',
     'functions/api/compte/[[chemin]].js', 'functions/api/pay/[[chemin]].js',
+    'functions/api/reponses/[lien].js',
     'functions/d/[lien].js', 'functions/c/[lien].js', 'functions/p/[lien].js',
   ])
   const vus = []
