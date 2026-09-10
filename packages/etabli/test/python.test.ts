@@ -63,6 +63,21 @@ describe('le manifeste, qui vient du réseau', () => {
     expect(lireManifeste(menteur)?.octets).toBe(8_645_967)
   })
 
+  /*
+   * Le manifeste s'est enrichi en route — « notreBrotli » pour l'estimation de
+   * construction, « mesureSur » pour dire quelle origine a été mesurée. Un
+   * lecteur qui refuserait ce qu'il ne connaît pas ferait disparaître Python le
+   * jour où le script gagne un champ, sans que rien ne dise pourquoi.
+   */
+  it('accepte les champs qu’il ne connaît pas', () => {
+    const enrichi = {
+      ...MANIFESTE,
+      mesureSur: 'https://etabli237.pages.dev/',
+      fichiers: [{ ...FICHIER, notreBrotli: 2_600_000, inconnu: 'plus tard' }],
+    }
+    expect(lireManifeste(enrichi)?.surLeFil).toBe(2_667_808)
+  })
+
   it('refuse tout ce qui ne tient pas debout, plutôt que d’annoncer un prix faux', () => {
     expect(lireManifeste(null)).toBe(null)
     expect(lireManifeste('0.28.3')).toBe(null)
