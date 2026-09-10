@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { ALPHABET_LIEN, LONGUEUR_LIEN, lienValide } from '@a237/engine'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { publier, tirerLien } from '../src/publier.js'
+import { publier, televerserCarte, tirerLien } from '../src/publier.js'
 import type { OutilEnregistre } from '../src/stockage.js'
 
 const LE_9_SEPT = new Date('2026-09-09T07:45:00.000Z')
@@ -114,5 +114,28 @@ describe('publier', () => {
     }) as unknown as typeof fetch
     const issue = await publier(outil(), LE_9_SEPT)
     expect(issue.sorte).toBe('conflit')
+  })
+})
+
+describe('téléverser la carte', () => {
+  /*
+   * Elle part **après** le dépôt, jamais avec lui : une image en base64 dans du
+   * JSON coûte un tiers de sa taille en plus, et la page de lecture fonctionne
+   * sans elle. Un échec de téléversement ne doit donc rien casser — le lien
+   * vaut déjà, l'aperçu sera sobre.
+   */
+  it('dit oui quand le serveur l’accepte', async () => {
+    repond(200)
+    expect(await televerserCarte('K7M2XQ4BN9PZ', new Blob([new Uint8Array([1])]))).toBe(true)
+  })
+
+  it('dit non quand il la refuse, sans jeter', async () => {
+    repond(413)
+    expect(await televerserCarte('K7M2XQ4BN9PZ', new Blob([new Uint8Array([1])]))).toBe(false)
+  })
+
+  it('et non quand il n’y a pas de réseau', async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError('hors ligne')) as unknown as typeof fetch
+    expect(await televerserCarte('K7M2XQ4BN9PZ', new Blob([new Uint8Array([1])]))).toBe(false)
   })
 })

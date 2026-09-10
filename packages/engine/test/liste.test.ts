@@ -257,6 +257,23 @@ describe('la carte d’un registre composé', () => {
     expect(carte.sub).toBe('')
   })
 
+  it('emporte le total et les personnes quand la configuration en a', () => {
+    // Deux champs facultatifs : un registre qui totalise, et un registre dont
+    // chaque ligne nomme quelqu'un — celui-là tire des relances `wa.me`. Les
+    // omettre par défaut évite d'inventer un total qui n'a pas de sens.
+    const avec = squeletteDeRegistre({
+      ...REGISTRE,
+      total: { type: 'somme', clef: 'pondus', libelle: 'Oeufs', unite: '' },
+      personnes: true,
+    })
+    expect(avec.config.total).toEqual({ type: 'somme', clef: 'pondus', libelle: 'Oeufs', unite: '' })
+    expect(avec.config.personnes).toBe(true)
+
+    const sans = squeletteDeRegistre(REGISTRE)
+    expect(sans.config.total).toBeUndefined()
+    expect(sans.config.personnes).toBeUndefined()
+  })
+
   it('mais un squelette du catalogue garde le sien : il dit la sorte', () => {
     // « Caisse de septembre » sous-titré « Livre de caisse » : les deux
     // renseignent, et c'est le cas courant.

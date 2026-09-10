@@ -79,6 +79,16 @@ describe('ce que le serveur refuse', () => {
     expect(controler(depot({}, ''), null)?.statut).toBe(400)
   })
 
+  it('un instantané dont le squelette n’est pas une chaîne', () => {
+    // Ce qui arrive par `curl` n'a pas de forme garantie : un squelette absent,
+    // un nombre, un objet. Tous se rangent sous « squelette inconnu » plutôt
+    // que de jeter.
+    for (const skeleton of [undefined, 42, null, {}, []]) {
+      const verdict = controler({ lien: LIEN, instantane: { ...depot().instantane, skeleton } }, null)
+      expect(verdict?.corps.erreur, String(skeleton)).toBe('squelette-inconnu')
+    }
+  })
+
   it('un corps qui n’est pas un dépôt', () => {
     expect(controler(undefined, null)?.statut).toBe(400)
     expect(controler({ lien: LIEN }, null)?.corps.erreur).toBe('instantane-absent')

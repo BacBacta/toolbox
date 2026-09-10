@@ -167,3 +167,63 @@ describe('la carte', () => {
     expect(hote.textContent).toContain('PNG de 2 Ko')
   })
 })
+
+describe('partager la carte', () => {
+  /*
+   * Le § 6 du brief tient à `navigator.share({files})` : c'est lui qui ouvre
+   * WhatsApp avec l'image déjà attachée. Il n'existe pas partout — un
+   * navigateur de bureau, une vieille version d'Android — et ce qu'on fait
+   * alors compte autant : on copie le texte, et on dit quoi faire de l'image.
+   */
+  function cliquer(texte: string): void {
+    const b = [...hote.querySelectorAll('button')].find((x) => x.textContent?.includes(texte))
+    if (b === undefined) throw new Error(`bouton introuvable : ${texte}`)
+    act(() => b.click())
+  }
+
+  it('passe par le partage natif quand il accepte les fichiers', async () => {
+    const partage = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      canShare: () => true,
+      share: partage,
+    })
+    await poser()
+    cliquer('Partager la carte')
+    await reposer(8)
+
+    expect(partage).toHaveBeenCalled()
+    const [donne] = partage.mock.calls[0] as [{ files: File[]; text: string }]
+    expect(donne.files[0]?.type).toBe('image/png')
+    expect(donne.files[0]?.name).toBe('njangi-s36.png')
+    expect(donne.text).toContain('NJANGI NKOLBISSON')
+  })
+
+  it('et retombe sur le texte copié quand il ne les accepte pas', async () => {
+    const ecrit = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      canShare: () => false,
+      clipboard: { writeText: ecrit },
+    })
+    await poser()
+    cliquer('Partager la carte')
+    await reposer(8)
+
+    expect(ecrit).toHaveBeenCalled()
+    expect(hote.textContent).toContain('Texte copié')
+    expect(hote.textContent).toContain('Appuie longuement')
+  })
+
+  it('et le dit franchement quand même la copie est refusée', async () => {
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      canShare: () => false,
+      clipboard: { writeText: vi.fn().mockRejectedValue(new Error('refusé')) },
+    })
+    await poser()
+    cliquer('Partager la carte')
+    await reposer(8)
+    expect(hote.textContent).toContain('Copie impossible')
+  })
+})
