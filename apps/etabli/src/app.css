@@ -245,3 +245,58 @@ body {
   font: inherit;
   cursor: pointer;
 }
+
+/* --- Sauvegarder et partager --- */
+
+.mot { margin: 0; padding: 12px 16px; font-size: 14px; color: var(--gris); }
+.mot.alerte { color: var(--rouge); }
+
+.partage { padding: 0 8px 12px; background: white; }
+
+.partager {
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--vert);
+  color: white;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.partager:disabled { opacity: .6; cursor: default; }
+
+.partage-lien { margin-top: 10px; }
+
+/*
+ * L'adresse se lit et se recopie à la main : elle passe à la ligne plutôt que
+ * de sortir de l'écran, et garde une casse fixe pour qu'on ne confonde pas
+ * deux caractères en la dictant.
+ */
+.adresse {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  background: var(--fond);
+  font-family: var(--mono);
+  font-size: 14px;
+  word-break: break-all;
+}
+
+.partage-actions { display: flex; gap: 8px; margin-top: 8px; }
+.partage-actions button,
+.partage-actions .whatsapp {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  background: var(--fond);
+  color: inherit;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}

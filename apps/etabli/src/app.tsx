@@ -1,8 +1,10 @@
 import type { Fichier, Projet } from '@a237/etabli'
 import { MODELES, fichierAExporter } from '@a237/etabli'
+import { lienDemande, recuperer } from './partage.js'
 import type { JSX } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
 import { Apercu } from './apercu.js'
+import { Partage } from './partage-vue.js'
 import { Editeur } from './editeur.js'
 import { enregistrer, lireProjets, supprimer } from './stockage.js'
 
@@ -26,9 +28,41 @@ type Ecran =
 export function App(): JSX.Element {
   const [projets, setProjets] = useState<readonly Projet[] | null>(null)
   const [ecran, setEcran] = useState<Ecran>({ quoi: 'liste' })
+  const [ouverture, setOuverture] = useState<'non'|'en-cours'|'faite'|'introuvable'|'echouee'>('non')
 
   useEffect(() => {
     void lireProjets().then(setProjets)
+  }, [])
+
+  /*
+   * Un lien reçu s'ouvre tout seul.
+   *
+   * Quelqu'un reçoit l'adresse sur WhatsApp et la touche : il doit voir le
+   * projet, pas un écran d'accueil où il faudrait deviner quoi faire. Le projet
+   * arrive comme une copie à lui — il l'ouvre, le modifie, et sauvegardera sous
+   * son propre lien s'il le veut. Celui qui a partagé ne risque rien.
+   */
+  useEffect(() => {
+    const lien = lienDemande(location.search)
+    if (lien === null) return
+    setOuverture('en-cours')
+    void recuperer(lien).then((r) => {
+      if (r.sorte !== 'ouvert') {
+        setOuverture(r.sorte === 'introuvable' ? 'introuvable' : 'echouee')
+        return
+      }
+      const copie: Projet = {
+        id: `p${Date.now().toString(36)}`,
+        nom: r.nom,
+        fichiers: r.fichiers.map((f) => ({ ...f })),
+        maj: Date.now(),
+      }
+      setProjets((p) => [copie, ...(p ?? [])])
+      setEcran({ quoi: 'projet', id: copie.id })
+      setOuverture('faite')
+      void enregistrer(copie)
+      history.replaceState(null, '', location.pathname)
+    })
   }, [])
 
   function creer(modeleId: string): void {
@@ -73,6 +107,14 @@ export function App(): JSX.Element {
     <main class="liste">
       <h1>Établi</h1>
       <p class="sous-titre">Écris du code, ici, sans réseau.</p>
+
+      {ouverture === 'en-cours' && <p class="mot">On ouvre le projet reçu…</p>}
+      {ouverture === 'introuvable' && (
+        <p class="mot alerte">Ce lien n’existe plus. Demande à celui qui te l’a envoyé de le repartager.</p>
+      )}
+      {ouverture === 'echouee' && (
+        <p class="mot alerte">Ce lien n’a pas pu être ouvert. Vérifie ton réseau et réessaie.</p>
+      )}
 
       <h2>Commencer</h2>
       <div class="modeles">
@@ -187,6 +229,7 @@ function EcranProjet(props: {
               Exporter en un fichier
             </button>
           </div>
+          <Partage projet={props.projet} onChanger={props.onChanger} />
         </>
       )}
     </main>

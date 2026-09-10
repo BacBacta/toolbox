@@ -121,6 +121,32 @@ Les fonctions vivent dans `functions/` : `functions/api/ai.js` répond sur
 `/api/ai`. Elles partent avec le même déploiement que les fichiers statiques —
 c'est tout l'intérêt d'un seul projet.
 
+## L'Établi — un second projet, et une seconde origine
+
+| | |
+|---|---|
+| Production | **https://etabli237.pages.dev** |
+| Projet | `etabli237` — envoi direct, pas d'intégration Git |
+| Liaison | KV `PROJETS` seulement |
+
+Il vit sur son propre sous-domaine parce qu'il **exécute du code écrit par
+quelqu'un**, et que ce code ne doit jamais tourner sur l'origine qui porte les
+comptes, les paiements et les publications.
+
+```bash
+pnpm --filter @a237/etabli-web build
+npx wrangler pages deploy dist --cwd apps/etabli --branch main
+```
+
+**Depuis `apps/etabli`, jamais depuis la racine.** Lancé d'en haut, l'envoi fait
+lire le `wrangler.toml` de l'atelier à wrangler : le projet de l'Établi s'est
+ainsi retrouvé une fois avec les fonctions de l'atelier **et ses liaisons** —
+`INSTANTANES`, `CARTES`, et `COMPTES`. Aucune fuite, les secrets n'y étaient
+pas, et les routes ne rendaient que du HTML ; mais l'API refusant de détacher
+des liaisons, il a fallu détruire et refaire le projet. `apps/etabli/wrangler.toml`
+existe pour que ça ne se reproduise pas : wrangler prend la configuration la
+plus proche.
+
 ### Pourquoi Cloudflare, et pas là où c'était déjà
 
 L'atelier a d'abord tourné sur Vercel, parce que la PWA y était déployée en une

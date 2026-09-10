@@ -1,14 +1,48 @@
 import { Fragment as _Fragment, jsx as _jsx, jsxs as _jsxs } from "preact/jsx-runtime";
 import { MODELES, fichierAExporter } from '@a237/etabli';
+import { lienDemande, recuperer } from './partage.js';
 import { useEffect, useState } from 'preact/hooks';
 import { Apercu } from './apercu.js';
+import { Partage } from './partage-vue.js';
 import { Editeur } from './editeur.js';
 import { enregistrer, lireProjets, supprimer } from './stockage.js';
 export function App() {
     const [projets, setProjets] = useState(null);
     const [ecran, setEcran] = useState({ quoi: 'liste' });
+    const [ouverture, setOuverture] = useState('non');
     useEffect(() => {
         void lireProjets().then(setProjets);
+    }, []);
+    /*
+     * Un lien reçu s'ouvre tout seul.
+     *
+     * Quelqu'un reçoit l'adresse sur WhatsApp et la touche : il doit voir le
+     * projet, pas un écran d'accueil où il faudrait deviner quoi faire. Le projet
+     * arrive comme une copie à lui — il l'ouvre, le modifie, et sauvegardera sous
+     * son propre lien s'il le veut. Celui qui a partagé ne risque rien.
+     */
+    useEffect(() => {
+        const lien = lienDemande(location.search);
+        if (lien === null)
+            return;
+        setOuverture('en-cours');
+        void recuperer(lien).then((r) => {
+            if (r.sorte !== 'ouvert') {
+                setOuverture(r.sorte === 'introuvable' ? 'introuvable' : 'echouee');
+                return;
+            }
+            const copie = {
+                id: `p${Date.now().toString(36)}`,
+                nom: r.nom,
+                fichiers: r.fichiers.map((f) => ({ ...f })),
+                maj: Date.now(),
+            };
+            setProjets((p) => [copie, ...(p ?? [])]);
+            setEcran({ quoi: 'projet', id: copie.id });
+            setOuverture('faite');
+            void enregistrer(copie);
+            history.replaceState(null, '', location.pathname);
+        });
     }, []);
     function creer(modeleId) {
         const modele = MODELES.find((m) => m.id === modeleId);
@@ -40,7 +74,7 @@ export function App() {
             return _jsx("main", { class: "chargement", children: "Ce projet n\u2019existe plus." });
         return (_jsx(EcranProjet, { projet: projet, onChanger: remplacer, onFermer: () => setEcran({ quoi: 'liste' }) }));
     }
-    return (_jsxs("main", { class: "liste", children: [_jsx("h1", { children: "\u00C9tabli" }), _jsx("p", { class: "sous-titre", children: "\u00C9cris du code, ici, sans r\u00E9seau." }), _jsx("h2", { children: "Commencer" }), _jsx("div", { class: "modeles", children: MODELES.map((m) => (_jsxs("button", { type: "button", class: "modele", onClick: () => creer(m.id), children: [_jsx("b", { children: m.nom }), _jsx("span", { children: m.dit })] }, m.id))) }), projets.length > 0 && (_jsxs(_Fragment, { children: [_jsx("h2", { children: "Tes projets" }), _jsx("ul", { class: "projets", children: projets.map((p) => (_jsxs("li", { children: [_jsxs("button", { type: "button", class: "projet", onClick: () => setEcran({ quoi: 'projet', id: p.id }), children: [_jsx("b", { children: p.nom }), _jsxs("span", { children: [p.fichiers.length, " fichier", p.fichiers.length > 1 ? 's' : ''] })] }), _jsx("button", { type: "button", class: "effacer", "aria-label": `Effacer ${p.nom}`, onClick: () => effacer(p.id), children: "\u2715" })] }, p.id))) })] }))] }));
+    return (_jsxs("main", { class: "liste", children: [_jsx("h1", { children: "\u00C9tabli" }), _jsx("p", { class: "sous-titre", children: "\u00C9cris du code, ici, sans r\u00E9seau." }), ouverture === 'en-cours' && _jsx("p", { class: "mot", children: "On ouvre le projet re\u00E7u\u2026" }), ouverture === 'introuvable' && (_jsx("p", { class: "mot alerte", children: "Ce lien n\u2019existe plus. Demande \u00E0 celui qui te l\u2019a envoy\u00E9 de le repartager." })), ouverture === 'echouee' && (_jsx("p", { class: "mot alerte", children: "Ce lien n\u2019a pas pu \u00EAtre ouvert. V\u00E9rifie ton r\u00E9seau et r\u00E9essaie." })), _jsx("h2", { children: "Commencer" }), _jsx("div", { class: "modeles", children: MODELES.map((m) => (_jsxs("button", { type: "button", class: "modele", onClick: () => creer(m.id), children: [_jsx("b", { children: m.nom }), _jsx("span", { children: m.dit })] }, m.id))) }), projets.length > 0 && (_jsxs(_Fragment, { children: [_jsx("h2", { children: "Tes projets" }), _jsx("ul", { class: "projets", children: projets.map((p) => (_jsxs("li", { children: [_jsxs("button", { type: "button", class: "projet", onClick: () => setEcran({ quoi: 'projet', id: p.id }), children: [_jsx("b", { children: p.nom }), _jsxs("span", { children: [p.fichiers.length, " fichier", p.fichiers.length > 1 ? 's' : ''] })] }), _jsx("button", { type: "button", class: "effacer", "aria-label": `Effacer ${p.nom}`, onClick: () => effacer(p.id), children: "\u2715" })] }, p.id))) })] }))] }));
 }
 /**
  * Un projet ouvert : on écrit, ou on regarde. Jamais les deux en même temps.
@@ -77,7 +111,7 @@ function EcranProjet(props) {
         setTour((t) => t + 1);
         setVue('voir');
     }
-    return (_jsxs("main", { class: "projet-ouvert", children: [_jsxs("header", { class: "barre", children: [_jsx("button", { type: "button", class: "retour", onClick: props.onFermer, children: "\u2190 Mes projets" }), _jsx("b", { class: "nom", children: props.projet.nom }), vue === 'ecrire' ? (_jsx("button", { type: "button", class: "lancer", onClick: lancer, children: "\u25B6 Lancer" })) : (_jsx("button", { type: "button", class: "lancer", onClick: () => setVue('ecrire'), children: "\u00C9crire" }))] }), vue === 'ecrire' ? (_jsx(Editeur, { projet: props.projet, ouvert: ouvert, onOuvrir: setOuvert, onEcrire: ecrire, onAjouter: ajouter })) : (_jsxs(_Fragment, { children: [_jsx(Apercu, { projet: props.projet, tour: tour }), _jsxs("div", { class: "actions", children: [_jsx("button", { type: "button", onClick: () => setTour((t) => t + 1), children: "\u27F3 Relancer" }), _jsx("button", { type: "button", onClick: () => telecharger(props.projet), children: "Exporter en un fichier" })] })] }))] }));
+    return (_jsxs("main", { class: "projet-ouvert", children: [_jsxs("header", { class: "barre", children: [_jsx("button", { type: "button", class: "retour", onClick: props.onFermer, children: "\u2190 Mes projets" }), _jsx("b", { class: "nom", children: props.projet.nom }), vue === 'ecrire' ? (_jsx("button", { type: "button", class: "lancer", onClick: lancer, children: "\u25B6 Lancer" })) : (_jsx("button", { type: "button", class: "lancer", onClick: () => setVue('ecrire'), children: "\u00C9crire" }))] }), vue === 'ecrire' ? (_jsx(Editeur, { projet: props.projet, ouvert: ouvert, onOuvrir: setOuvert, onEcrire: ecrire, onAjouter: ajouter })) : (_jsxs(_Fragment, { children: [_jsx(Apercu, { projet: props.projet, tour: tour }), _jsxs("div", { class: "actions", children: [_jsx("button", { type: "button", onClick: () => setTour((t) => t + 1), children: "\u27F3 Relancer" }), _jsx("button", { type: "button", onClick: () => telecharger(props.projet), children: "Exporter en un fichier" })] }), _jsx(Partage, { projet: props.projet, onChanger: props.onChanger })] }))] }));
 }
 /**
  * Le fichier part sur le téléphone, et de là sur WhatsApp.

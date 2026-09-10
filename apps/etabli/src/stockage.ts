@@ -39,11 +39,21 @@ function lireProjet(valeur: unknown): Projet | null {
   )
   if (fichiers.length !== p.fichiers.length) return null
 
+  /*
+   * Le lien et la clef suivent le projet.
+   *
+   * Sans eux, rouvrir l'application après l'avoir fermée ferait repartir la
+   * sauvegarde sur un lien neuf : celui déjà envoyé à quelqu'un cesserait de
+   * recevoir les modifications, sans que personne ne s'en aperçoive.
+   */
+  const q = valeur as { lien?: unknown; clef?: unknown }
   return {
     id: p.id,
     nom: p.nom,
     fichiers: fichiers.map((f) => ({ nom: f.nom, contenu: f.contenu })),
     maj: typeof p.maj === 'number' ? p.maj : 0,
+    ...(typeof q.lien === 'string' ? { lien: q.lien } : {}),
+    ...(typeof q.clef === 'string' ? { clef: q.clef } : {}),
   }
 }
 

@@ -57,3 +57,29 @@ describe('les projets sur le téléphone', () => {
     expect((await lireProjets()).map((p) => p.id)).toEqual(['daté', 'sans'])
   })
 })
+
+/**
+ * Le lien et la clef survivent à la fermeture de l'application.
+ *
+ * Sans ça, rouvrir l'Établi ferait repartir la sauvegarde sur un lien neuf :
+ * celui déjà envoyé à quelqu'un cesserait de recevoir les modifications, et
+ * personne ne s'en apercevrait — ni celui qui écrit, ni celui qui regarde.
+ */
+describe('le lien d’un projet déjà partagé', () => {
+  beforeEach(async () => {
+    await clear(PROJETS)
+  })
+
+  it('se range et se relit avec lui', async () => {
+    await enregistrer({ ...projet('a', 1), lien: 'ABCDEFGHJK', clef: 'c'.repeat(32) })
+    const [lu] = await lireProjets()
+    expect(lu?.lien).toBe('ABCDEFGHJK')
+    expect(lu?.clef).toBe('c'.repeat(32))
+  })
+
+  it('et un projet jamais partagé n’en invente pas', async () => {
+    await enregistrer(projet('b', 1))
+    const [lu] = await lireProjets()
+    expect(lu?.lien).toBeUndefined()
+  })
+})

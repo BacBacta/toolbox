@@ -1,0 +1,29 @@
+# L'Établi sur Cloudflare Pages — et sa propre configuration.
+#
+# Elle existe pour une raison précise, apprise à ses dépens : envoyer l'Établi
+# depuis la racine du dépôt faisait lire le `wrangler.toml` de l'atelier à
+# wrangler, et le projet de l'Établi s'est retrouvé avec les fonctions de
+# l'atelier **et ses liaisons** — dont `COMPTES`, la base des comptes et des
+# paiements. Aucune fuite : les secrets n'y étaient pas. Mais une origine qui
+# porte du code écrit par des inconnus n'a rien à faire branchée là-dessus.
+#
+# Wrangler prend la configuration la plus proche. Celle-ci étant dans
+# `apps/etabli`, un envoi lancé d'ici ne peut plus attraper celle de la racine.
+#
+# On envoie donc ainsi, et jamais autrement :
+#
+#     pnpm --filter @a237/etabli-web build
+#     npx wrangler pages deploy dist --cwd apps/etabli --branch main
+
+name = "etabli237"
+compatibility_date = "2026-01-01"
+pages_build_output_dir = "dist"
+
+# Les projets déposés : un lien qu'on garde, une clef qui autorise à réécrire.
+#
+# Son propre espace de noms, séparé de l'atelier. Ce qui est déposé ici est
+# écrit par n'importe qui — c'est le principe — et n'a donc rien à partager
+# avec les instantanés publiés de l'atelier.
+[[kv_namespaces]]
+binding = "PROJETS"
+id = "2cd86397b8584f198495c6f85477b0b2"

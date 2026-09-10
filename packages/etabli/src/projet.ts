@@ -23,6 +23,22 @@ export interface Projet {
   readonly fichiers: readonly Fichier[]
   /** Quand il a changé pour la dernière fois. Sert à ranger la liste. */
   readonly maj: number
+  /**
+   * Le lien du dépôt, une fois qu'il en a un.
+   *
+   * C'est lui qu'on partage, et c'est lui qui retrouve le projet quand le
+   * téléphone a disparu. Absent tant qu'on n'a rien sauvegardé : l'Établi
+   * marche entier sans réseau, et le dépôt est un geste, pas une condition.
+   */
+  readonly lien?: string
+  /**
+   * La clef qui autorise à réécrire sur ce lien. Ne quitte jamais l'appareil.
+   *
+   * Sans compte, c'est elle qui tient lieu d'identité. Le lien se partage ; si
+   * la clef partait avec, le premier destinataire pourrait effacer le travail
+   * de celui qui le lui a envoyé.
+   */
+  readonly clef?: string
 }
 
 /** Huit fichiers : au-delà, les onglets ne tiennent plus sur la largeur. */
